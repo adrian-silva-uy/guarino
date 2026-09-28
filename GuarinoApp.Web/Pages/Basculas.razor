@@ -1,0 +1,78 @@
+@page "/basculas"
+@using MediatR
+@using MudBlazor
+@using GuarinoApp.Application.Modules.Basculas.Queries.GetBasculas
+@using GuarinoApp.Application.Modules.Basculas.Dtos
+@inject IMediator Mediator
+
+<MudText Typo="Typo.h4" GutterBottom="true">⚖️ Básculas</MudText>
+<MudText Typo="Typo.body2" Class="mb-4">Listado de Básculas</MudText>
+
+<MudCard>
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
+                    @(_loading ? "Cargando..." : "Actualizar")
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_data.Any())
+        {
+            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    @foreach (var prop in typeof(BasculaDto).GetProperties())
+                    {
+                        <MudTh>@prop.Name</MudTh>
+                    }
+                </HeaderContent>
+                <RowTemplate>
+                    @foreach (var prop in typeof(BasculaDto).GetProperties())
+                    {
+                        var value = prop.GetValue(context);
+                        <MudTd>@value</MudTd>
+                    }
+                </RowTemplate>
+            </MudTable>
+
+            <DataSourceFooter EsDummy="true" Origen="Base de datos DTrace" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
+        }
+        else if (!_loading && _cargado)
+        {
+            <MudAlert Severity="Severity.Info">No se encontraron registros.</MudAlert>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<BasculaDto> _data = new();
+    private bool _loading = false;
+    private bool _cargado = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        _loading = true;
+        _cargado = false;
+        try
+        {
+            _data = await Mediator.Send(new GetBasculasQuery());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            _cargado = true;
+            StateHasChanged();
+        }
+    }
+}
+

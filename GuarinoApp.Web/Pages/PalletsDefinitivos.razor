@@ -1,0 +1,405 @@
+@page "/pallets-definitivos"
+@using GuarinoApp.Application.Common.Interfaces
+@using GuarinoApp.Application.Modules.PalletsDefinitivos.Dtos
+@using GuarinoApp.Application.Modules.PalletsDefinitivos.Queries.GetPalletsDefinitivos
+@using GuarinoApp.Web.Helpers
+@using GuarinoApp.Web.Shared
+@using MudBlazor
+@using System.IO
+@inject ISender Mediator
+@inject IExportService ExportService
+@inject IEmailService EmailService
+@inject GuarinoApp.Infrastructure.Services.IPdfGenerator PdfGenerator
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<div class="d-flex justify-content-between align-items-center mb-1">
+    <div>
+        <MudText Typo="Typo.h5" Class="fw-bold d-flex align-items-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.ViewModule" Color="Color.Primary" />
+            Pallets Definitivos
+        </MudText>
+
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            Resumen de pallets procesados en catálogo y exportación de datos
+        </MudText>
+    </div>
+
+    <ExportToolbar
+        ReportName="Pallets_Definitivos"
+        @bind-FechaDesde="_fechaDesde"
+        @bind-FechaHasta="_fechaHasta"
+        IsLoading="_isLoading"
+        ShowDateFilters="true"
+        OnRefresh="CargarPallets"
+        OnExportCsv="ExportarCsv"
+        OnExportExcel="ExportarExcel"
+        OnExportPdf="ExportarPdf"
+        OnExportEmail="ExportarEmail" />
+</div>
+
+<MudDivider Class="mb-4" />
+
+<MudTable T="PalletDefinitivoDto"
+          Items="_pallets"
+          Loading="_isLoading"
+          Hover="true"
+          Striped="true"
+          Dense="true"
+          Elevation="1">
+
+    <HeaderContent>
+        <MudTh>Pallet</MudTh>
+        <MudTh>Orden</MudTh>
+        <MudTh>Variedad</MudTh>
+        <MudTh>Productor</MudTh>
+        <MudTh>Cliente</MudTh>
+        <MudTh>Marca</MudTh>
+        <MudTh>Calibre</MudTh>
+        <MudTh>Envase</MudTh>
+        <MudTh>Estado</MudTh>
+        <MudTh>Envases</MudTh>
+        <MudTh>Peso Neto</MudTh>
+    </HeaderContent>
+
+    <RowTemplate Context="row">
+        <MudTd DataLabel="Pallet">
+            @row.Pallet
+        </MudTd>
+
+        <MudTd DataLabel="Orden">
+            @row.Orden
+        </MudTd>
+
+        <MudTd DataLabel="Variedad">
+            @row.Variedad
+        </MudTd>
+
+        <MudTd DataLabel="Productor">
+            @row.Productor
+        </MudTd>
+
+        <MudTd DataLabel="Cliente">
+            @row.Cliente
+        </MudTd>
+
+        <MudTd DataLabel="Marca">
+            @row.Marca
+        </MudTd>
+
+        <MudTd DataLabel="Calibre">
+            @row.Calibre
+        </MudTd>
+
+        <MudTd DataLabel="Envase">
+            @row.Envase
+        </MudTd>
+
+        <MudTd DataLabel="Estado">
+            <MudChip T="string"
+                     Color="Color.Success"
+                     Size="Size.Small"
+                     Variant="Variant.Text">
+                @row.Estado
+            </MudChip>
+        </MudTd>
+
+        <MudTd DataLabel="Envases">
+            @row.CantEnvases
+        </MudTd>
+
+        <MudTd DataLabel="Peso Neto">
+            @row.PesoNeto kg
+        </MudTd>
+    </RowTemplate>
+
+    <NoRecordsContent>
+        <MudText>No se encontraron pallets en el rango seleccionado.</MudText>
+    </NoRecordsContent>
+
+</MudTable>
+
+@* <button class="btn btn-primary" @onclick="SendPalletEmail">Enviar email con PDF</button> *@
+
+@if (!string.IsNullOrEmpty(StatusMessage))
+{
+    <div class="mt-2 alert @StatusClass">@StatusMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(CreatedPdfPath))
+{
+    <div>
+        PDF creado en: <a href="@($"file:///{CreatedPdfPath}")" target="_blank">@CreatedPdfPath</a>
+    </div>
+}
+
+@code {
+    private DateTime? _fechaDesde = DateTime.Now.AddDays(-30);
+    private DateTime? _fechaHasta = DateTime.Now;
+    private bool _isLoading;
+    private List<PalletDefinitivoDto> _pallets = new();
+
+    private string StatusMessage = string.Empty;
+    private string StatusClass = string.Empty;
+    private string CreatedPdfPath = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarPallets();
+    }
+
+    private async Task CargarPallets()
+    {
+        _isLoading = true;
+
+        try
+        {
+            var desde = _fechaDesde ?? DateTime.Now.AddDays(-30);
+            var hasta = _fechaHasta ?? DateTime.Now;
+
+            var query = new GetPalletsDefinitivosQuery(desde, hasta);
+
+            _pallets = await Mediator.Send(query);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando pallets definitivos: {ex}");
+
+            Snackbar.Add(
+                $"Error al cargar los pallets: {ex.Message}",
+                Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ExportarCsv()
+    {
+        if (!_pallets.Any())
+        {
+            Snackbar.Add(
+                "No hay datos para exportar.",
+                Severity.Warning);
+
+            return;
+        }
+
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+
+            sb.AppendLine(
+                "Pallet;Orden;Variedad;Productor;Cliente;Marca;Calibre;Envase;Estado;CantEnvases;PesoNeto");
+
+            foreach (var p in _pallets)
+            {
+                sb.AppendLine(
+                    $"{p.Pallet};" +
+                    $"{p.Orden};" +
+                    $"{p.Variedad};" +
+                    $"{p.Productor};" +
+                    $"{p.Cliente};" +
+                    $"{p.Marca};" +
+                    $"{p.Calibre};" +
+                    $"{p.Envase};" +
+                    $"{p.Estado};" +
+                    $"{p.CantEnvases};" +
+                    $"{p.PesoNeto}");
+            }
+
+            await JS.InvokeVoidAsync(
+                "downloadFileFromText",
+                $"Pallets_Definitivos_{DateTime.Now:yyyyMMdd_HHmmss}.csv",
+                sb.ToString(),
+                "text/csv;charset=utf-8;");
+
+            Snackbar.Add(
+                "CSV exportado correctamente.",
+                Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error exportando CSV: {ex}");
+
+            Snackbar.Add(
+                $"⚠️ No se pudo exportar el CSV: {ex.Message}",
+                Severity.Error,
+                config => config.VisibleStateDuration = 8000);
+        }
+    }
+
+    private async Task ExportarExcel()
+    {
+        if (!_pallets.Any())
+        {
+            Snackbar.Add(
+                "No hay datos para exportar.",
+                Severity.Warning);
+
+            return;
+        }
+
+        try
+        {
+            var bytes = await ExportService.ExportToExcelAsync(
+                _pallets,
+                "PalletsDefinitivos");
+
+            await JS.InvokeVoidAsync(
+                "downloadFileFromByteArray",
+                $"Pallets_Definitivos_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx",
+                bytes);
+
+            Snackbar.Add(
+                "Excel exportado correctamente.",
+                Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error exportando Excel: {ex}");
+
+            Snackbar.Add(
+                $"⚠️ No se pudo exportar el Excel: {ex.Message}",
+                Severity.Error,
+                config => config.VisibleStateDuration = 8000);
+        }
+    }
+
+    private async Task ExportarPdf()
+    {
+        if (!_pallets.Any())
+        {
+            Snackbar.Add(
+                "No hay datos para exportar.",
+                Severity.Warning);
+
+            return;
+        }
+
+        try
+        {
+            var bytes = await ExportService.ExportToPdfAsync(
+                _pallets,
+                "Pallets Definitivos");
+
+            await JS.InvokeVoidAsync(
+                "downloadFileFromByteArray",
+                $"Pallets_Definitivos_{DateTime.Now:yyyyMMdd_HHmmss}.pdf",
+                bytes,
+                "application/pdf");
+
+            Snackbar.Add(
+                "PDF exportado correctamente.",
+                Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error exportando PDF: {ex}");
+
+            Snackbar.Add(
+                $"⚠️ No se pudo exportar el PDF: {ex.Message}",
+                Severity.Error,
+                config => config.VisibleStateDuration = 8000);
+        }
+    }
+
+    private async Task ExportarEmail()
+    {
+        if (!_pallets.Any())
+        {
+            Snackbar.Add(
+                "No hay datos para exportar.",
+                Severity.Warning);
+
+            return;
+        }
+
+        try
+        {
+            var bytes = await ExportService.ExportToExcelAsync(
+                _pallets,
+                "PalletsDefinitivos");
+
+            var nombreArchivo =
+                $"Pallets_Definitivos_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+
+            await EmailService.SendEmailAsync(
+                "adriansil@hotmail.com",
+                $"Reporte de Pallets Definitivos {DateTime.Now:dd/MM/yyyy}",
+                "Adjunto encontrarás el listado de pallets definitivos del período seleccionado.",
+                bytes,
+                nombreArchivo);
+
+            Snackbar.Add(
+                "📧 Email enviado correctamente a adriansil@hotmail.com.",
+                Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error enviando email: {ex}");
+
+            Snackbar.Add(
+                $"⚠️ No se pudo enviar el email: {ex.Message}",
+                Severity.Error,
+                config => config.VisibleStateDuration = 8000);
+        }
+    }
+
+    private async Task SendPalletEmail()
+    {
+        StatusMessage = "Generando PDF...";
+        StatusClass = "alert-info";
+
+        byte[] pdfBytes;
+        try
+        {
+            pdfBytes = await PdfGenerator.GeneratePalletPdfAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error generando PDF: {ex.Message}";
+            StatusClass = "alert-danger";
+            return;
+        }
+
+        var pdfResult = await EmailService.CreatePdfAsync(pdfBytes, null, $"Pallets_Definitivos_{DateTime.Now:yyyyMMdd_HHmmss}.pdf");
+        if (!pdfResult.IsSuccess)
+        {
+            StatusMessage = $"No se pudo crear el PDF: {pdfResult.Message}";
+            StatusClass = "alert-danger";
+            return;
+        }
+
+        CreatedPdfPath = pdfResult.Path ?? string.Empty;
+        StatusMessage = "PDF creado correctamente. Preparando email...";
+        StatusClass = "alert-success";
+
+        var placeholders = new Dictionary<string, string>
+        {
+            { "NombrePallet", "Pallet-123" },
+            { "Fecha", DateTime.Now.ToString("g") }
+        };
+
+        var templatePath = Path.Combine(AppContext.BaseDirectory, "EmailTemplates", "pallet_template.html");
+
+        var mailResult = await EmailService.SendEmailWithTemplateAndAttachmentAsync(
+            to: "destinatario@example.com",
+            subject: "Pallets definitivos",
+            templateFilePath: templatePath,
+            templatePlaceholders: placeholders,
+            attachmentFilePath: CreatedPdfPath);
+
+        if (mailResult.IsSuccess)
+        {
+            StatusMessage = "Email enviado correctamente.";
+            StatusClass = "alert-success";
+        }
+        else
+        {
+            StatusMessage = $"Fallo al enviar email: {mailResult.Message}";
+            StatusClass = "alert-danger";
+        }
+    }
+}

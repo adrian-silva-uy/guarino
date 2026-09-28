@@ -1,0 +1,601 @@
+@page "/iachat"
+@using MudBlazor
+@using GuarinoApp.Application.Common
+@using GuarinoApp.Application.Common.Dtos
+@using GuarinoApp.Application.Common.Interfaces
+@using Microsoft.AspNetCore.Components.Web
+@using MediatR
+@using GuarinoApp.Application.Modules.Proyeccion.Dtos
+@using GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccionZafra
+@inject IAIService AiService
+@inject IDashboardDataService DashboardService
+@inject IMediator Mediator
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject Microsoft.Extensions.Logging.ILogger<IAChat> Logger
+
+<PageTitle>Asistente IA</PageTitle>
+
+<style>
+    .chat-history {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .chat-row {
+        display: flex;
+        width: 100%;
+    }
+
+    .chat-row-user {
+        justify-content: flex-end;
+    }
+
+    .chat-row-bot {
+        justify-content: flex-start;
+    }
+
+    .chat-bubble {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        max-width: 85%;
+        padding: 10px 14px;
+        border-radius: 16px;
+        box-sizing: border-box;
+        white-space: normal;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        line-height: 1.4;
+        font-size: 0.9rem;
+    }
+
+    @@media (max-width: 600px) {
+        .chat-bubble {
+            max-width: 92%;
+            font-size: 0.85rem;
+            padding: 8px 12px;
+        }
+    }
+
+    .chat-bubble-user {
+        background-color: var(--mud-palette-primary);
+        color: var(--mud-palette-primary-text);
+        border-bottom-right-radius: 4px;
+    }
+
+    .chat-bubble-bot {
+        background-color: var(--mud-palette-secondary);
+        color: var(--mud-palette-secondary-text);
+        border-bottom-left-radius: 4px;
+    }
+
+    .chat-bubble-icon {
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .chat-bubble-text {
+        white-space: pre-line;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }
+
+    .suggestion-item {
+        white-space: normal !important;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        height: auto !important;
+        min-height: unset !important;
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+
+    .suggestion-text {
+        white-space: normal;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        line-height: 1.35;
+    }
+
+    .suggestion-dot {
+        width: 8px;
+        height: 8px;
+        min-width: 8px;
+        border-radius: 50%;
+        margin-top: 6px;
+    }
+</style>
+
+<MudGrid>
+    <MudItem xs="12" md="9">
+        <MudCard Elevation="3">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h4" Color="Color.Primary">🤖 Asistente IA</MudText>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Tertiary">Análisis contextual y recomendaciones basadas en tus datos</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (AiService.IsAvailable)
+                {
+                    <MudChip Color="Color.Success" Size="Size.Small" Class="mb-3" Icon="@Icons.Material.Filled.Psychology">
+                        IA generativa activa
+                    </MudChip>
+                }
+                else
+                {
+                    <MudTooltip Text="Ollama no está activo. Mostrando análisis automatizado con datos reales de la base de datos.">
+                        <MudChip Color="Color.Warning" Size="Size.Small" Class="mb-3" Icon="@Icons.Material.Filled.OfflineBolt">
+                            Datos en vivo (sin IA generativa)
+                        </MudChip>
+                    </MudTooltip>
+                }
+
+                <MudAlert Severity="Severity.Info" Class="mb-4">
+                    @_textoIntroductorio
+                </MudAlert>
+
+                <!-- Historial de mensajes -->
+                <MudPaper Class="pa-4 mb-4 chat-history" Style="max-height: 400px; overflow-y: auto;">
+                    @foreach (var msg in _messages)
+                    {
+                        <div class='chat-row @(msg.IsUser ? "chat-row-user" : "chat-row-bot")'>
+                            <div class='chat-bubble @(msg.IsUser ? "chat-bubble-user" : "chat-bubble-bot")'>
+                                @if (!msg.IsUser)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" Class="chat-bubble-icon" />
+                                }
+                                <span class="chat-bubble-text">@msg.Text</span>
+                            </div>
+                        </div>
+                    }
+                    @if (_isLoading)
+                    {
+                        <div class="chat-row chat-row-bot">
+                            <MudProgressCircular Color="Color.Primary" Size="Size.Small" Class="ml-2" />
+                        </div>
+                    }
+                </MudPaper>
+
+                <!-- Input y botón de enviar -->
+                <MudGrid>
+                    <MudItem xs="10">
+                        <MudTextField @bind-Value="_currentInput"
+                                      Immediate="true"
+                                      Label="Escribe tu consulta operativa o de empaque..."
+                                      Variant="Variant.Outlined"
+                                      T="string"
+                                      @onkeydown="@HandleKeyDown"
+                                      For="@(() => _currentInput)" />
+                    </MudItem>
+                    <MudItem xs="2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   OnClick="@SendMessage" Disabled="@(_isLoading || string.IsNullOrWhiteSpace(_currentInput))" FullWidth="true">
+                            <MudIcon Icon="@Icons.Material.Filled.Send" />
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Panel de parámetros y sugerencias -->
+    <MudItem xs="12" md="3">
+        <MudCard Elevation="3">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6" Color="Color.Secondary">⚙️ Parámetros IA</MudText>
+                    <MudSpacer />
+                    <MudTooltip Text="Ajustes que afectan cómo la IA filtra y proyecta resultados.">
+                        <MudIconButton Icon="@Icons.Material.Filled.Info" Color="Color.Primary" Size="Size.Medium" />
+                    </MudTooltip>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+
+                <!-- Nivel de confianza -->
+                <MudStack Spacing="1" Class="mb-2">
+                    <div class="d-flex align-center">
+                        <MudText Typo="Typo.body2">Nivel de confianza mínimo</MudText>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Filled.HelpOutline" Size="Size.Small" Color="Color.Primary" OnClick="@(() => TogglePopover(Confidence))" AriaLabel="Ayuda Nivel de confianza" />
+                    </div>
+
+                    <MudSlider @bind-Value="_minConfidence" Min="50" Max="100" Step="1" Size="Size.Small" />
+                    <MudText Typo="Typo.caption">Actual: @_minConfidence% — umbral mínimo para mostrar resultados.</MudText>
+                </MudStack>
+
+                <MudDivider Class="my-2" />
+
+                <!-- Horizonte -->
+                <MudStack Spacing="1" Class="mb-2">
+                    <div class="d-flex align-center">
+                        <MudText Typo="Typo.body2">Horizonte de proyección (meses)</MudText>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Filled.HelpOutline" Size="Size.Small" Color="Color.Primary" OnClick="@(() => TogglePopover(Horizon))" AriaLabel="Ayuda Horizonte" />
+                    </div>
+
+                    <MudSlider @bind-Value="_horizonte" Min="1" Max="12" Step="1" Size="Size.Small" />
+                    <MudText Typo="Typo.caption">Actual: @_horizonte meses — mayor horizonte = más incertidumbre.</MudText>
+                </MudStack>
+
+                <MudDivider Class="my-2" />
+
+                <!-- Estacionalidad -->
+                <MudStack Spacing="1" Class="mb-2">
+                    <div class="d-flex align-center">
+                        <MudText Typo="Typo.body2">Incluir estacionalidad</MudText>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Filled.HelpOutline" Size="Size.Small" Color="Color.Primary" OnClick="@(() => TogglePopover(Seasonality))" AriaLabel="Ayuda Estacionalidad" />
+                    </div>
+
+                    <MudSwitch T="bool" @bind-Checked="_incluirEstacionalidad" Color="Color.Primary" />
+                    <MudText Typo="Typo.caption">Activa modelado de patrones repetitivos (p.ej. temporada).</MudText>
+                </MudStack>
+
+                <MudDivider Class="my-2" />
+
+                <!-- Sugerencias activas -->
+                <MudText Typo="Typo.body2" Class="mt-2">📋 Sugerencias del Consultor IA</MudText>
+                @if (_sugerencias.Any())
+                {
+                    <MudList Dense="true">
+                        @foreach (var sug in _sugerencias)
+                        {
+                            <MudListItem Class="cursor-pointer suggestion-item" OnClick="@(() => CargarSugerencia(sug))">
+                                <div class="d-flex align-start" style="gap:6px;">
+                                    @{
+                                        var icono = IconoDesde(sug.Icon);
+                                    }
+                                    @if (icono is not null)
+                                    {
+                                        <MudIcon Icon="@icono" Size="Size.Small" Style="@($"color:{ColorIndicador(sug.Color)};margin-top:2px;")" />
+                                    }
+                                    else
+                                    {
+                                        <span class="suggestion-dot" style="background-color:@ColorIndicador(sug.Color);"></span>
+                                    }
+                                    <MudText Typo="Typo.body2" Class="suggestion-text">@sug.Text</MudText>
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">@_sugerencias.Count recomendaciones generadas</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Tertiary">No hay sugerencias activas.</MudText>
+                }
+
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@ActualizarSugerencias" FullWidth="true" Class="mt-2">
+                    RECALCULAR SUGERENCIAS
+                </MudButton>
+
+                <MudDivider Class="my-2" />
+
+                <!-- Parámetros recomendados adicionales -->
+                <MudExpansionPanels>
+                    <MudExpansionPanel Text="Más parámetros recomendados (opcional)" Expanded="false">
+                        <MudList Dense="true">
+                            @foreach (var p in _recommendedParams)
+                            {
+                                <MudListItem>
+                                    <MudGrid>
+                                        <MudItem xs="9">
+                                            <MudText Typo="Typo.subtitle2">@p.Key</MudText>
+                                            <MudText Typo="Typo.caption" Class="d-block">@p.Value.Short</MudText>
+                                        </MudItem>
+                                        <MudItem xs="3" Class="d-flex align-end justify-end">
+                                            <MudSwitch T="bool" @bind-Checked="@_enabledExtras[p.Key]" Color="Color.Primary" />
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudListItem>
+                            }
+                        </MudList>
+                        <MudText Typo="Typo.caption" Class="mt-2">Activa parámetros extra para control fino (p. ej. algoritmo, ventana histórico, sensibilidad a anomalías).</MudText>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- Popovers de ayuda -->
+<MudPopover Open="@_popoverStates[Confidence]" AnchorOrigin="Origin.TopCenter" TransformOrigin="Origin.BottomCenter" CloseOnOutsideClick="true">
+    <MudPaper Class="pa-3" Style="max-width:320px">
+        <MudText Typo="Typo.subtitle2">Nivel de confianza — ¿por qué existe?</MudText>
+        <MudText Typo="Typo.body2" Class="mt-1">Filtra resultados de baja certeza para no mostrar predicciones poco fiables.</MudText>
+        <MudDivider Class="my-2" />
+        <MudText Typo="Typo.caption"><strong>Ejemplo:</strong> 80%: solo mostrar predicciones con probabilidad ≥80%.</MudText>
+    </MudPaper>
+</MudPopover>
+
+<MudPopover Open="@_popoverStates[Horizon]" AnchorOrigin="Origin.TopCenter" TransformOrigin="Origin.BottomCenter" CloseOnOutsideClick="true">
+    <MudPaper Class="pa-3" Style="max-width:320px">
+        <MudText Typo="Typo.subtitle2">Horizonte de proyección</MudText>
+        <MudText Typo="Typo.body2" Class="mt-1">Determina cuántos periodos hacia adelante la IA proyecta.</MudText>
+    </MudPaper>
+</MudPopover>
+
+<MudPopover Open="@_popoverStates[Seasonality]" AnchorOrigin="Origin.TopCenter" TransformOrigin="Origin.BottomCenter" CloseOnOutsideClick="true">
+    <MudPaper Class="pa-3" Style="max-width:320px">
+        <MudText Typo="Typo.subtitle2">Incluir estacionalidad</MudText>
+        <MudText Typo="Typo.body2" Class="mt-1">Activa componentes de temporada en el modelo.</MudText>
+    </MudPaper>
+</MudPopover>
+
+@code {
+    // =========================================================================================
+    // NOTA DE ARQUITECTURA (validada contra FallbackAIService.cs / OllamaAIService.cs reales):
+    //
+    // Este componente NO arma prompts, NO arma personas de IA, NO arma sugerencias en C#, y
+    // NO inyecta IPromptProvider. Toda esa responsabilidad vive del lado del servicio:
+    //
+    //   - Chat libre (SendMessage): AiService.ChatAsync(mensajeDelUsuario, historial) alcanza.
+    //     OllamaAIService.ChatAsync arma su propio system prompt (persona + stock, variedad,
+    //     crecimiento, pallets reales) a partir de la plantilla "Chat.txt" cargada vía
+    //     IPromptProvider. Reconstruir esa persona/contexto acá sería duplicar lógica.
+    //
+    //   - Sugerencias del panel lateral (GenerarSugerencias): AiService.GetBusinessSuggestionsAsync
+    //     recibe un BusinessSuggestionRequest con los datos reales Y los parámetros que el
+    //     usuario configuró en pantalla (confianza / horizonte / estacionalidad). Internamente
+    //     decide Ollama (prompt "BusinessSuggestion.txt" vía IPromptProvider) o el fallback por
+    //     reglas de FallbackAIService (recursos localizables BusinessSuggestions.*.resx, no
+    //     texto hardcodeado en un componente Razor). El componente solo arma el request y
+    //     muestra el resultado (Text/Color/Icon).
+    //
+    //   ⚠ IMPORTANTE: la plantilla de sugerencias se busca con la clave "BusinessSuggestion".
+    //   El archivo debe llamarse "BusinessSuggestion.txt" (no "Businesssugestion.txt") o
+    //   IPromptProvider no lo va a encontrar y siempre se usará el template embebido en C#.
+    //
+    //   ⚠ El campo "Icon" que devuelve la IA no es una ruta SVG usable tal cual (ej. el string
+    //   literal "@Icons.Material.Filled.Warning" no es lo mismo que la constante real
+    //   Icons.Material.Filled.Warning). IconoDesde(...) más abajo resuelve por nombre corto
+    //   los 4 identificadores definidos en la paleta del prompt de sugerencias (Warning,
+    //   TrendingUp, Tune, Inventory2). Si sumás categorías nuevas al prompt, agregalas ahí.
+    //
+    // CONFIRMADO contra BusinessSuggestionRequest.cs / ZafraDto.cs / BusinessSuggestionDto.cs /
+    // GetProyeccionZafraQuery.cs (ya no quedan campos sin completar ni asunciones sobre DTOs):
+    //   - BusinessSuggestionRequest: TotalStock (int), StockByVariety (Dictionary<string,int>?),
+    //     PalletsWithoutClient (int), GrowthPercent (decimal), PeriodLabel (string),
+    //     MinConfidence (int, 0-100), HorizonMonths (int, 1-36), IncludeSeasonality (bool),
+    //     ProyeccionZafra (ZafraDto?).
+    //   - ProyeccionZafra se completa ejecutando GetProyeccionZafraQuery vía MediatR y
+    //     quedándose con la zafra de Estado == "Proyectado" (ver ObtenerProyeccionZafraActual).
+    //     Si la query falla, no completa el request pero tampoco interrumpe las sugerencias.
+    //   - BusinessSuggestionDto: Text/Color/Icon, todos string (Color: hex o nombre CSS;
+    //     Icon: nombre de icono Material, opcional — de ahí IconoDesde más abajo).
+    //
+    // ÚNICA ASUNCIÓN QUE QUEDA: se inyectó MediatR.IMediator para poder hacer Mediator.Send(...).
+    // =========================================================================================
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "mensaje")]
+    public string? MensajeInicial { get; set; }
+
+    private List<ChatMessage> _messages = new();
+    private string _currentInput = "";
+    private bool _isLoading = false;
+    private int _minConfidence = 70;
+    private int _horizonte = 6;
+    private bool _incluirEstacionalidad = true;
+    private List<BusinessSuggestionDto> _sugerencias = new();
+    private bool _mensajeInicialEnviado = false;
+
+    // Métricas dinámicas (se recalculan siempre contra datos reales).
+    // Tipos confirmados contra IDashboardDataService.cs: GetTotalStockAsync y
+    // GetStockByVarietyAsync devuelven int; GetProjectedGrowthAsync devuelve decimal.
+    private int _totalStockCache = 0;
+    private string _topVarietyCache = "Sin variedad";
+    private int _topVarietyCountCache = 0;
+    private decimal _crecimientoCache = 0m;
+    private int _palletsSinClienteCache = 0;
+
+    // Copy de layout (no es prompt ni sugerencia de negocio)
+    private const string TextoIntroductorioGeneral =
+        "Puedes hacer preguntas sobre tendencias, stock, empaque, estacionalidad, clientes y más.";
+    private string _textoIntroductorio = TextoIntroductorioGeneral;
+
+    private readonly Dictionary<string, (string Short, string Long)> _recommendedParams = new()
+    {
+        { "Algoritmo", ("ARIMA / Prophet / ML", "Selecciona el motor de predicción: estadístico o basado en ML.") },
+        { "VentanaHistórico", ("Lookback (periodos)", "Número de periodos históricos usados por el modelo.") },
+        { "SensibilidadAnomalias", ("Detección outliers", "Controla la eliminación o atenuación de picos atípicos.") },
+        { "GranularidadSalida", ("Daily/Weekly/Monthly", "Nivel de agregación para la predicción.") }
+    };
+    private readonly Dictionary<string, bool> _enabledExtras = new();
+
+    private static readonly string Confidence = nameof(Confidence);
+    private static readonly string Horizon = nameof(Horizon);
+    private static readonly string Seasonality = nameof(Seasonality);
+    private readonly Dictionary<string, bool> _popoverStates = new()
+    {
+        { Confidence, false },
+        { Horizon, false },
+        { Seasonality, false }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        foreach (var k in _recommendedParams.Keys)
+            _enabledExtras[k] = false;
+
+        await GenerarSugerencias();
+
+        if (!string.IsNullOrWhiteSpace(MensajeInicial) && !_mensajeInicialEnviado)
+        {
+            _mensajeInicialEnviado = true;
+            _textoIntroductorio = "Estás viendo la explicación de tu análisis de proyección. Puedes hacer más preguntas operativas.";
+            _currentInput = MensajeInicial;
+            await SendMessage();
+        }
+    }
+
+    private void TogglePopover(string key)
+    {
+        var keys = _popoverStates.Keys.ToList();
+        foreach (var k in keys) _popoverStates[k] = false;
+        if (_popoverStates.ContainsKey(key)) _popoverStates[key] = true;
+        StateHasChanged();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e is not null && e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_currentInput)) return;
+
+        var userMsg = _currentInput.Trim();
+        _messages.Add(new ChatMessage { IsUser = true, Text = userMsg });
+        _currentInput = "";
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var history = _messages.Take(_messages.Count - 1).ToList();
+
+            // AiService.ChatAsync ya arma la persona + el contexto de datos reales internamente
+            // (plantilla "Chat.txt" vía IPromptProvider). Alcanza con reenviar la consulta cruda.
+            var respuesta = await AiService.ChatAsync(userMsg, history);
+
+            if (string.IsNullOrWhiteSpace(respuesta))
+            {
+                respuesta = "Lo siento, no pude procesar tu consulta en este momento. Por favor, intenta de nuevo.";
+            }
+
+            _messages.Add(new ChatMessage { IsUser = false, Text = respuesta });
+
+            // Recalcular sugerencias tras interactuar, para mantenerlas frescas
+            await GenerarSugerencias();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error en SendMessage");
+            _messages.Add(new ChatMessage { IsUser = false, Text = "Ocurrió un error de conexión. Intenta nuevamente más tarde." });
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Arma el request con datos reales + los parámetros que el usuario configuró en pantalla,
+    /// y delega el texto de las sugerencias en AiService.GetBusinessSuggestionsAsync. El
+    /// componente no redacta ni una sola oración: solo decide QUÉ datos mandar.
+    /// </summary>
+    private async Task GenerarSugerencias()
+    {
+        try
+        {
+            _totalStockCache = await DashboardService.GetTotalStockAsync();
+            var stockPorVariedad = await DashboardService.GetStockByVarietyAsync();
+            _crecimientoCache = await DashboardService.GetProjectedGrowthAsync();
+            _palletsSinClienteCache = await DashboardService.GetPalletsWithoutClientAsync();
+
+            var top = stockPorVariedad is { Count: > 0 }
+                ? stockPorVariedad.OrderByDescending(kv => kv.Value).First()
+                : default;
+            _topVarietyCache = top.Key ?? "Sin variedad";
+            _topVarietyCountCache = top.Value;
+
+            var proyeccionZafra = await ObtenerProyeccionZafraActual();
+
+            var request = new BusinessSuggestionRequest
+            {
+                TotalStock = _totalStockCache,
+                StockByVariety = stockPorVariedad ?? new Dictionary<string, int>(),
+                GrowthPercent = _crecimientoCache,
+                PalletsWithoutClient = _palletsSinClienteCache,
+                MinConfidence = _minConfidence,
+                HorizonMonths = _horizonte,
+                IncludeSeasonality = _incluirEstacionalidad,
+                PeriodLabel = $"Próximos {_horizonte} meses",
+                ProyeccionZafra = proyeccionZafra
+            };
+
+            var sugerenciasDto = await AiService.GetBusinessSuggestionsAsync(request, _messages.ToList());
+
+            _sugerencias = (sugerenciasDto ?? new List<BusinessSuggestionDto>())
+                .Where(s => !string.IsNullOrWhiteSpace(s.Text))
+                .Take(4)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error generando sugerencias de IA en /iachat");
+            _sugerencias = new List<BusinessSuggestionDto>();
+        }
+    }
+
+    /// <summary>
+    /// Ejecuta GetProyeccionZafraQuery y devuelve la zafra en estado "Proyectado" (la próxima
+    /// zafra, según el comentario de BusinessSuggestionRequest.ProyeccionZafra). Si la query
+    /// falla o no hay ninguna zafra proyectada, devuelve null sin interrumpir el resto de
+    /// GenerarSugerencias — la falta de este dato no debe tumbar las sugerencias completas.
+    /// </summary>
+    private async Task<ZafraDto?> ObtenerProyeccionZafraActual()
+    {
+        try
+        {
+            var zafras = await Mediator.Send(new GetProyeccionZafraQuery());
+            return zafras?.FirstOrDefault(z =>
+                string.Equals(z.Estado, "Proyectado", StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "No se pudo obtener la proyección de zafra para las sugerencias de IA.");
+            return null;
+        }
+    }
+
+    private static string ColorIndicador(string? color) =>
+        !string.IsNullOrWhiteSpace(color) ? color! : "var(--mud-palette-tertiary)";
+
+    /// <summary>
+    /// Resuelve el campo "Icon" devuelto por la IA (ej. "Warning", "TrendingUp",
+    /// "@Icons.Material.Filled.Warning") al path SVG real de MudBlazor. Devuelve null si no
+    /// reconoce el identificador, y la UI cae al indicador de color simple.
+    /// </summary>
+    private static string? IconoDesde(string? iconoCrudo)
+    {
+        if (string.IsNullOrWhiteSpace(iconoCrudo)) return null;
+
+        var nombre = iconoCrudo.Trim();
+        var ultimoPunto = nombre.LastIndexOf('.');
+        if (ultimoPunto >= 0 && ultimoPunto < nombre.Length - 1)
+            nombre = nombre[(ultimoPunto + 1)..];
+
+        return nombre switch
+        {
+            "Warning" => Icons.Material.Filled.Warning,
+            "TrendingUp" => Icons.Material.Filled.TrendingUp,
+            "Tune" => Icons.Material.Filled.Tune,
+            "Inventory2" => Icons.Material.Filled.Inventory2,
+            _ => null
+        };
+    }
+
+    private async Task ActualizarSugerencias()
+    {
+        await GenerarSugerencias();
+        StateHasChanged();
+        Snackbar.Add("Sugerencias recalculadas", Severity.Success);
+    }
+
+    private async Task CargarSugerencia(BusinessSuggestionDto sugerencia)
+    {
+        _currentInput = sugerencia.Text ?? string.Empty;
+        await SendMessage();
+    }
+}

@@ -1,0 +1,217 @@
+@page "/graficaprocesos"
+@using MediatR
+@using MudBlazor
+@using GuarinoApp.Application.Common.Interfaces
+@using GuarinoApp.Application.Modules.GraficaProcesos.Queries.GetGraficaProcesos
+@using GuarinoApp.Application.Modules.GraficaProcesos.Dtos
+@using GuarinoApp.Web.Shared
+@inject IMediator Mediator
+@inject IExportService ExportService
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<ExportToolbar ReportName="📈 Gráfica de Procesos"
+               @bind-FechaDesde="_fechaDesde"
+               @bind-FechaHasta="_fechaHasta"
+               OnRefresh="@(async () => await LoadData())"
+               IsLoading="_loading"
+               OnExportPdf="ExportToPdf"
+               OnExportExcel="ExportToExcel"
+               OnExportCsv="ExportToCsv" />
+
+<MudText Typo="Typo.h4" GutterBottom="true">📈 Gráfica de Procesos</MudText>
+
+<MudCard>
+    <MudCardContent>
+        <!-- Componente informativo sobre el ritmo -->
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+            <strong>¿Qué es el ritmo?</strong><br />
+            El ritmo indica la velocidad de la línea de calibrado.
+            <ul class="mb-0">
+                <li><strong>Ritmo 1</strong> = producción por hora efectiva de calibradora: <code>calibradora / hscal</code></li>
+                <li><strong>Ritmo 2</strong> = producción por hora total (incluye paradas) o producción neta: <code>calibradora / (hscal + hspar)</code></li>
+            </ul>
+        </MudAlert>
+
+        @if (_data.Any())
+        {
+            <MudText Typo="Typo.h6">Evolución de Ritmos por Fecha</MudText>
+            <InteractiveChart Series="_chartSeries"
+                              Labels="_fechasLabels"
+                              Type="InteractiveChart.InteractiveChartType.Line"
+                              Height="400px" />
+
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6">Ritmo 1</MudText>
+                    <InteractiveChart Series="_ritmo1Series"
+                                      Labels="_fechasLabels"
+                                      Type="InteractiveChart.InteractiveChartType.Line"
+                                      Height="200px" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6">Ritmo 2</MudText>
+                    <InteractiveChart Series="_ritmo2Series"
+                                      Labels="_fechasLabels"
+                                      Type="InteractiveChart.InteractiveChartType.Line"
+                                      Height="200px" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Fecha</MudTh>
+                    <MudTh>Variedad</MudTh>
+                    <MudTh Numeric="true">Ritmo 1</MudTh>
+                    <MudTh Numeric="true">Ritmo 2</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@(context.Fecha.ToShortDateString() ?? "-")</MudTd>
+                    <MudTd>@context.Variedad</MudTd>
+                    <MudTd Numeric="true">@(context.Ritmo1.ToString("N2"))</MudTd>
+                    <MudTd Numeric="true">@(context.Ritmo2.ToString("N2"))</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else if (!_loading && _cargado)
+        {
+            <MudAlert Severity="Severity.Info">No se encontraron registros para el período seleccionado.</MudAlert>
+        }
+
+        <DataSourceFooter EsDummy="true"
+                          Origen="Base de datos informes (Producción)"
+                          FechaActualizacion="@DateTime.Now"
+                          TotalRegistros="@_data.Count" />
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<GraficaProcesosDto> _data = new();
+    private bool _loading = false;
+    private bool _cargado = false;
+    private DateTime? _fechaDesde = DateTime.Now.AddMonths(-3);
+    private DateTime? _fechaHasta = DateTime.Now;
+
+    private List<ChartSeriesItem> _chartSeries = new();
+    private List<ChartSeriesItem> _ritmo1Series = new();
+    private List<ChartSeriesItem> _ritmo2Series = new();
+    private string[] _fechasLabels = Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (!_fechaDesde.HasValue || !_fechaHasta.HasValue) return;
+        if (_fechaDesde.Value.Date > _fechaHasta.Value.Date)
+        {
+            Snackbar.Add("La fecha desde no puede ser posterior a la fecha hasta.", Severity.Warning);
+            return;
+        }
+
+        _loading = true;
+        _cargado = false;
+        try
+        {
+            _data = await Mediator.Send(new GetGraficaProcesosQuery { FechaDesde = _fechaDesde, FechaHasta = _fechaHasta });
+            LoadCharts();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar datos: {ex.Message}", Severity.Error);
+            Console.WriteLine($"Error: {ex}");
+        }
+        finally
+        {
+            _loading = false;
+            _cargado = true;
+            StateHasChanged();
+        }
+    }
+
+    private void LoadCharts()
+    {
+        if (!_data.Any())
+        {
+            _chartSeries = new List<ChartSeriesItem>();
+            _ritmo1Series = new List<ChartSeriesItem>();
+            _ritmo2Series = new List<ChartSeriesItem>();
+            _fechasLabels = Array.Empty<string>();
+            return;
+        }
+
+        var sorted = _data.OrderBy(x => x.Fecha).ToList();
+        // Ritmo1 y Ritmo2 son int no anulables, no se usa ??
+        var ritmo1Data = sorted.Select(x => (double)x.Ritmo1).ToArray();
+        var ritmo2Data = sorted.Select(x => (double)x.Ritmo2).ToArray();
+
+        // Fecha es DateTime? por lo que sí se usa manejo de nulos
+        _fechasLabels = sorted.Select(x => x.Fecha.ToShortDateString() ?? "").ToArray();
+
+        // Colores fijos por serie
+        const string colorRitmo1 = "#008FFB"; // azul
+        const string colorRitmo2 = "#00E396"; // verde
+
+        _chartSeries = new List<ChartSeriesItem>
+        {
+            new ChartSeriesItem { Name = "Ritmo 1", Data = ritmo1Data, Color = colorRitmo1 },
+            new ChartSeriesItem { Name = "Ritmo 2", Data = ritmo2Data, Color = colorRitmo2 }
+        };
+
+        _ritmo1Series = new List<ChartSeriesItem>
+        {
+            new ChartSeriesItem { Name = "Ritmo 1", Data = ritmo1Data, Color = colorRitmo1 }
+        };
+
+        _ritmo2Series = new List<ChartSeriesItem>
+        {
+            new ChartSeriesItem { Name = "Ritmo 2", Data = ritmo2Data, Color = colorRitmo2 }
+        };
+    }
+
+    // Métodos de exportación (sin cambios)
+    private async Task ExportToPdf()
+    {
+        if (!EnsureDataForExport()) return;
+        await ExportAsync(() => ExportService.ExportToPdfAsync(_data, "Gráfica de Procesos"), $"Grafica_Procesos_{DateTime.Now:yyyyMMdd_HHmmss}.pdf", "application/pdf");
+    }
+
+    private async Task ExportToExcel()
+    {
+        if (!EnsureDataForExport()) return;
+        await ExportAsync(() => ExportService.ExportToExcelAsync(_data, "Gráfica de Procesos"), $"Grafica_Procesos_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+
+    private async Task ExportToCsv()
+    {
+        if (!EnsureDataForExport()) return;
+        var fileName = $"Grafica_Procesos_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+        await JS.InvokeVoidAsync("downloadFileFromText", fileName, ExportService.ExportToCsv(_data), "text/csv");
+        Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+    }
+
+    private bool EnsureDataForExport()
+    {
+        if (_data.Any()) return true;
+        Snackbar.Add("No hay datos para exportar.", Severity.Warning);
+        return false;
+    }
+
+    private async Task ExportAsync(Func<Task<byte[]>> createFile, string fileName, string mimeType)
+    {
+        try
+        {
+            var bytes = await createFile();
+            if (bytes.Length == 0) throw new InvalidOperationException("El archivo generado está vacío.");
+            await JS.InvokeVoidAsync("downloadFileFromByteArray", fileName, bytes, mimeType);
+            Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error exportando: {ex}");
+            Snackbar.Add($"No se pudo generar el archivo: {ex.Message}", Severity.Error);
+        }
+    }
+}

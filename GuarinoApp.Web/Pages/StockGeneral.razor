@@ -1,0 +1,218 @@
+@page "/stockgeneral"
+@using MediatR
+@using MudBlazor
+@using GuarinoApp.Application.Modules.Stock.Queries.GetPallets
+@using GuarinoApp.Application.Common.Interfaces
+@inject IMediator Mediator
+@inject IDashboardDataService DashboardService
+
+<MudText Typo="Typo.h4" GutterBottom="true">📦 Gestión de Stock</MudText>
+<MudText Typo="Typo.body2" Class="mb-4">
+    Inventario detallado de pallets por variedad y estado (último corte consultado: @_ultimoCorteLabel)
+</MudText>
+
+<MudCard>
+    @if (_loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="string" @bind-Value="_zafra" Label="Filtrar por Zafra" Variant="Variant.Outlined" Clearable="true">
+                    <MudSelectItem T="string" Value="@("")">Todos</MudSelectItem>
+                    @foreach (var z in _availableZafras)
+                    {
+                        <MudSelectItem T="string" Value="@z">@z</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="string" @bind-Value="_estado" Label="Estado" Variant="Variant.Outlined" Clearable="true">
+                    <MudSelectItem T="string" Value="@("")">Todos</MudSelectItem>
+                    @foreach (var e in _availableEstados)
+                    {
+                        <MudSelectItem T="string" Value="@e">@e</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
+                    @(_loading ? "Cargando..." : "Buscar")
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_pallets.Any())
+        {
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6" GutterBottom="true">Stock por Variedad</MudText>
+                    <InteractiveChart Series="_variedadChartSeries" Labels="_variedadLabels" Type="InteractiveChart.InteractiveChartType.Bar" Height="300px" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6" GutterBottom="true">Distribución de Estados</MudText>
+                    <InteractiveChart Series="_estadoChartSeries" Labels="_estadoLabels" Type="InteractiveChart.InteractiveChartType.Pie" Height="300px" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTable Items="@_pallets" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Id</MudTh>
+                    <MudTh>Código</MudTh>
+                    <MudTh>Lote</MudTh>
+                    <MudTh>Variedad</MudTh>
+                    <MudTh>Estado</MudTh>
+                    <MudTh>Cliente</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Id</MudTd>
+                    <MudTd>@context.Codigo</MudTd>
+                    <MudTd>@context.LoteCodigo</MudTd>
+                    <MudTd>@context.Variedad</MudTd>
+                    <MudTd>@context.Estado</MudTd>
+                    <MudTd>@context.Cliente</MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <DataSourceFooter EsDummy="@_esDummy"
+                              Origen="@(_esDummy ? "Datos de ejemplo (sin datos reales para este filtro)" : "Base de datos DTrace (Producción)")"
+                              FechaActualizacion="@_ultimoCorte"
+                              TotalRegistros="@_pallets.Count" />
+        }
+        else if (!_loading && _cargado)
+        {
+            <MudAlert Severity="Severity.Info">No se encontraron registros.</MudAlert>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private string? _zafra = string.Empty;
+    private string? _estado = string.Empty;
+    private List<PalletDto> _pallets = new();
+    private bool _esDummy = false;
+    private bool _loading = false;
+    private bool _cargado = false;
+    private List<ChartSeriesItem> _variedadChartSeries = new();
+    private List<ChartSeriesItem> _estadoChartSeries = new();
+    private ChartOptions _chartOptions = new() { YAxisTicks = 3 };
+
+    private List<string> _availableZafras = new();
+    private List<string> _availableEstados = new();
+    private string[] _variedadLabels = Array.Empty<string>();
+    private string[] _estadoLabels = Array.Empty<string>();
+    private DateTime _ultimoCorte = DateTime.Now;
+    private string _ultimoCorteLabel => _ultimoCorte.ToString("dd/MM/yyyy HH:mm");
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        StateHasChanged(); // Muestra el indicador de carga inmediatamente al entrar a la página
+
+        try
+        {
+            await LoadData();
+        }
+        finally
+        {
+            _loading = false;
+            _cargado = true;
+            StateHasChanged();
+        }
+    }
+
+    private void PopulateZafrasFromData()
+    {
+        // Extrae las zafras directamente de los datos cargados para evitar la consulta pesada a DashboardService
+        _availableZafras = _pallets
+            .Select(p => p.Zafra)
+            .Where(z => !string.IsNullOrWhiteSpace(z))
+            .Distinct()
+            .OrderBy(z => z)
+            .ToList()!;
+    }
+
+    async Task LoadData()
+    {
+        _loading = true;
+        _cargado = false;
+        StateHasChanged(); // Forzar renderizado del spinner/progress bar antes del I/O
+
+        try
+        {
+            var z = string.IsNullOrWhiteSpace(_zafra) ? null : _zafra;
+            var e = string.IsNullOrWhiteSpace(_estado) ? null : _estado;
+
+            // GetPalletsQuery ahora devuelve PalletsResultDto, que además de los pallets informa
+            // si son datos reales o el fallback de ejemplo (EsDummy). Antes el footer siempre
+            // mostraba "true" fijo, sin importar el origen real de los datos.
+            var resultado = await Mediator.Send(new GetPalletsQuery(z, e));
+            _pallets = resultado.Pallets;
+            _esDummy = resultado.EsDummy;
+
+            // Cargar listas de filtros dinámicamente desde el resultado
+            PopulateZafrasFromData();
+
+            _availableEstados = _pallets
+                .Select(p => p.Estado ?? string.Empty)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct()
+                .OrderBy(s => s)
+                .ToList();
+
+            LoadCharts();
+            _ultimoCorte = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            _cargado = true;
+            StateHasChanged();
+        }
+    }
+
+    void LoadCharts()
+    {
+        // 1. Stock por variedad
+        var variedadData = _pallets
+            .GroupBy(x => x.Variedad)
+            .Select(g => new { Name = g.Key ?? "Sin variedad", Value = g.Count() })
+            .OrderByDescending(x => x.Value)
+            .Take(10)
+            .ToList();
+
+        _variedadLabels = variedadData.Select(x => x.Name ?? "Sin variedad").ToArray();
+        _variedadChartSeries = new List<ChartSeriesItem>
+        {
+            new ChartSeriesItem
+            {
+                Name = "Cantidad de pallets",
+                Data = variedadData.Select(x => (double)x.Value).ToArray(),
+                Labels = _variedadLabels // Asignación explícita para renderizado de InteractiveChart
+            }
+        };
+
+        // 2. Distribución por estado
+        var estadoData = _pallets
+            .GroupBy(x => x.Estado)
+            .Select(g => new { Name = g.Key ?? "Sin estado", Value = g.Count() })
+            .OrderByDescending(x => x.Value)
+            .ToList();
+
+        _estadoLabels = estadoData.Select(x => x.Name ?? "Sin estado").ToArray();
+        _estadoChartSeries = new List<ChartSeriesItem>
+        {
+            new ChartSeriesItem
+            {
+                Name = "Pallets por estado",
+                Data = estadoData.Select(x => (double)x.Value).ToArray(),
+                Labels = _estadoLabels // Asignación explícita para renderizado de InteractiveChart
+            }
+        };
+    }
+}

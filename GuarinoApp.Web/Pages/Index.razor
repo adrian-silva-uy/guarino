@@ -1,0 +1,122 @@
+@page "/"
+@using MudBlazor
+
+<div class="d-flex flex-column gap-2 mb-6">
+    <MudText Typo="Typo.h4" Color="Color.Primary" Class="font-weight-bold">
+        Sistema de Gestión Citrícola
+    </MudText>
+    <MudText Typo="Typo.body1" Class="mud-text-secondary">
+        Panel central de operaciones, control de stock, empaque y gerencia.
+    </MudText>
+</div>
+
+<!-- KPIs Rápidos Globales -->
+<MudGrid Class="mb-6">
+    <MudItem xs="12" sm="4">
+        <MudCard Elevation="2" Style="border-top: 4px solid var(--mud-palette-primary);">
+            <MudCardContent>
+                <MudText Typo="Typo.button" Class="mud-text-secondary">Dashboard Ejecutivo</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/dashboard" Class="mt-2 p-0" StartIcon="@Icons.Material.Filled.ArrowForward">Ver indicadores</MudButton>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <MudCard Elevation="2" Style="border-top: 4px solid var(--mud-palette-success);">
+            <MudCardContent>
+                <MudText Typo="Typo.button" Class="mud-text-secondary">Control de Stock</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Success" Href="/stockgeneral" Class="mt-2 p-0" StartIcon="@Icons.Material.Filled.ArrowForward">Ver stock en playa</MudButton>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <MudCard Elevation="2" Style="border-top: 4px solid var(--mud-palette-warning);">
+            <MudCardContent>
+                <MudText Typo="Typo.button" Class="mud-text-secondary">Asistente IA</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Warning" Href="/iachat" Class="mt-2 p-0" StartIcon="@Icons.Material.Filled.AutoAwesome">Consultar al chat</MudButton>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<MudDivider Class="mb-6" />
+
+<MudText Typo="Typo.h5" GutterBottom="true" Class="mb-4">Módulos del Sistema</MudText>
+
+<!-- Accesos directos agrupados lógicamente -->
+<MudGrid>
+    <!-- 1. Gerencia y Proyecciones -->
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" />
+                    </MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Gerencia y Proyecciones</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="d-flex flex-column gap-1">
+                    <MudLink Href="/dashboard" Typo="Typo.body2">Dashboard Ejecutivo</MudLink>
+                    <MudLink Href="/gerencia" Typo="Typo.body2">Panel Gerencial</MudLink>
+                    <MudLink Href="/proyeccion-volcados" Typo="Typo.body2">Proyección de Fruta</MudLink>
+                    <MudLink Href="/proyeccion-zafra" Typo="Typo.body2">Proyección de Zafra</MudLink>
+                    <MudLink Href="/resumenmensual" Typo="Typo.body2">Resumen Mensual</MudLink>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- 2. Operaciones y Planta -->
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Success" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.Agriculture" />
+                    </MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Planta y Operaciones</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="d-flex flex-column gap-1">
+                    <MudLink Href="/frutavolcar" Typo="Typo.body2">Fruta a Volcar</MudLink>
+                    <MudLink Href="/empaque" Typo="Typo.body2">Línea de Empaque</MudLink>
+                    <MudLink Href="/basculas" Typo="Typo.body2">Control de Básculas</MudLink>
+                    <MudLink Href="/registropesadas" Typo="Typo.body2">Registro de Pesadas</MudLink>
+                    <MudLink Href="/camioneszorras" Typo="Typo.body2">Camiones y Zorras</MudLink>
+                    <MudLink Href="/graficaprocesos" Typo="Typo.body2">Gráfica de Procesos</MudLink>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- 3. Stock y Pallets -->
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Info" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.Inventory2" />
+                    </MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Stock y Pallets</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="d-flex flex-column gap-1">
+                    <MudLink Href="/stockgeneral" Typo="Typo.body2">Stock General</MudLink>
+                    <MudLink Href="/stockplaya" Typo="Typo.body2">Stock en Playa</MudLink>
+                    <MudLink Href="/pallets-definitivos" Typo="Typo.body2">Pallets Definitivos</MudLink>
+                    <MudLink Href="/palletssincliente" Typo="Typo.body2">Pallets sin Cliente</MudLink>
+                    <MudLink Href="/palletscontramarca" Typo="Typo.body2">Pallets Contramarca</MudLink>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>

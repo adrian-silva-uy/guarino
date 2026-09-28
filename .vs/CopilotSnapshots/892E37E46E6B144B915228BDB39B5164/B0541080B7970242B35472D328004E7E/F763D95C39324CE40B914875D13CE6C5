@@ -1,0 +1,203 @@
+﻿using System.Net.Http.Json;
+using System.Text.Json;
+using GuarinoApp.Application.Common.Interfaces;
+using GuarinoApp.Application.Settings;
+using GuarinoApp.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace GuarinoApp.Infrastructure.Services
+    {
+    // Servicio que consume Open-Meteo (Gratis, sin API Key)
+    public class OpenMeteoClimateService : IClimateService
+        {
+        private readonly HttpClient _httpClient;
+        private readonly IApplicationDbContext _context;
+        private readonly ILogger<OpenMeteoClimateService> _logger;
+        private readonly ClimateRiskSettings _settings;
+
+        // Segundos escalones de severidad ("Crítica"), ahora también configurables
+        // vía ClimateRiskSettings.Thresholds (LluviaMuyExcesivaMm y VientoFuerteKmhCritico).
+
+        public OpenMeteoClimateService(
+            HttpClient httpClient,
+            IApplicationDbContext context,
+            ILogger<OpenMeteoClimateService> logger,
+            IOptions<ClimateRiskSettings> settings)
+            {
+            _httpClient = httpClient;
+            _context = context;
+            _logger = logger;
+            _settings = settings.Value;
+            }
+
+        public async Task DetectarYRegistrarEventosAsync(CancellationToken cancellationToken)
+            {
+            var thresholds = _settings.Thresholds;
+            var impacto = _settings.ImpactEstimates;
+
+            _logger.LogInformation("Iniciando escaneo automático de eventos climáticos ({RegionalContext})...", _settings.RegionalContext);
+
+            var lotes = await _context.Lotes
+                .Where(l => l.Latitude != null && l.Longitude != null)
+                .ToListAsync(cancellationToken);
+
+            if (!lotes.Any())
+                {
+                _logger.LogWarning("No hay lotes con coordenadas. Escaneo detenido.");
+                return;
+                }
+
+            foreach (var lote in lotes)
+                {
+                try
+                    {
+                    var url = $"https://api.open-meteo.com/v1/forecast?latitude={lote.Latitude}&longitude={lote.Longitude}&hourly=temperature_2m,precipitation,wind_speed_10m,weathercode&timezone=auto&past_days=3";
+
+                    var response = await _httpClient.GetAsync(url, cancellationToken);
+                    if (!response.IsSuccessStatusCode) continue;
+
+                    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+                    var climaData = JsonSerializer.Deserialize<OpenMeteoResponse>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    if (climaData?.Hourly == null) continue;
+
+                    var eventosDetectados = new List<EventoClimatico>();
+                    var registrosProcesados = new HashSet<(string tipo, DateTime fecha)>();
+
+                    for (int i = 0; i < climaData.Hourly.Time.Count; i++)
+                        {
+                        var fechaHora = climaData.Hourly.Time[i];
+                        var temp = climaData.Hourly.Temperature_2m[i] ?? 999;
+                        var lluvia = climaData.Hourly.Precipitation[i] ?? 0;
+                        var viento = climaData.Hourly.Wind_speed_10m[i] ?? 0;
+
+                        // DETECCIÓN DE HELADA
+                        if (temp <= thresholds.HeladaTempMin)
+                            {
+                            var key = ("Helada", fechaHora.Date);
+                            if (!registrosProcesados.Contains(key))
+                                {
+                                var severidad = temp <= thresholds.HeladaTempSevera ? "Crítica" : "Alta";
+                                var perdidaEstimada = temp <= thresholds.HeladaTempSevera
+                                    ? impacto.HeladaSeveraPerdida
+                                    : impacto.HeladaPerdida;
+
+                                eventosDetectados.Add(new EventoClimatico
+                                    {
+                                    LoteId = lote.Id,
+                                    ProductorId = lote.ProductorId,
+                                    Fecha = fechaHora.Date,
+                                    TipoEvento = "Helada",
+                                    SeveridadEstimada = severidad,
+                                    PorcentajePerdidaEstimada = (decimal?)perdidaEstimada,
+                                    Fuente = $"Detección Automática - OpenMeteo ({_settings.RegionalContext})",
+                                    Observaciones = $"Temp mínima: {temp}°C a las {fechaHora.Hour}:00. Riesgo de daño a frutos."
+                                    });
+                                registrosProcesados.Add(key);
+                                }
+                            }
+
+                        // DETECCIÓN DE LLUVIA EXCESIVA
+                        if (lluvia >= thresholds.LluviaExcesivaMm)
+                            {
+                            var key = ("LluviaExcesiva", fechaHora.Date);
+                            if (!registrosProcesados.Contains(key))
+                                {
+                                var severidad = lluvia >= thresholds.LluviaMuyExcesivaMm ? "Crítica" : "Alta";
+                                var perdidaEstimada = lluvia >= thresholds.LluviaMuyExcesivaMm
+                                    ? impacto.LluviaMuyExcesivaPerdida
+                                    : impacto.LluviaExcesivaPerdida;
+
+                                eventosDetectados.Add(new EventoClimatico
+                                    {
+                                    LoteId = lote.Id,
+                                    ProductorId = lote.ProductorId,
+                                    Fecha = fechaHora.Date,
+                                    TipoEvento = "LluviaExcesiva",
+                                    SeveridadEstimada = severidad,
+                                    PorcentajePerdidaEstimada = (decimal?)perdidaEstimada,
+                                    Fuente = "Detección Automática - OpenMeteo",
+                                    Observaciones = $"Acumulado 24h: {lluvia}mm. Riesgo de gomosis."
+                                    });
+                                registrosProcesados.Add(key);
+                                }
+                            }
+
+                        // DETECCIÓN DE VIENTO FUERTE
+                        if (viento >= thresholds.VientoFuerteKmh)
+                            {
+                            var key = ("VientoFuerte", fechaHora.Date);
+                            if (!registrosProcesados.Contains(key))
+                                {
+                                var severidad = viento >= thresholds.VientoFuerteKmhCritico ? "Crítica" : "Alta";
+                                var perdidaEstimada = impacto.VientoFuertePerdida;
+
+                                eventosDetectados.Add(new EventoClimatico
+                                    {
+                                    LoteId = lote.Id,
+                                    ProductorId = lote.ProductorId,
+                                    Fecha = fechaHora.Date,
+                                    TipoEvento = "VientoFuerte",
+                                    SeveridadEstimada = severidad,
+                                    PorcentajePerdidaEstimada = (decimal?)perdidaEstimada,
+                                    Fuente = "Detección Automática - OpenMeteo",
+                                    Observaciones = $"Viento máximo: {viento} km/h. Riesgo de ramas/fruta."
+                                    });
+                                registrosProcesados.Add(key);
+                                }
+                            }
+
+                        // DETECCIÓN DE CALOR EXTREMO
+                        if (temp >= thresholds.CalorExtremoTempMax)
+                            {
+                            var key = ("CalorExtremo", fechaHora.Date);
+                            if (!registrosProcesados.Contains(key))
+                                {
+                                eventosDetectados.Add(new EventoClimatico
+                                    {
+                                    LoteId = lote.Id,
+                                    ProductorId = lote.ProductorId,
+                                    Fecha = fechaHora.Date,
+                                    TipoEvento = "CalorExtremo",
+                                    SeveridadEstimada = "Alta",
+                                    PorcentajePerdidaEstimada = (decimal?)impacto.CalorExtremoPerdida,
+                                    Fuente = "Detección Automática - OpenMeteo",
+                                    Observaciones = $"Temp máxima: {temp}°C a las {fechaHora.Hour}:00. Riesgo de golpe de sol en fruta."
+                                    });
+                                registrosProcesados.Add(key);
+                                }
+                            }
+                        }
+
+                    if (eventosDetectados.Any())
+                        {
+                        await _context.EventosClimaticos.AddRangeAsync(eventosDetectados, cancellationToken);
+                        _logger.LogInformation("Lote {Codigo}: {Cantidad} eventos detectados.", lote.Codigo, eventosDetectados.Count);
+                        }
+                    }
+                catch (Exception ex)
+                    {
+                    _logger.LogError(ex, "Error procesando clima para Lote {LoteId}", lote.Id);
+                    }
+                }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Escaneo climático finalizado.");
+            }
+        }
+
+    public class OpenMeteoResponse
+        {
+        public HourlyData Hourly { get; set; } = new HourlyData();
+        }
+
+    public class HourlyData
+        {
+        public List<DateTime> Time { get; set; } = [];
+        public List<double?> Temperature_2m { get; set; } = [];
+        public List<double?> Precipitation { get; set; } = [];
+        public List<double?> Wind_speed_10m { get; set; } = [];
+        }
+    }

@@ -1,0 +1,95 @@
+@page "/resumenmensual"
+@using MediatR
+@using MudBlazor
+@using GuarinoApp.Application.Modules.ResumenMensual.Queries.GetResumenMensual
+@using GuarinoApp.Application.Modules.ResumenMensual.Dtos
+@inject IMediator Mediator
+
+<MudText Typo="Typo.h4" GutterBottom="true">📊 Resumen Mensual de Volcado</MudText>
+
+<MudCard>
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudDatePicker @bind-Date="_fechaDesde" Label="Fecha Desde" DateFormat="dd-MM-yyyy" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudDatePicker @bind-Date="_fechaHasta" Label="Fecha Hasta" DateFormat="dd-MM-yyyy" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
+                    @(_loading ? "Cargando..." : "Actualizar")
+                </MudButton>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudButton Variant="Variant.Outlined" OnClick="@ClearFilters" Disabled="@_loading" FullWidth="true">Limpiar filtros</MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_data.Any())
+        {
+            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" SortLabel="Ordenar por" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Año</MudTh>
+                    <MudTh>Mes</MudTh>
+                    <MudTh>Nombre</MudTh>
+                    <MudTh>Kgs Volcados</MudTh>
+                    <MudTh>Bins Volcados</MudTh>
+                    <MudTh>Balanza</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Año</MudTd>
+                    <MudTd>@context.Mes</MudTd>
+                    <MudTd>@context.Nombre</MudTd>
+                    <MudTd>@context.Kgs_Volcados.ToString("N0")</MudTd>
+                    <MudTd>@context.BinsVolcados</MudTd>
+                    <MudTd>@context.Balanza</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else if (!_loading && _cargado)
+        {
+            <MudAlert Severity="Severity.Info">No se encontraron registros con los filtros seleccionados.</MudAlert>
+        }
+    <DataSourceFooter EsDummy="true" Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />`n`</MudCardContent>
+</MudCard>
+
+@code {
+    private List<ResumenMensualDto> _data = new();
+    private bool _loading = false;
+    private bool _cargado = false;
+    private DateTime? _fechaDesde = DateTime.Now.AddMonths(-3);
+    private DateTime? _fechaHasta = DateTime.Now;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        _loading = true;
+        _cargado = false;
+        try
+        {
+            _data = await Mediator.Send(new GetResumenMensualQuery(_fechaDesde, _fechaHasta));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            _cargado = true;
+            StateHasChanged();
+        }
+    }
+
+    void ClearFilters()
+    {
+        _fechaDesde = DateTime.Now.AddMonths(-3);
+        _fechaHasta = DateTime.Now;
+        StateHasChanged();
+    }
+}

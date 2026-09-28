@@ -1,0 +1,346 @@
+@page "/gestion-riesgos-climaticos"
+@using GuarinoApp.Application.Modules.ClimateRisk.Dtos
+@using GuarinoApp.Application.Modules.ClimateRisk.Queries
+@using GuarinoApp.Application.Modules.ClimateRisk.Commands
+@using MediatR
+@using Microsoft.JSInterop
+@using MudBlazor
+@implements IAsyncDisposable
+
+<PageTitle>Gestión de Riesgos Climáticos</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="mb-4">
+        <h2>Gestión de Riesgos Climáticos</h2>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            Monitoreo de eventos climáticos que pueden comprometer la calidad, el calibre o el volumen
+            de fruta exportable a EEUU, Unión Europea y Brasil — tanto lo que ya ocurrió como lo pronosticado.
+        </MudText>
+        <div class="d-flex gap-2">
+            <MudButton OnClick="EjecutarEscaneo" Disabled="@escaneando" Color="Color.Warning">
+                @if (escaneando)
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="me-1" />
+                    <span>Escaneando...</span>
+                }
+                else
+                {
+                    <span>Ejecutar Escaneo</span>
+                }
+            </MudButton>
+            <MudButton OnClick="CargarDatos" Disabled="@escaneando" Color="Color.Primary">
+                Actualizar
+            </MudButton>
+        </div>
+    </div>
+
+    <MudCard Class="mb-4">
+        <MudCardHeader><CardHeaderContent><MudText Typo="Typo.h6">Mapa de Lotes</MudText></CardHeaderContent></MudCardHeader>
+        <MudCardContent>
+            <div id="mapa-riesgos-climaticos" style="height:420px; width:100%; border-radius:8px; overflow:hidden;"></div>
+            <MudText Typo="Typo.caption" Class="mt-2">
+                🟢 Sin eventos &nbsp;&nbsp; 🟡 Riesgo Alta &nbsp;&nbsp; 🔴 Riesgo Crítica
+                @if (mapaMarcadores.Count > 0)
+                {
+                    <span> &nbsp;&nbsp;·&nbsp;&nbsp; @mapaMarcadores.Count lote(s) con coordenadas</span>
+                }
+            </MudText>
+        </MudCardContent>
+    </MudCard>
+
+    @if (!cargado)
+    {
+        <MudCard>
+            <MudCardContent>
+                <MudProgressCircular Indeterminate="true" />
+                <p>Cargando...</p>
+            </MudCardContent>
+        </MudCard>
+    }
+    else if (resumen == null)
+    {
+        <MudAlert Severity="Severity.Success">
+            Sin exposición detectada a heladas, lluvias excesivas, viento fuerte o calor extremo: ni en el
+            historial reciente ni en el pronóstico disponible (hasta 7 días hacia adelante).
+        </MudAlert>
+    }
+    else
+    {
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <MudCard><MudCardContent>
+                    <MudText Typo="Typo.h6">@resumen.TotalEventosRecientes</MudText>
+                    <MudText Typo="Typo.caption">Eventos Ya Ocurridos</MudText>
+                </MudCardContent></MudCard>
+            </div>
+            <div class="col-md-3">
+                <MudCard><MudCardContent>
+                    <MudText Typo="Typo.h6">@resumen.TotalEventosPronosticados</MudText>
+                    <MudText Typo="Typo.caption">Alertas Pronosticadas</MudText>
+                </MudCardContent></MudCard>
+            </div>
+            <div class="col-md-3">
+                <MudCard><MudCardContent>
+                    <MudText Typo="Typo.h6">@resumen.LotesAfectados</MudText>
+                    <MudText Typo="Typo.caption">Lotes con Riesgo</MudText>
+                </MudCardContent></MudCard>
+            </div>
+            <div class="col-md-3">
+                <MudCard><MudCardContent>
+                    <MudText Typo="Typo.h6">@resumen.ProductoresAfectados</MudText>
+                    <MudText Typo="Typo.caption">Productores con Riesgo</MudText>
+                </MudCardContent></MudCard>
+            </div>
+        </div>
+
+        <MudCard Class="mb-4">
+            <MudCardHeader><CardHeaderContent><MudText Typo="Typo.h6">Resumen por Severidad y Tipo</MudText></CardHeaderContent></MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Por severidad</MudText>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    @foreach (var kv in resumen.EventosPorSeveridad)
+                    {
+                        <MudChip T="string" Color="@ColorSeveridad(kv.Key)">@kv.Key: @kv.Value</MudChip>
+                    }
+                </div>
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Por tipo de evento</MudText>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var kv in resumen.EventosPorTipo)
+                    {
+                        <MudChip T="string" Color="Color.Default">@kv.Key: @kv.Value</MudChip>
+                    }
+                </div>
+            </MudCardContent>
+        </MudCard>
+
+        @if (resumen.EventosPronosticados.Any())
+        {
+            <MudCard Class="mb-4" Outlined="true" Style="border-left: 4px solid var(--mud-palette-warning);">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">🔮 Riesgo Pronosticado — Ventana Preventiva</MudText>
+                        <MudText Typo="Typo.caption">
+                            Todavía no ocurrió. Es la oportunidad de actuar antes de que impacte la fruta exportable.
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudTable Items="@resumen.EventosPronosticados" Hover="true" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Fecha Pronosticada</MudTh>
+                            <MudTh>Lote</MudTh>
+                            <MudTh>Productor</MudTh>
+                            <MudTh>Tipo</MudTh>
+                            <MudTh>Severidad</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Fecha.ToString("dd/MM")</MudTd>
+                            <MudTd>@context.LoteNombre</MudTd>
+                            <MudTd>@context.ProductorNombre</MudTd>
+                            <MudTd>@context.TipoEvento</MudTd>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small" Color="@ColorSeveridad(context.SeveridadEstimada)">
+                                    @context.SeveridadEstimada
+                                </MudChip>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudCardContent>
+            </MudCard>
+        }
+
+        @if (resumen.EventosRecientes.Any())
+        {
+            <MudCard Class="mb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">🕐 Impacto Ya Ocurrido</MudText>
+                        <MudText Typo="Typo.caption">@resumen.Observaciones</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudTable Items="@resumen.EventosRecientes" Hover="true" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Fecha</MudTh>
+                            <MudTh>Lote</MudTh>
+                            <MudTh>Productor</MudTh>
+                            <MudTh>Tipo</MudTh>
+                            <MudTh>Severidad</MudTh>
+                            <MudTh>% Pérdida Estimada</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Fecha.ToString("dd/MM")</MudTd>
+                            <MudTd>@context.LoteNombre</MudTd>
+                            <MudTd>@context.ProductorNombre</MudTd>
+                            <MudTd>@context.TipoEvento</MudTd>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small" Color="@ColorSeveridad(context.SeveridadEstimada)">
+                                    @context.SeveridadEstimada
+                                </MudChip>
+                            </MudTd>
+                            <MudTd>@(context.PorcentajePerdidaEstimada?.ToString("0.##") ?? "N/D")%</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudCardContent>
+            </MudCard>
+        }
+
+        <MudCard>
+            <MudCardHeader><CardHeaderContent><MudText Typo="Typo.h6">Plan de Mitigación</MudText></CardHeaderContent></MudCardHeader>
+            <MudCardContent>
+                @if (generandoPlan)
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Typo="Typo.caption" Class="ms-2">Generando recomendaciones...</MudText>
+                }
+                else if (resumen.PlanMitigacion?.Any() == true)
+                {
+                    <div class="row">
+                        @foreach (var plan in resumen.PlanMitigacion)
+                        {
+                            <div class="col-md-6 mb-3">
+                                <MudCard Outlined="true">
+                                    <MudCardContent>
+                                        <MudText Typo="Typo.body2">@plan.Texto</MudText>
+                                        <MudText Typo="Typo.caption" Class="mt-2">
+                                            <strong>@plan.Categoria</strong> · @plan.Origen
+                                        </MudText>
+                                    </MudCardContent>
+                                </MudCard>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2">Sin recomendaciones disponibles todavía.</MudText>
+                }
+                <MudButton OnClick="RegenerarPlan" Color="Color.Success" Disabled="@generandoPlan">Regenerar</MudButton>
+            </MudCardContent>
+        </MudCard>
+    }
+</div>
+
+@code {
+    private bool cargado = false;
+    private bool escaneando = false;
+    private bool generandoPlan = false;
+    private ClimateRiskSummaryDto? resumen;
+    private List<ClimateMapMarkerDto> mapaMarcadores = new();
+
+    private IJSObjectReference? _mapModule;
+    private bool _mapInicializado = false;
+
+    [Inject] private IMediator Mediator { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync() => await CargarDatos();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _mapModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/climateMap.js");
+                await _mapModule.InvokeVoidAsync("initMap", "mapa-riesgos-climaticos", mapaMarcadores);
+                _mapInicializado = true;
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"No se pudo cargar el mapa: {ex.Message}", Severity.Warning);
+            }
+        }
+    }
+
+    private async Task CargarDatos()
+    {
+        cargado = false;
+        StateHasChanged();
+
+        try
+        {
+            mapaMarcadores = await Mediator.Send(new GetClimateMapMarkersQuery());
+            if (_mapInicializado && _mapModule != null)
+            {
+                await _mapModule.InvokeVoidAsync("setMarkers", mapaMarcadores);
+            }
+
+            resumen = await Mediator.Send(new GetClimateRiskSummaryQuery());
+            cargado = true;
+            StateHasChanged();
+
+            if (resumen != null)
+            {
+                await GenerarPlan();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            cargado = true;
+        }
+    }
+
+    private async Task EjecutarEscaneo()
+    {
+        escaneando = true;
+        StateHasChanged();
+        try
+        {
+            await Mediator.Send(new EjecutarEscaneoClimaticoCommand());
+            Snackbar.Add("✓ Escaneo completado", Severity.Success);
+            await CargarDatos();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            escaneando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GenerarPlan()
+    {
+        if (resumen == null || resumen.Eventos.Count == 0) return;
+
+        generandoPlan = true;
+        StateHasChanged();
+
+        try
+        {
+            resumen.PlanMitigacion = await Mediator.Send(new GenerarPlanMitigacionCommand(resumen.Eventos));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"No se pudo generar el plan de mitigación: {ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            generandoPlan = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RegenerarPlan() => await GenerarPlan();
+
+    private static Color ColorSeveridad(string severidad) => severidad switch
+    {
+        "Crítica" => Color.Error,
+        "Alta" => Color.Warning,
+        _ => Color.Default
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_mapModule != null)
+        {
+            try { await _mapModule.InvokeVoidAsync("dispose"); } catch { }
+            try { await _mapModule.DisposeAsync(); } catch { }
+        }
+    }
+}

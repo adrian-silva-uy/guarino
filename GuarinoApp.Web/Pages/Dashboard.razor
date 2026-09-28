@@ -1,0 +1,560 @@
+@page "/dashboard"
+@using GuarinoApp.Application.Common.Dtos
+@using MudBlazor
+@using GuarinoApp.Application.Common.Interfaces
+@using GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccionZafra
+@using GuarinoApp.Web.Shared
+@inject IExportService ExportService
+@inject IEmailService EmailService
+@inject IDashboardDataService DashboardService
+@inject IAIService AiService
+@inject ISender Mediator
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject Microsoft.Extensions.Logging.ILogger<Dashboard> Logger
+
+<div class="d-flex flex-wrap align-center justify-space-between mb-4 gap-4">
+    <div>
+        <MudText Typo="Typo.h4" Class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Color="Color.Primary" Size="Size.Large" />
+            Dashboard Ejecutivo
+        </MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1">
+            Resumen de indicadores clave y Análisis con IA
+        </MudText>
+    </div>
+
+    <ExportToolbar ReportName="Dashboard_Ejecutivo"
+                   ShowDateFilters="true"
+                   FechaDesde="_fechaDesde"
+                   FechaHasta="_fechaHasta"
+                   FechaDesdeChanged="OnFechaDesdeChanged"
+                   FechaHastaChanged="OnFechaHastaChanged"
+                   OnRefresh="LoadData"
+                   IsLoading="@(_loading || _exportingPdf)"
+                   OnExportPdf="ExportToPdf"
+                   OnExportExcel="@(e => ExportToExcel())"
+                   OnExportCsv="@(e => ExportToCsv())"
+                   OnExportEmail="@(e => SendEmail())" />
+</div>
+
+<!-- Selector de período -->
+<MudGrid Class="align-center mb-2">
+    <MudItem xs="12" Class="d-flex align-center gap-2">
+        <MudText Typo="Typo.body2" Color="Color.Primary">@PeriodLabel</MudText>
+    </MudItem>
+</MudGrid>
+
+<style>
+    .dashboard-period-picker .mud-input-control {
+        cursor: pointer;
+    }
+
+    .dashboard-period-picker .mud-input {
+        cursor: pointer;
+    }
+
+    .dashboard-period-picker .mud-input-slot {
+        font-weight: 600;
+        color: var(--mud-palette-primary);
+        font-size: 0.95rem;
+    }
+
+    .dashboard-period-picker .mud-input-outlined-border {
+        border: none !important;
+    }
+</style>
+
+<MudDivider Class="my-2" />
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="my-4" />
+}
+
+@if (_exportingPdf)
+{
+    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+        Generando el PDF... la descarga comenzará automáticamente.
+    </MudAlert>
+}
+<MudGrid>
+    <!-- KPIs -->
+    @foreach (var kpi in _kpis)
+    {
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard>
+                <MudCardContent>
+                    <MudText Typo="Typo.body2" Color="Color.Tertiary">@kpi.Title</MudText>
+                    <MudText Typo="Typo.h4">@kpi.Value</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">@kpi.PeriodLabel</MudText>
+                    @if (!string.IsNullOrEmpty(kpi.TrendText))
+                    {
+                        <MudText Typo="Typo.body2" Color="@kpi.TrendColor" Class="d-flex align-center mt-1 gap-1">
+                            <MudIcon Icon="@kpi.TrendIcon" Size="Size.Small" /> @kpi.TrendText
+                        </MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    }
+
+    <!-- Gráfico de Volcados Mensuales -->
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardContent>
+                <MudText Typo="Typo.h6" GutterBottom="true" Align="Align.Center">Volcados Mensuales (miles de Kgs)</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mb-2 d-block" Align="Align.Center">
+                    @PeriodLabel
+                </MudText>
+
+                @if (_monthlySeries.Any() && _monthlySeries[0].Data.Any(d => d > 0))
+                {
+                    <InteractiveChart @key="_monthlyChartKey" Series="_monthlySeries" Labels="_monthLabels" Type="InteractiveChart.InteractiveChartType.Bar" Height="300px" />
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-4">No hay volcados registrados en este período.</MudAlert>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Gráfico de Stock por Variedad -->
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardContent>
+                <MudText Typo="Typo.h6" GutterBottom="true" Align="Align.Center">Stock por Variedad</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mb-2 d-block" Align="Align.Center">
+                    Último corte de stock disponible: @StockDateLabel
+                </MudText>
+
+                @if (_stockVarietySeries.Any())
+                {
+                    <InteractiveChart @key="_stockVarietyChartKey" Series="_stockVarietySeries" Labels="_stockVarietyLabels" Type="InteractiveChart.InteractiveChartType.Bar" Height="300px" />
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-4">No hay stock por variedad registrado en este período.</MudAlert>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Panel de IA -->
+    <MudItem xs="12">
+        <MudText Typo="Typo.h6" Color="Color.Primary" Class="d-flex align-center gap-2 mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" /> Análisis y Sugerencias IA
+        </MudText>
+
+        @if (_iaSuggestions.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">Generando Análisis...</MudAlert>
+        }
+
+        <MudGrid>
+            @foreach (var suggestion in _iaSuggestions)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="2" Style="@GetCardStyle(suggestion.Color)">
+                        <MudCardContent Class="d-flex align-start gap-2">
+                            @if (!string.IsNullOrEmpty(suggestion.Icon))
+                            {
+                                <MudIcon Icon="@suggestion.Icon" Style="@GetIconStyle(suggestion.Color)" Size="Size.Small" Class="mt-1 flex-shrink-0" />
+                            }
+                            <MudText Typo="Typo.body2">@suggestion.Text</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudItem>
+
+    <!-- Tabla -->
+    <MudItem xs="12">
+        <MudCard>
+            <MudCardContent>
+                <MudText Typo="Typo.h6" GutterBottom="true">Detalle de Volcados por Productor</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mb-4 d-block">
+                    @PeriodLabel
+                </MudText>
+
+                @if (_tableData.Any())
+                {
+                    <MudTable Items="@_tableData"
+                              Hover="true"
+                              Striped="true"
+                              Dense="true"
+                              Breakpoint="Breakpoint.Sm">
+                        <HeaderContent>
+                            <MudTh>Productor</MudTh>
+                            <MudTh>Variedad</MudTh>
+                            <MudTh Numeric="true">Kgs Volcados</MudTh>
+                            <MudTh Numeric="true">Bins</MudTh>
+                            <MudTh>Zafra</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Productor">@context.Productor</MudTd>
+                            <MudTd DataLabel="Variedad">@context.Variedad</MudTd>
+                            <MudTd DataLabel="Kgs Volcados" Numeric="true">@context.KgsVolcados.ToString("N0")</MudTd>
+                            <MudTd DataLabel="Bins" Numeric="true">@context.Bins</MudTd>
+                            <MudTd DataLabel="Zafra">@context.Zafra</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No hay volcados registrados en este período.</MudAlert>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private DateTime? _fechaDesde = DateTime.Today.AddMonths(-11);
+    private DateTime? _fechaHasta = DateTime.Today;
+    private DateTime? _selectedDate => _fechaHasta;
+    private DateTime? _fechaStock;
+    private bool _loading = false;
+    private bool _exportingPdf;
+    private List<KPI> _kpis = new();
+    private List<ChartSeriesItem> _monthlySeries = new();
+    private string[] _monthLabels = Array.Empty<string>();
+    private List<ChartSeriesItem> _stockVarietySeries = new();
+    private string[] _stockVarietyLabels = Array.Empty<string>();
+    private int _monthlyChartKey;
+    private int _stockVarietyChartKey;
+    private List<VolcadoDetalle> _tableData = new();
+    private List<IASuggestionSimple> _iaSuggestions = new();
+
+    // Defaults razonables para los parámetros de la IA que en /iachat el usuario
+    // controla con sliders (MinConfidence/HorizonMonths/IncludeSeasonality). Acá en
+    // el Dashboard no hay esos controles todavía, así que sin esto quedaban en 0/0/false
+    // — lo que le manda a la IA un pedido sin sentido ("confianza mínima 0%, horizonte
+    // 0 meses"). Si más adelante se agregan controles equivalentes en el Dashboard,
+    // reemplazar estos valores fijos por los que elija el usuario.
+    private const int DefaultMinConfidence = 70;
+    private const int DefaultHorizonMonths = 6;
+    private const bool DefaultIncludeSeasonality = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private string PeriodLabel => _fechaDesde.HasValue && _fechaHasta.HasValue
+        ? $"período: {_fechaDesde.Value:dd/MM/yyyy} al {_fechaHasta.Value:dd/MM/yyyy}"
+        : "período no seleccionado";
+
+    private string StockDateLabel => _fechaStock?.ToString("dd/MM/yyyy") ?? "sin información disponible";
+
+    private async Task OnFechaDesdeChanged(DateTime? date)
+    {
+        _fechaDesde = date;
+        await LoadData();
+    }
+
+    private async Task OnFechaHastaChanged(DateTime? date)
+    {
+        _fechaHasta = date;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (!_fechaDesde.HasValue || !_fechaHasta.HasValue) return;
+        if (_fechaDesde.Value.Date > _fechaHasta.Value.Date)
+        {
+            Snackbar.Add("La fecha desde no puede ser posterior a la fecha hasta.", Severity.Warning);
+            return;
+        }
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var fechaDesde = _fechaDesde.Value;
+            var fechaHasta = _fechaHasta.Value;
+            _fechaStock = await DashboardService.GetLastStockDateAsync(fechaHasta);
+            var totalStock = await DashboardService.GetTotalStockAsync(fechaHasta);
+            var stockPorVariedad = await DashboardService.GetStockByVarietyAsync(fechaHasta);
+            var volcadosMensuales = await DashboardService.GetMonthlyVolcadosAsync(fechaDesde, fechaHasta);
+            var palletsSinCliente = await DashboardService.GetPalletsWithoutClientAsync(fechaHasta);
+            var crecimiento = await DashboardService.GetProjectedGrowthAsync(fechaDesde, fechaHasta);
+
+            _tableData = await DashboardService.GetVolcadosDetailAsync(fechaDesde, fechaHasta, 20);
+
+            var kgsDelPeriodo = volcadosMensuales.Sum(x => x.Kgs);
+            var mesTexto = PeriodLabel;
+
+            _kpis = new List<KPI>
+            {
+                new()
+                {
+                    Title = "Stock Total",
+                    Value = $"{totalStock:N0} bins",
+                    PeriodLabel = _fechaStock.HasValue ? $"Al cierre de {_fechaStock.Value:dd/MM/yyyy}" : "Sin información de stock",
+                    TrendText = "",
+                    TrendColor = Color.Default,
+                    TrendIcon = ""
+                },
+                new()
+                {
+                    Title = "Volcado del período",
+                    Value = $"{kgsDelPeriodo:N0} kg",
+                    PeriodLabel = mesTexto,
+                    TrendText = crecimiento == 0 ? "Sin base comparable" : $"{(crecimiento >= 0 ? "+" : "")}{crecimiento:0.0}% vs. período anterior",
+                    TrendColor = crecimiento >= 0 ? Color.Success : Color.Error,
+                    TrendIcon = crecimiento >= 0 ? Icons.Material.Filled.ArrowUpward : Icons.Material.Filled.ArrowDownward
+                },
+                new()
+                {
+                    Title = "Pallets sin Cliente",
+                    Value = $"{palletsSinCliente:N0}",
+                    PeriodLabel = $"Al cierre de {fechaHasta:dd/MM/yyyy}",
+                    TrendText = "",
+                    TrendColor = Color.Default,
+                    TrendIcon = ""
+                },
+                new()
+                {
+                    Title = "Variación de volcados",
+                    Value = $"{(crecimiento >= 0 ? "+" : "")}{crecimiento:0.0}%",
+                    PeriodLabel = "Vs. período anterior equivalente",
+                    TrendText = "",
+                    TrendColor = crecimiento >= 0 ? Color.Success : Color.Error,
+                    TrendIcon = crecimiento >= 0 ? Icons.Material.Filled.ArrowUpward : Icons.Material.Filled.ArrowDownward
+                }
+            };
+
+            _monthLabels = volcadosMensuales.Select(m => m.Month ?? "").ToArray();
+            _monthlySeries = new List<ChartSeriesItem>
+            {
+                new() { Name = "Kgs Volcados (miles)", Data = volcadosMensuales.Select(m => Math.Round(m.Kgs / 1000.0, 1)).ToArray() }
+            };
+            _monthlyChartKey++;
+
+            var stockOrdenado = stockPorVariedad.OrderByDescending(x => x.Value).ToList();
+            _stockVarietyLabels = stockOrdenado.Select(x => x.Key).ToArray();
+            _stockVarietySeries = new List<ChartSeriesItem>
+            {
+                new() { Name = "Stock (bins)", Data = stockOrdenado.Select(x => (double)x.Value).ToArray() }
+            };
+            _stockVarietyChartKey++;
+
+            var proyeccionZafra = await Mediator.Send(new GetProyeccionZafraQuery());
+            await RefreshSuggestionsAsync(totalStock, palletsSinCliente, crecimiento, mesTexto, stockPorVariedad, volcadosMensuales, proyeccionZafra);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshSuggestionsAsync(
+        int totalStock,
+        int palletsSinCliente,
+        decimal crecimiento,
+        string mesTexto,
+        IReadOnlyDictionary<string, int> stockPorVariedad,
+        IReadOnlyList<MonthlyVolcado> volcadosMensuales,
+        IReadOnlyList<GuarinoApp.Application.Modules.Proyeccion.Dtos.ZafraDto> proyeccionesZafra)
+    {
+        // FIX: antes se usaba GuarinoApp.Application.Common.BusinessSuggestionRequest
+        // (sin ".Dtos") — la clase duplicada que veníamos rastreando. El namespace
+        // correcto es GuarinoApp.Application.Common.Dtos, que es el que realmente
+        // espera IAIService y el que tiene el campo ProyeccionZafra.
+        var request = new GuarinoApp.Application.Common.BusinessSuggestionRequest
+        {
+            TotalStock = totalStock,
+            StockByVariety = stockPorVariedad.ToDictionary(kv => kv.Key, kv => kv.Value),
+            PalletsWithoutClient = palletsSinCliente,
+            GrowthPercent = crecimiento,
+            PeriodLabel = mesTexto,
+            MinConfidence = DefaultMinConfidence,
+            HorizonMonths = DefaultHorizonMonths,
+            IncludeSeasonality = DefaultIncludeSeasonality,
+            // FIX: esto se consultaba (proyeccionesZafra) pero nunca se asignaba acá,
+            // así que la proyección de zafra jamás llegaba al contexto de la IA.
+            ProyeccionZafra = proyeccionesZafra?.FirstOrDefault(z => z.Estado == "Proyectado")
+        };
+
+        List<GuarinoApp.Application.Common.Dtos.BusinessSuggestionDto> suggestions = new();
+        try
+        {
+            suggestions = await AiService.GetBusinessSuggestionsAsync(request);
+        }
+        catch (System.Exception ex)
+        {
+            Logger.LogWarning(ex, "Error al solicitar sugerencias IA estructuradas para periodo {Periodo}", mesTexto);
+            suggestions = new List<GuarinoApp.Application.Common.Dtos.BusinessSuggestionDto>();
+        }
+
+        if (suggestions != null && suggestions.Count > 0)
+        {
+            _iaSuggestions = suggestions.Select(s => new IASuggestionSimple
+            {
+                Text = s.Text ?? string.Empty,
+                Color = s.Color ?? "#9c27b0",
+                Icon = s.Icon ?? Icons.Material.Filled.Lightbulb
+            }).ToList();
+
+            return;
+        }
+
+        var ultimoVolcado = volcadosMensuales.LastOrDefault()?.Kgs ?? 0;
+        var variedadPrincipal = stockPorVariedad.OrderByDescending(x => x.Value).FirstOrDefault();
+
+        _iaSuggestions = new List<IASuggestionSimple>
+        {
+            new()
+            {
+                Text = palletsSinCliente > 0
+                    ? $"Prioridad alta: asignar cliente a {palletsSinCliente:N0} pallets pendientes para liberar inventario comercializable y evitar inmovilización de stock."
+                    : "Mantener la asignación de clientes al ingreso: no hay pallets pendientes y el inventario está listo para su gestión comercial.",
+                Color = palletsSinCliente > 0 ? "#ff9800" : "#4caf50",
+                Icon = palletsSinCliente > 0 ? Icons.Material.Filled.AssignmentLate : Icons.Material.Filled.CheckCircle
+            },
+            new()
+            {
+                Text = variedadPrincipal.Key is not null
+                    ? $"Planificar rotación y compromisos comerciales para {variedadPrincipal.Key}, la variedad con mayor stock ({variedadPrincipal.Value:N0} bins), para reducir concentración y mejorar la salida."
+                    : "Registrar el detalle de stock por variedad para habilitar recomendaciones de rotación más precisas.",
+                Color = "#3d6fb0",
+                Icon = Icons.Material.Filled.Inventory2
+            },
+            new()
+            {
+                Text = $"Revisar capacidad operativa frente a un crecimiento proyectado de {crecimiento:0.0}% y {ultimoVolcado:N0} kg volcados en el último mes.",
+                Color = "#4caf50",
+                Icon = Icons.Material.Filled.TrendingUp
+            }
+        };
+    }
+
+    // --- Exportaciones ---
+    private async Task ExportToExcel()
+    {
+        try
+        {
+            var data = _tableData.Select(t => new { t.Productor, t.Variedad, t.KgsVolcados, t.Bins, t.Zafra }).ToList();
+            var bytes = await ExportService.ExportToExcelAsync(data, "Volcados");
+            await JSRuntime.InvokeVoidAsync("downloadFileFromByteArray", $"Volcados_{_fechaDesde:yyyyMMdd}_{_fechaHasta:yyyyMMdd}.xlsx", bytes);
+            Snackbar.Add("Excel descargado correctamente.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error exportando Excel periodo {Desde}-{Hasta}", _fechaDesde, _fechaHasta);
+            Snackbar.Add($"⚠️ No se pudo generar el Excel: {ex.Message}", Severity.Error, config => config.VisibleStateDuration = 8000);
+        }
+    }
+
+    private async Task ExportToPdf()
+    {
+        if (_exportingPdf)
+            return;
+
+        if (!_fechaDesde.HasValue || !_fechaHasta.HasValue || !_tableData.Any())
+        {
+            Snackbar.Add("No hay datos para exportar en el período seleccionado.", Severity.Warning);
+            return;
+        }
+
+        _exportingPdf = true;
+        StateHasChanged();
+
+        try
+        {
+            var data = _tableData.Select(t => new { t.Productor, t.Variedad, t.KgsVolcados, t.Bins, t.Zafra }).ToList();
+            var bytes = await ExportService.ExportToPdfAsync(data, $"Volcados {PeriodLabel}");
+            if (bytes.Length == 0)
+                throw new InvalidOperationException("El generador devolvió un archivo vacío.");
+
+            var fileName = $"Volcados_{_fechaDesde:yyyyMMdd}_{_fechaHasta:yyyyMMdd}.pdf";
+            await JSRuntime.InvokeVoidAsync("downloadFileFromByteArray", fileName, bytes, "application/pdf");
+            Snackbar.Add($"Se inició la descarga de {fileName}. Revisa la carpeta Descargas del navegador.", Severity.Success, config => config.VisibleStateDuration = 8000);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error exportando PDF periodo {Desde}-{Hasta}", _fechaDesde, _fechaHasta);
+            Snackbar.Add($"⚠️ No se pudo generar el PDF: {ex.Message}", Severity.Error, config => config.VisibleStateDuration = 8000);
+        }
+        finally
+        {
+            _exportingPdf = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExportToCsv()
+    {
+        try
+        {
+            var data = _tableData.Select(t => new { t.Productor, t.Variedad, t.KgsVolcados, t.Bins, t.Zafra }).ToList();
+            var csv = ExportService.ExportToCsv(data);
+            await JSRuntime.InvokeVoidAsync("downloadFileFromText", $"Volcados_{_fechaDesde:yyyyMMdd}_{_fechaHasta:yyyyMMdd}.csv", csv, "text/csv");
+            Snackbar.Add("CSV descargado correctamente.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error exportando CSV periodo {Desde}-{Hasta}", _fechaDesde, _fechaHasta);
+            Snackbar.Add($"⚠️ No se pudo generar el CSV: {ex.Message}", Severity.Error, config => config.VisibleStateDuration = 8000);
+        }
+    }
+
+    private async Task SendEmail()
+    {
+        var parameters = new DialogParameters<SendEmailDialog>
+        {
+            { x => x.Email, "adriansil@hotmail.com" } // valor por defecto, editable en el diálogo
+        };
+
+        var dialogRef = await DialogService.ShowAsync<SendEmailDialog>("Enviar reporte por email", parameters);
+        var result = await dialogRef.Result;
+
+        if (result is null || result.Canceled)
+            return; // el usuario canceló, no se envía nada
+
+        var recipientEmail = (string)result.Data!;
+
+        try
+        {
+            var data = _tableData.Select(t => new { t.Productor, t.Variedad, t.KgsVolcados, t.Bins, t.Zafra }).ToList();
+            var bytes = await ExportService.ExportToExcelAsync(data, "Volcados");
+            await EmailService.SendEmailAsync(recipientEmail, $"Reporte de Volcados {PeriodLabel}",
+                "Adjunto encontrarás el reporte detallado.", bytes, $"Volcados_{_selectedDate:yyyyMM}.xlsx");
+            Snackbar.Add($"📧 Email enviado correctamente a {recipientEmail}.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error enviando email periodo {Desde}-{Hasta}", _fechaDesde, _fechaHasta);
+            Snackbar.Add($"⚠️ No se pudo enviar el email: {ex.Message} | Detalle: {ex.InnerException?.Message}",
+                Severity.Error, config => config.VisibleStateDuration = 8000);
+        }
+    }
+
+    // --- Clases auxiliares ---
+    public class KPI
+    {
+        public string? Title { get; set; }
+        public string? Value { get; set; }
+        public string? PeriodLabel { get; set; }
+        public string? TrendText { get; set; }
+        public Color TrendColor { get; set; }
+        public string? TrendIcon { get; set; }
+    }
+
+    public class IASuggestionSimple
+    {
+        public string? Text { get; set; }
+        public string? Color { get; set; }
+        public string? Icon { get; set; }
+    }
+
+    private string GetCardStyle(string? color) => $"border-left: 4px solid {color}; height: 100%;";
+
+    private string GetIconStyle(string? color) => $"color: {color};";
+}

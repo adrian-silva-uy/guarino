@@ -1,0 +1,134 @@
+@page "/stockplaya"
+@using MediatR
+@using MudBlazor
+@using GuarinoApp.Application.Common.Filters
+@using GuarinoApp.Application.Modules.StockPlaya.Queries.GetStockPlaya
+@using GuarinoApp.Application.Modules.StockPlaya.Dtos
+@inject IMediator Mediator
+
+<MudText Typo="Typo.h4" GutterBottom="true">📦 Stock en Playa</MudText>
+
+<MudCard>
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudDatePicker @bind-Date="_fechaDesde" Label="Fecha Desde" DateFormat="dd-MM-yyyy" OnChange="@(() => LoadData())" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudDatePicker @bind-Date="_fechaHasta" Label="Fecha Hasta" DateFormat="dd-MM-yyyy" OnChange="@(() => LoadData())" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
+                    @(_loading ? "Cargando..." : "Actualizar")
+                </MudButton>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudButton Variant="Variant.Outlined" OnClick="@ClearFilters" Disabled="@_loading" FullWidth="true">Limpiar filtros</MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_data.Any())
+        {
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6">Stock por Variedad (Kilos)</MudText>
+                    <InteractiveChart Series="_stockChartSeries" Type="InteractiveChart.InteractiveChartType.Bar" Height="300px" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6">Stock por Productor (Bins)</MudText>
+                    <InteractiveChart Series="_productorChartSeries" Type="InteractiveChart.InteractiveChartType.Bar" Height="300px" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" SortLabel="Ordenar por">
+                <HeaderContent>
+                    <MudTh>Lote</MudTh><MudTh>Productor</MudTh><MudTh>Variedad</MudTh>
+                    <MudTh>Ingresados</MudTh><MudTh>Volcados</MudTh><MudTh>Saldo</MudTh>
+                    <MudTh>Kg Stock</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Lote</MudTd>
+                    <MudTd>@context.Productor</MudTd>
+                    <MudTd>@context.Variedad</MudTd>
+                    <MudTd>@context.Ingresados</MudTd>
+                    <MudTd>@context.Volcados</MudTd>
+                    <MudTd>@context.Saldo</MudTd>
+                    <MudTd>@context.KgStock.ToString("N0")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else if (!_loading && _cargado)
+        {
+            <MudAlert Severity="Severity.Info">No se encontraron registros.</MudAlert>
+        }
+    <DataSourceFooter EsDummy="true" Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />`n`</MudCardContent>
+</MudCard>
+
+@code {
+    private List<StockPlayaDto> _data = new();
+    private bool _loading = false;
+    private bool _cargado = false;
+    private DateTime? _fechaDesde = DateTime.Now.AddMonths(-3);
+    private DateTime? _fechaHasta = DateTime.Now;
+    private List<ChartSeriesItem> _stockChartSeries = new();
+    private List<ChartSeriesItem> _productorChartSeries = new();
+    private ChartOptions _chartOptions = new() { YAxisTicks = 3 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        _loading = true;
+        _cargado = false;
+        try
+        {
+            _data = await Mediator.Send(new GetStockPlayaQuery(new List<Filter>()));
+            LoadCharts();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            _cargado = true;
+            StateHasChanged();
+        }
+    }
+
+    void LoadCharts()
+    {
+        var varietyStock = _data.GroupBy(x => x.Variedad)
+            .Select(g => new { Name = g.Key ?? "Sin variedad", Value = g.Sum(x => x.KgStock) })
+            .OrderByDescending(x => x.Value)
+            .Take(10)
+            .ToList();
+
+        _stockChartSeries = new List<ChartSeriesItem>
+        {
+            new ChartSeriesItem { Name = "Kg Stock", Data = varietyStock.Select(x => (double)x.Value).ToArray() }
+        };
+
+        var productorStock = _data.GroupBy(x => x.Productor)
+            .Select(g => new { Name = g.Key ?? "Sin productor", Value = g.Sum(x => x.Saldo) })
+            .OrderByDescending(x => x.Value)
+            .Take(10)
+            .ToList();
+
+        _productorChartSeries = new List<ChartSeriesItem>
+        {
+            new ChartSeriesItem { Name = "Bins en stock", Data = productorStock.Select(x => (double)x.Value).ToArray() }
+        };
+    }
+
+    void ClearFilters()
+    {
+        _fechaDesde = DateTime.Now.AddMonths(-3);
+        _fechaHasta = DateTime.Now;
+        StateHasChanged();
+    }
+}

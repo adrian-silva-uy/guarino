@@ -1,0 +1,97 @@
+@page "/email-test"
+@using GuarinoApp.Infrastructure.Services
+@inject GuarinoApp.Application.Common.Interfaces.IEmailService EmailService
+@inject Microsoft.Extensions.Options.IOptionsMonitor<EmailOptions> OptionsMonitor
+@inject Microsoft.Extensions.Hosting.IHostEnvironment HostEnv
+@inject Microsoft.Extensions.Logging.ILogger<EmailTest> Logger
+
+<h3>Prueba de envío de email (demo)</h3>
+
+<div>
+    <label>Destinatario (To):</label>
+    <input @bind="To" />
+</div>
+<div>
+    <label>Usuario dummy - nombre:</label>
+    <input @bind="DummyName" />
+</div>
+<div>
+    <label>Usuario dummy - email:</label>
+    <input @bind="DummyEmail" />
+</div>
+
+<button @onclick="SendTestEmail">Enviar correo de prueba</button>
+
+@if (LastResult is not null)
+{
+    <div style="margin-top:1rem;">
+        <strong>Resultado:</strong>
+        <div>@LastResult</div>
+    </div>
+}
+
+@if (ExpectedFromPreview is not null)
+{
+    <div style="margin-top:1rem;">
+        <strong>Cabeceras esperadas</strong>
+        <ul>
+            <li>From: @ExpectedFromPreview</li>
+            <li>Sender / Envelope-From: @ExpectedSenderPreview</li>
+            <li>Reply-To: @ExpectedReplyToPreview</li>
+        </ul>
+        @if (HostEnv.IsDevelopment())
+        {
+            <div>En desarrollo, abre <a href="http://localhost:5000" target="_blank">smtp4dev (http://localhost:5000)</a> para ver el correo capturado.</div>
+        }
+    </div>
+}
+
+@code {
+    private string To { get; set; } = "recipient@test.local";
+    private string DummyName { get; set; } = "Juan Pérez";
+    private string DummyEmail { get; set; } = "juan.perez@example.com";
+
+    private string? LastResult;
+    private string? ExpectedFromPreview;
+    private string? ExpectedSenderPreview;
+    private string? ExpectedReplyToPreview;
+
+    private async Task SendTestEmail()
+    {
+        LastResult = null;
+        try
+        {
+            var options = OptionsMonitor.CurrentValue;
+            // Calcular cómo se verá el From / Sender / Reply-To según la configuración
+            var authenticatedSender = !string.IsNullOrWhiteSpace(options.SmtpUser) ? options.SmtpUser! : options.FromEmail;
+            if (options.UseCompanyMailboxForSending)
+            {
+                var companyDisplay = !string.IsNullOrWhiteSpace(options.FromName) ? options.FromName : authenticatedSender;
+                var displayName = options.UseUserNameInFromDisplay ? $"{DummyName} via {companyDisplay}" : companyDisplay;
+                ExpectedFromPreview = $"\"{displayName}\" <{authenticatedSender}>";
+                ExpectedSenderPreview = options.EnvelopeFrom ?? authenticatedSender;
+                ExpectedReplyToPreview = options.UseReplyToUser ? DummyEmail : "(none)";
+            }
+            else
+            {
+                ExpectedFromPreview = $"\"{DummyName}\" <{DummyEmail}>";
+                ExpectedSenderPreview = options.EnvelopeFrom ?? authenticatedSender;
+                ExpectedReplyToPreview = "(none)";
+            }
+
+            var subject = "Correo de prueba — Demo local";
+            var body = $"<p>Hola {DummyName},</p><p>Este es un correo de prueba para la demo.</p>";
+
+            // Llamada al servicio de email; from/fromName son los del usuario logueado
+            await EmailService.SendEmailAsync(To, subject, body, attachment: null, attachmentName: "", from: DummyEmail, fromName: DummyName);
+
+            LastResult = "Envío realizado. Revisa smtp4dev / bandeja de test local.";
+            Logger.LogInformation("Email demo enviado a {To} (dummy {DummyEmail})", To, DummyEmail);
+        }
+        catch (Exception ex)
+        {
+            LastResult = $"Error al enviar: {ex.Message}";
+            Logger.LogError(ex, "Fallo envío demo");
+        }
+    }
+}

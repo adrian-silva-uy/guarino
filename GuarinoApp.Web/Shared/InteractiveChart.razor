@@ -1,0 +1,79 @@
+@using ApexCharts
+@using MudBlazor
+@using GuarinoApp.Web.Shared
+
+<ApexChart TItem="InteractiveChartPoint" Height="@Height" Options="_options">
+    @foreach (var series in Series)
+    {
+        <ApexPointSeries TItem="InteractiveChartPoint"
+                         Items="_points"
+                         Name="@series.Name"
+                         SeriesType="@ToApexSeriesType()"
+                         XValue="point => point.Label"
+                         YValue="point => (decimal?)point.GetValue(series.Name)"
+                         Color="@series.Color" />
+    }
+</ApexChart>
+
+@code {
+    [Parameter] public IReadOnlyList<ChartSeriesItem> Series { get; set; } = Array.Empty<ChartSeriesItem>();
+    [Parameter] public IReadOnlyList<string> Labels { get; set; } = Array.Empty<string>();
+    [Parameter] public IReadOnlyList<double> Values { get; set; } = Array.Empty<double>();
+    [Parameter] public string SeriesName { get; set; } = "Valor";
+    [Parameter] public InteractiveChartType Type { get; set; } = InteractiveChartType.Bar;
+    [Parameter] public string Height { get; set; } = "300px";
+
+    private List<InteractiveChartPoint> _points = new();
+    private readonly string _chartId = Guid.NewGuid().ToString("N");
+
+    private ApexChartOptions<InteractiveChartPoint> _options => new()
+    {
+        Chart = new Chart
+        {
+            Id = _chartId,
+            Toolbar = new Toolbar { Show = true }
+        }
+    };
+
+    protected override void OnParametersSet()
+    {
+        var sourceSeries = Series.Count > 0
+            ? Series
+            : new[] { new ChartSeriesItem { Name = SeriesName, Data = Values.ToArray(), Labels = Labels.ToArray() } };
+
+        // Prioriza el parámetro Labels; si está vacío, toma los Labels dentro de la serie de datos
+        var effectiveLabels = Labels.Count > 0
+            ? Labels
+            : sourceSeries.FirstOrDefault(s => s.Labels != null && s.Labels.Length > 0)?.Labels
+              ?? Array.Empty<string>();
+
+        var pointCount = sourceSeries.Select(series => series.Data?.Length ?? 0).DefaultIfEmpty().Max();
+
+        _points = Enumerable.Range(0, pointCount)
+            .Select(index => new InteractiveChartPoint
+            {
+                Label = index < effectiveLabels.Count ? effectiveLabels[index] : string.Empty,
+                Values = sourceSeries.ToDictionary(
+                    series => series.Name,
+                    series => index < (series.Data?.Length ?? 0) ? series.Data![index] : 0d)
+            })
+            .ToList();
+    }
+
+    private SeriesType ToApexSeriesType() => Type switch
+    {
+        InteractiveChartType.Line => SeriesType.Line,
+        InteractiveChartType.Pie => SeriesType.Pie,
+        InteractiveChartType.Donut => SeriesType.Donut,
+        _ => SeriesType.Bar
+    };
+
+    public sealed class InteractiveChartPoint
+    {
+        public string Label { get; init; } = string.Empty;
+        public Dictionary<string, double> Values { get; init; } = new();
+        public double GetValue(string seriesName) => Values.TryGetValue(seriesName, out var value) ? value : 0d;
+    }
+
+    public enum InteractiveChartType { Bar, Line, Pie, Donut }
+}

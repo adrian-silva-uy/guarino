@@ -1,0 +1,22 @@
+﻿@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Titulo</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body1" Style="white-space: pre-line;">@Contenido</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Cerrar" Style="min-width: 100px;">Cerrar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string? Titulo { get; set; }
+    [Parameter] public string? Contenido { get; set; }
+
+    private void Cerrar() => MudDialog.Close();
+}

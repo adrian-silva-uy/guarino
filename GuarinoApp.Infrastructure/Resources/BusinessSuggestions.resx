@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=7.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=7.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="AssignPallets_Text" xml:space="preserve">
+    <value>Operaciones: Asignar cliente o priorizar despacho de los {0:N0} pallets sin cliente para liberar inventario comercializable y reducir riesgo de inmovilización.</value>
+  </data>
+  <data name="AssignPallets_Color" xml:space="preserve"><value>#ff9800</value></data>
+  <data name="AssignPallets_Icon" xml:space="preserve"><value>Icons.Material.Filled.AssignmentLate</value></data>
+
+  <data name="Concentration_Text" xml:space="preserve">
+    <value>Operaciones: Reducir concentración en {0} ({1:N0} bins). Priorizar salida por compromisos comerciales o promociones en los próximos 30 días.</value>
+  </data>
+  <data name="Concentration_Color" xml:space="preserve"><value>#3d6fb0</value></data>
+  <data name="Concentration_Icon" xml:space="preserve"><value>Icons.Material.Filled.Inventory2</value></data>
+
+  <data name="Planning_Growth_Text" xml:space="preserve">
+    <value>Planificación: Preparar capacidad adicional (turnos/espacio de frío) ante crecimiento proyectado de {0:0.0}%. Estimar +{1} bins de capacidad adicional.</value>
+  </data>
+  <data name="Planning_Growth_Color" xml:space="preserve"><value>#4caf50</value></data>
+  <data name="Planning_Growth_Icon" xml:space="preserve"><value>Icons.Material.Filled.TrendingUp</value></data>
+
+  <data name="Planning_Default_Text" xml:space="preserve">
+    <value>Planificación: Mantener capacidad actual y monitorizar la evolución mensual (crecimiento {0:0.0}%).</value>
+  </data>
+  <data name="Planning_Default_Color" xml:space="preserve"><value>#4caf50</value></data>
+  <data name="Planning_Default_Icon" xml:space="preserve"><value>Icons.Material.Filled.CheckCircle</value></data>
+
+  <data name="Commercial_Logistica_Text" xml:space="preserve">
+    <value>Comercial/Logí­stica: Contactar clientes potenciales y lanzar ofertas puntuales para las variedades principales: {0}. Objetivo: reducir 15-25% del exceso en 30-60 días.</value>
+  </data>
+  <data name="Commercial_Logistica_Color" xml:space="preserve"><value>#2196f3</value></data>
+  <data name="Commercial_Logistica_Icon" xml:space="preserve"><value>Icons.Material.Filled.LocalActivity</value></data>
+
+  <data name="Default_NoActions_Text" xml:space="preserve"><value>No se detectaron acciones prioritarias con los datos actuales.</value></data>
+  <data name="Default_NoActions_Color" xml:space="preserve"><value>#9e9e9e</value></data>
+  <data name="Default_NoActions_Icon" xml:space="preserve"><value>Icons.Material.Filled.Info</value></data>
+</root>

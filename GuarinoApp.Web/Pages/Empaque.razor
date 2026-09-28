@@ -1,0 +1,118 @@
+@page "/empaque"
+@using MediatR
+@using MudBlazor
+@using GuarinoApp.Application.Modules.Empaque.Queries.GetEmpaque
+@using GuarinoApp.Application.Modules.Empaque.Dtos
+@inject IMediator Mediator
+
+<MudText Typo="Typo.h4" GutterBottom="true">📦 Gestión de Empaque</MudText>
+<MudText Typo="Typo.body2" Class="mb-4">Resumen de empaques y su ocupación</MudText>
+
+<MudCard>
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
+                    @(_loading ? "Cargando..." : "Actualizar")
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_data.Any())
+        {
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6" GutterBottom="true">Pallets por Empaque</MudText>
+                    <InteractiveChart Series="_chartSeries"
+                                      Labels="_labels"
+                                      Type="InteractiveChart.InteractiveChartType.Bar"
+                                      Height="300px" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6" GutterBottom="true">Ocupación de Empaques (%)</MudText>
+                    <InteractiveChart Series="_donutSeries" Labels="_labels" Type="InteractiveChart.InteractiveChartType.Donut" Height="300px" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Empaque</MudTh>
+                    <MudTh Numeric="true">Pallets</MudTh>
+                    <MudTh Numeric="true">Envases</MudTh>
+                    <MudTh Numeric="true">Peso (kg)</MudTh>
+                    <MudTh Numeric="true">Capacidad</MudTh>
+                    <MudTh Numeric="true">Ocupación</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.TipoEmpaque</MudTd>
+                    <MudTd Numeric="true">@context.TotalPallets</MudTd>
+                    <MudTd Numeric="true">@context.TotalEnvases</MudTd>
+                    <MudTd Numeric="true">@context.PesoTotal.ToString("N0")</MudTd>
+                    <MudTd Numeric="true">@context.CapacidadMaxima</MudTd>
+                    <MudTd Numeric="true">@(context.Ocupacion?.ToString() ?? "0")%</MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <DataSourceFooter EsDummy="true" Origen="Base de datos DTrace (Producción)"
+                              FechaActualizacion="@DateTime.Now"
+                              TotalRegistros="@_data.Count" />
+        }
+        else if (!_loading && _cargado)
+        {
+            <MudAlert Severity="Severity.Info">No se encontraron registros.</MudAlert>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<EmpaqueDto> _data = new();
+    private bool _loading = false;
+    private bool _cargado = false;
+    private List<ChartSeriesItem> _chartSeries = new();
+    private List<ChartSeriesItem> _donutSeries = new();
+    private string[] _labels = Array.Empty<string>();
+    private ChartOptions _chartOptions = new() { YAxisTicks = 3 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        _loading = true;
+        _cargado = false;
+        try
+        {
+            _data = await Mediator.Send(new GetEmpaqueQuery());
+            LoadCharts();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            _cargado = true;
+            StateHasChanged();
+        }
+    }
+
+    void LoadCharts()
+    {
+        var sorted = _data.OrderByDescending(x => x.TotalPallets).ToList();
+
+        _labels = sorted.Select(x => x.TipoEmpaque ?? "").ToArray();
+
+        _chartSeries = new List<ChartSeriesItem>
+        {
+            new ChartSeriesItem { Name = "Pallets", Data = sorted.Select(x => (double)x.TotalPallets).ToArray() }
+        };
+
+        _donutSeries = new List<ChartSeriesItem>
+        {
+            new ChartSeriesItem { Name = "Ocupación", Data = sorted.Select(x => (double)(x.Ocupacion ?? 0)).ToArray() }
+        };
+    }
+}

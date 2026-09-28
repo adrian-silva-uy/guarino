@@ -1,0 +1,223 @@
+@page "/frutavolcar"
+@using MediatR
+@using MudBlazor
+@using GuarinoApp.Application.Common.Filters
+@using GuarinoApp.Application.Common.Interfaces
+@using GuarinoApp.Application.Modules.FrutaVolcar.Queries.GetFrutaVolcar
+@using GuarinoApp.Application.Modules.FrutaVolcar.Dtos
+@inject IMediator Mediator
+@inject IExportService ExportService
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h4" Class="d-flex align-center gap-2">
+        <span style="font-size: 1.8rem; line-height: 1;">🍊</span>
+        Cítricos - Fruta a Volcar
+    </MudText>
+
+    <ExportToolbar ReportName="Citricos_Fruta_a_Volcar"
+                   @bind-FechaDesde="_fechaDesde"
+                   @bind-FechaHasta="_fechaHasta"
+                   OnRefresh="LoadData"
+                   IsLoading="_loading"
+                   OnExportPdf="ExportToPdf"
+                   OnExportExcel="ExportToExcel"
+                   OnExportCsv="ExportToCsv" />
+</div>
+
+<MudCard>
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading">Cargar datos</MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_data.Any())
+        {
+            <MudGrid Class="mt-4">
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6" Align="Align.Center">Kilos a Volcar por Productor</MudText>
+                    <InteractiveChart Series="_productorChartSeries"
+                                      Labels="_productorLabels"
+                                      Type="InteractiveChart.InteractiveChartType.Bar"
+                                      Height="300px" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6" Align="Align.Center">Resumen por Variedad</MudText>
+                    <InteractiveChart Series="_varietyChartSeries"
+                                      Labels="_varietyLabels"
+                                      Type="InteractiveChart.InteractiveChartType.Pie"
+                                      Height="300px" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm" Class="mt-6">
+                <HeaderContent>
+                    <MudTh>Lote</MudTh>
+                    <MudTh>Productor</MudTh>
+                    <MudTh>Variedad</MudTh>
+                    <MudTh Numeric="true">Cant. Bins</MudTh>
+                    <MudTh Numeric="true">Volcados</MudTh>
+                    <MudTh Numeric="true">Saldo</MudTh>
+                    <MudTh Numeric="true">Kg Saldo</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Lote">@context.Lote</MudTd>
+                    <MudTd DataLabel="Productor">@context.Productor</MudTd>
+                    <MudTd DataLabel="Variedad">@context.Variedad</MudTd>
+                    <MudTd DataLabel="Cant. Bins" Numeric="true">@context.CantBins</MudTd>
+                    <MudTd DataLabel="Volcados" Numeric="true">@context.Volcados</MudTd>
+                    <MudTd DataLabel="Saldo" Numeric="true">@context.Saldo</MudTd>
+                    <MudTd DataLabel="Kg Saldo" Numeric="true">@context.KgSaldo.ToString("N0")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else if (!_loading && _cargado)
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-4">No se encontraron registros.</MudAlert>
+        }
+
+        <DataSourceFooter EsDummy="true" Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<FrutaVolcarDto> _data = new();
+    private bool _loading = false;
+    private bool _cargado = false;
+    private DateTime? _fechaDesde = DateTime.Now.AddMonths(-3);
+    private DateTime? _fechaHasta = DateTime.Now;
+    private List<ChartSeriesItem> _productorChartSeries = new();
+    private List<ChartSeriesItem> _varietyChartSeries = new();
+    private string[] _productorLabels = Array.Empty<string>();
+    private string[] _varietyLabels = Array.Empty<string>();
+    private ChartOptions _chartOptions = new() { YAxisTicks = 3 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        _loading = true;
+        _cargado = false;
+        try
+        {
+            _data = await Mediator.Send(new GetFrutaVolcarQuery(new List<Filter>()));
+            LoadCharts();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            _cargado = true;
+            StateHasChanged();
+        }
+    }
+
+    void LoadCharts()
+    {
+        // 1. Datos por Productor (Gráfico de Barras)
+        var productorKgs = _data
+            .GroupBy(x => x.Productor)
+            .Select(g => new
+            {
+                Name = string.IsNullOrWhiteSpace(g.Key) ? "Sin productor" : g.Key,
+                Value = g.Sum(x => x.KgSaldo)
+            })
+            .OrderByDescending(x => x.Value)
+            .Take(10)
+            .ToList();
+
+        _productorLabels = productorKgs.Select(x => x.Name).ToArray();
+
+        _productorChartSeries = new List<ChartSeriesItem>
+    {
+        new ChartSeriesItem
+        {
+            Name = "Kg Saldo",
+            Data = productorKgs.Select(x => (double)x.Value).ToArray(),
+            Labels = _productorLabels // Asignación dentro del item
+        }
+    };
+
+        // 2. Datos por Variedad (Gráfico Torta/Pie)
+        var varietyKgs = _data
+            .GroupBy(x => x.Variedad)
+            .Select(g => new
+            {
+                Name = string.IsNullOrWhiteSpace(g.Key) ? "Sin variedad" : g.Key,
+                Value = g.Sum(x => x.KgSaldo)
+            })
+            .OrderByDescending(x => x.Value)
+            .Take(5)
+            .ToList();
+
+        _varietyLabels = varietyKgs.Select(x => x.Name).ToArray();
+
+        _varietyChartSeries = new List<ChartSeriesItem>
+    {
+        new ChartSeriesItem
+        {
+            Name = "Kg por variedad",
+            Data = varietyKgs.Select(x => (double)x.Value).ToArray(),
+            Labels = _varietyLabels // Asignación dentro del item
+        }
+    };
+    }
+
+    private async Task ExportToPdf()
+    {
+        if (!await EnsureDataForExportAsync()) return;
+        await ExportAsync(
+            () => ExportService.ExportToPdfAsync(_data, "Citricos - Fruta a Volcar"),
+            $"Citricos_Fruta_a_Volcar_{DateTime.Now:yyyyMMdd_HHmmss}.pdf",
+            "application/pdf");
+    }
+
+    private async Task ExportToExcel()
+    {
+        if (!await EnsureDataForExportAsync()) return;
+        await ExportAsync(
+            () => ExportService.ExportToExcelAsync(_data, "Fruta a Volcar"),
+            $"Citricos_Fruta_a_Volcar_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+
+    private async Task ExportToCsv()
+    {
+        if (!await EnsureDataForExportAsync()) return;
+        var fileName = $"Citricos_Fruta_a_Volcar_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+        await JS.InvokeVoidAsync("downloadFileFromText", fileName, ExportService.ExportToCsv(_data), "text/csv");
+        Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+    }
+
+    private Task<bool> EnsureDataForExportAsync()
+    {
+        if (_data.Any()) return Task.FromResult(true);
+        Snackbar.Add("No hay datos para exportar.", Severity.Warning);
+        return Task.FromResult(false);
+    }
+
+    private async Task ExportAsync(Func<Task<byte[]>> createFile, string fileName, string mimeType)
+    {
+        try
+        {
+            var bytes = await createFile();
+            if (bytes.Length == 0) throw new InvalidOperationException("El archivo generado esta vacio.");
+            await JS.InvokeVoidAsync("downloadFileFromByteArray", fileName, bytes, mimeType);
+            Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error exportando: {ex}");
+            Snackbar.Add($"No se pudo generar el archivo: {ex.Message}", Severity.Error);
+        }
+    }
+}

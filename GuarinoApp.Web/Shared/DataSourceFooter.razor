@@ -1,0 +1,57 @@
+﻿@using MudBlazor
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12">
+        <MudDivider />
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                    <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" /> Origen de datos
+                </MudText>
+                <MudText Typo="Typo.body2" Class="font-weight-bold">@Origen</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                    <MudIcon Icon="@Icons.Material.Filled.Update" Size="Size.Small" /> Última actualización
+                </MudText>
+                <MudText Typo="Typo.body2" Class="font-weight-bold">@FechaActualizacion.ToString("dd/MM/yyyy HH:mm")</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                    <MudIcon Icon="@Icons.Material.Filled.ViewList" Size="Size.Small" /> Total de registros
+                </MudText>
+                <MudText Typo="Typo.body2" Class="font-weight-bold">@TotalRegistros</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                @if (EsDummy)
+                {
+                    <MudChip Color="Color.Warning" Size="Size.Medium" Icon="Icons.Material.Filled.Warning">
+                        <MudText Typo="Typo.body2" FontWeight="FontWeight.Bold">⚠️ DATOS DE PRUEBA (DEMO)</MudText>
+                    </MudChip>
+                }
+                else
+                {
+                    <MudChip Color="Color.Success" Size="Size.Small">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" /> Datos sincronizados
+                    </MudChip>
+                }
+            </MudItem>
+        </MudGrid>
+        @if (EsDummy)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mt-2">
+                <MudText Typo="Typo.body2">
+                    <strong>⚠️ Nota:</strong> Los datos mostrados son de prueba (DEMO) y no corresponden a información real de producción.
+                    Conecta la aplicación a la base de datos real para ver datos auténticos.
+                </MudText>
+            </MudAlert>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter] public string Origen { get; set; } = "Base de datos DTrace (Producción)";
+    [Parameter] public DateTime FechaActualizacion { get; set; } = DateTime.Now;
+    [Parameter] public int TotalRegistros { get; set; } = 0;
+    [Parameter] public bool EsDummy { get; set; } = true;
+}

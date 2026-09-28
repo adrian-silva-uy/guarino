@@ -1,0 +1,55 @@
+@using MudBlazor
+
+<MudNavMenu>
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Primary">🏠 inicio</MudText>
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">
+        🏠 inicio
+    </MudNavLink>
+    <MudNavLink Href="/dashboard" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Dashboard" IconColor="Color.Primary">Dashboard Ejecutivo</MudNavLink>
+
+    <MudDivider Class="my-2" />
+
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Success">📦 OPERACIÓN DIARIA</MudText>
+    <MudNavLink Href="/stockgeneral" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Inventory" IconColor="Color.Success">Stock General</MudNavLink>
+    <MudNavLink Href="/stockplaya" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Warehouse" IconColor="Color.Success">Stock en Playa</MudNavLink>
+    <MudNavLink Href="/frutavolcar" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Apple" IconColor="Color.Success">Fruta a Volcar</MudNavLink>
+    <MudNavLink Href="/palletssincliente" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.ProductionQuantityLimits" IconColor="Color.Success">Pallets sin Cliente</MudNavLink>
+    <MudNavLink Href="/lotesvolcados" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.List" IconColor="Color.Success">Lotes Volcados</MudNavLink>
+    <MudNavLink Href="/registropesadas" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Balance" IconColor="Color.Success">Registro de Pesadas</MudNavLink>
+
+    <MudDivider Class="my-2" />
+
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Secondary">🤖 INTELIGENCIA ARTIFICIAL</MudText>
+    <MudNavLink Href="/proyeccion-volcados" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.TrendingUp" IconColor="Color.Secondary">Proyección de Volcados</MudNavLink>
+    <MudNavLink Href="/proyeccion-zafra" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.CalendarMonth" IconColor="Color.Secondary">Proyección de Zafra Siguiente</MudNavLink>
+    <MudNavLink Href="/iachat" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.SmartToy" IconColor="Color.Secondary">Asistente IA</MudNavLink>
+
+    <MudDivider Class="my-2" />
+
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Warning">📊 REPORTES Y ANÁLISIS</MudText>
+    <MudNavLink Href="/resumenliquidaciones" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.ReceiptLong" IconColor="Color.Warning">Resumen de Liquidaciones</MudNavLink>
+    <MudNavLink Href="/liquidacionesquinta" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.House" IconColor="Color.Warning">Liquidaciones de Quinta</MudNavLink>
+    <MudNavLink Href="/stockpalletssincliente" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Inventory2" IconColor="Color.Warning">Stock Pallets sin Cliente</MudNavLink>
+    <MudNavLink Href="/resumenmensual" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.BarChart" IconColor="Color.Warning">Resumen Mensual</MudNavLink>
+    <MudNavLink Href="/graficaprocesos" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.ShowChart" IconColor="Color.Warning">Gráfica de Procesos</MudNavLink>
+    <MudNavLink Href="/palletscontramarca" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Receipt" IconColor="Color.Warning">Pallets por Contramarca</MudNavLink>
+    <MudNavLink Href="/pallets-definitivos" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.ListAlt" IconColor="Color.Warning">Pallets Definitivos</MudNavLink>
+
+    <MudNavLink Href="/gestion-riesgos-climaticos" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Eco" IconColor="Color.Warning">
+        Gestión de Riesgos Climáticos
+    </MudNavLink>
+
+    <MudDivider Class="my-2" />
+
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Info">🚛 LOGÍSTICA Y RECURSOS</MudText>
+    <MudNavLink Href="/transportistas" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.LocalShipping" IconColor="Color.Info">Transportistas</MudNavLink>
+    <MudNavLink Href="/camioneszorras" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.FireTruck" IconColor="Color.Info">Camiones y Zorras</MudNavLink>
+    <MudNavLink Href="/lugares" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Route" IconColor="Color.Info">Lugares de Origen/Destino</MudNavLink>
+    <MudNavLink Href="/basculas" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Scale" IconColor="Color.Info">Básculas</MudNavLink>
+
+    <MudDivider Class="my-2" />
+
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Error">⚙️ ADMINISTRACIÓN</MudText>
+    <MudNavLink Href="/empaque" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Widgets" IconColor="Color.Error">Gestión de Empaque</MudNavLink>
+    @* <MudNavLink Href="/facturacion" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.RequestQuote" IconColor="Color.Error">Facturación</MudNavLink> *@
+</MudNavMenu>

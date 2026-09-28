@@ -1,0 +1,117 @@
+@using MudBlazor
+@inject IJSRuntime JS
+
+<div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-4 w-100">
+    <!-- SECCIÓN IZQUIERDA: FILTROS DE FECHA (OPCIONALES) -->
+    @if (ShowDateFilters)
+    {
+        <div class="d-flex align-center gap-2">
+            <MudDatePicker Label="Fecha Desde" 
+                           Date="@FechaDesde" 
+                           DateChanged="HandleFechaDesdeChanged" 
+                           DateFormat="dd-MM-yyyy"
+                           Margin="Margin.Dense" 
+                           Variant="Variant.Outlined" 
+                           Style="max-width: 160px;" />
+
+            <MudDatePicker Label="Fecha Hasta" 
+                           Date="@FechaHasta" 
+                           DateChanged="HandleFechaHastaChanged" 
+                           DateFormat="dd-MM-yyyy"
+                           Margin="Margin.Dense" 
+                           Variant="Variant.Outlined" 
+                           Style="max-width: 160px;" />
+
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       OnClick="@(() => OnRefresh.InvokeAsync())" 
+                       Disabled="IsLoading"
+                       StartIcon="@Icons.Material.Filled.Refresh">
+                @(IsLoading ? "Cargando..." : "Actualizar")
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <div></div>
+    }
+
+    <!-- SECCIÓN DERECHA: BOTONERA DE EXPORTACIÓN -->
+    <div class="d-flex align-center gap-1 ms-auto">
+        <MudText Typo="Typo.subtitle2" Color="Color.Tertiary" Class="mr-2">Exportar:</MudText>
+        
+        <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" 
+                       Color="Color.Error" 
+                       Size="Size.Medium" 
+                       Disabled="IsLoading"
+                       OnClick="HandleExportPdf" 
+                       Title="Exportar PDF / Imprimir" />
+
+        <MudIconButton Icon="@Icons.Material.Filled.GridOn" 
+                       Color="Color.Success" 
+                       Size="Size.Medium" 
+                       Disabled="IsLoading"
+                       OnClick="@(() => OnExportExcel.InvokeAsync())" 
+                       Title="Exportar Excel" />
+
+        <MudIconButton Icon="@Icons.Material.Filled.Download" 
+                       Color="Color.Primary" 
+                       Size="Size.Medium" 
+                       Disabled="IsLoading"
+                       OnClick="@(() => OnExportCsv.InvokeAsync())" 
+                       Title="Exportar CSV" />
+
+        <MudIconButton Icon="@Icons.Material.Filled.Email" 
+                       Color="Color.Secondary" 
+                       Size="Size.Medium" 
+                       Disabled="IsLoading"
+                       OnClick="@(() => OnExportEmail.InvokeAsync())" 
+                       Title="Enviar por correo" />
+
+        @if (!string.IsNullOrEmpty(ReportName))
+        {
+            <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="ml-2 fw-bold">@ReportName</MudText>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? ReportName { get; set; }
+    [Parameter] public DateTime? FechaDesde { get; set; }
+    [Parameter] public DateTime? FechaHasta { get; set; }
+    [Parameter] public EventCallback<DateTime?> FechaDesdeChanged { get; set; }
+    [Parameter] public EventCallback<DateTime?> FechaHastaChanged { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public bool ShowDateFilters { get; set; } = true;
+
+    [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public EventCallback OnExportPdf { get; set; }
+    [Parameter] public EventCallback OnExportExcel { get; set; }
+    [Parameter] public EventCallback OnExportCsv { get; set; }
+    [Parameter] public EventCallback OnExportEmail { get; set; }
+
+    private async Task HandleExportPdf()
+    {
+        if (OnExportPdf.HasDelegate)
+        {
+            await OnExportPdf.InvokeAsync();
+        }
+        else
+        {
+            // Fallback por defecto: Abrir la ventana de impresión/PDF del navegador
+            await JS.InvokeVoidAsync("print");
+        }
+    }
+
+    private async Task HandleFechaDesdeChanged(DateTime? date)
+    {
+        FechaDesde = date;
+        await FechaDesdeChanged.InvokeAsync(date);
+    }
+
+    private async Task HandleFechaHastaChanged(DateTime? date)
+    {
+        FechaHasta = date;
+        await FechaHastaChanged.InvokeAsync(date);
+    }
+}

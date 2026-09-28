@@ -1,0 +1,77 @@
+@page "/lugaresdestino"
+@using MediatR
+@using MudBlazor
+@using GuarinoApp.Application.Modules.LugaresDestino.Queries.GetLugaresDestino
+@using GuarinoApp.Application.Modules.LugaresDestino.Dtos
+@inject IMediator Mediator
+
+<MudText Typo="Typo.h4" GutterBottom="true">📍 Lugares de Destino</MudText>
+<MudText Typo="Typo.body2" Class="mb-4">Gestión y visualización de datos</MudText>
+
+<MudCard>
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
+                    @(_loading ? "Cargando..." : "Cargar datos")
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_data.Any())
+        {
+            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    @foreach (var prop in typeof(LugaresDestinoDto).GetProperties())
+                    {
+                        <MudTh>@prop.Name</MudTh>
+                    }
+                </HeaderContent>
+                <RowTemplate>
+                    @foreach (var prop in typeof(LugaresDestinoDto).GetProperties())
+                    {
+                        var value = prop.GetValue(context);
+                        <MudTd>@value?.ToString()</MudTd>
+                    }
+                </RowTemplate>
+            </MudTable>
+
+            <DataSourceFooter Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
+        }
+        else if (!_loading && _cargado)
+        {
+            <MudAlert Severity="Severity.Info">No se encontraron registros.</MudAlert>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<LugaresDestinoDto> _data = new();
+    private bool _loading = false;
+    private bool _cargado = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        _loading = true;
+        _cargado = false;
+        try
+        {
+            _data = await Mediator.Send(new GetLugaresDestinoQuery());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            _cargado = true;
+            StateHasChanged();
+        }
+    }
+}

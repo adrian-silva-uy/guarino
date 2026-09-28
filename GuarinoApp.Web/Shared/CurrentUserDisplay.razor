@@ -1,0 +1,21 @@
+﻿@inject AuthenticationStateProvider AuthProvider
+@inject GuarinoApp.Application.Common.Interfaces.ICurrentUserService CurrentUserService
+
+<MudText Typo="Typo.body2" Class="d-inline-flex align-items-center">
+    <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Class="mr-1" Size="Size.Small" />
+    @_name
+    @if (CurrentUserService.IsInRole("Gerencia"))
+    {
+        <MudChip Color="Color.Primary" Size="Size.Small" Class="ml-2">Gerencia</MudChip>
+    }
+</MudText>
+
+@code {
+    private string? _name;
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _name = user.Identity?.Name ?? "Sin autenticar";
+    }
+}

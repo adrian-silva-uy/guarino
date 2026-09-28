@@ -1,0 +1,89 @@
+﻿using Blazored.LocalStorage;
+using GuarinoApp.Application;
+using GuarinoApp.Application.Settings;
+using GuarinoApp.Infrastructure;
+using GuarinoApp.Infrastructure.Data;
+using GuarinoApp.Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication.Negotiate;
+using MudBlazor.Services;
+using System.Globalization;
+using GuarinoApp.Application.Common.Interfaces;
+
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme).AddNegotiate();
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
+builder.Services.AddMudServices();
+builder.Services.AddBlazoredLocalStorage();
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
+
+// Agregar caché distribuido en memoria
+builder.Services.AddStackExchangeRedisCache(options =>
+    {
+    var connectionString = builder.Configuration.GetConnectionString("Redis");
+    if (string.IsNullOrEmpty(connectionString))
+        {
+        // Si no hay Redis configurado, usar caché en memoria
+        builder.Services.AddMemoryCache();
+        builder.Services.AddDistributedMemoryCache();
+        }
+    else
+        {
+        options.Configuration = connectionString;
+        }
+    });
+
+// Configurar ClimateRisk desde appsettings
+builder.Services.Configure<ClimateRiskSettings>(
+    builder.Configuration.GetSection(ClimateRiskSettings.SectionName));
+
+// IClimateService con OpenMeteoClimateService
+builder.Services.AddScoped<IClimateService, OpenMeteoClimateService>();
+
+// Registrar servicio de Riesgo Climático
+builder.Services.AddScoped<IClimateRiskService, ClimateRiskService>();
+
+// Background service para detección automática
+builder.Services.AddHostedService<ClimateDetectionBackgroundService>();
+
+// HttpClient genérico
+builder.Services.AddHttpClient();
+
+// Opciones de Ollama
+builder.Services.AddOptions<OllamaOptions>()
+    .BindConfiguration(OllamaOptions.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+QuestPdfFontRegistrar.RegisterFonts();
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapRazorPages();
+app.MapBlazorHub();
+app.MapFallbackToPage("/_Host");
+
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    DbInitializer.Initialize(context);
+}
+
+app.Run();

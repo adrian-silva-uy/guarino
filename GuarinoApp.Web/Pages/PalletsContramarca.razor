@@ -1,0 +1,75 @@
+@page "/palletscontramarca"
+@using MediatR
+@using MudBlazor
+@using GuarinoApp.Application.Modules.PalletsContramarca.Queries.GetPalletsContramarca
+@using GuarinoApp.Application.Modules.PalletsContramarca.Dtos
+@inject IMediator Mediator
+
+<MudText Typo="Typo.h4" GutterBottom="true">📋 Pallets por Contramarca</MudText>
+
+<MudCard>
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
+                    @(_loading ? "Cargando..." : "Cargar datos")
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_data.Any())
+        {
+            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Contramarca</MudTh>
+                    <MudTh Numeric="true">Total Pallets</MudTh>
+                    <MudTh Numeric="true">Total Envases</MudTh>
+                    <MudTh Numeric="true">Peso Total (kg)</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Contramarca</MudTd>
+                    <MudTd Numeric="true">@context.TotalPallets</MudTd>
+                    <MudTd Numeric="true">@context.TotalEnvases</MudTd>
+                    <MudTd Numeric="true">@context.PesoTotal.ToString("N2")</MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <MudText Typo="Typo.body2" Class="mt-4">Total registros: @_data.Count</MudText>
+        }
+        else if (!_loading && _cargado)
+        {
+            <MudAlert Severity="Severity.Info">No se encontraron registros.</MudAlert>
+        }
+    <DataSourceFooter EsDummy="true" Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />`n`</MudCardContent>
+</MudCard>
+
+@code {
+    private List<PalletContramarcaDto> _data = new();
+    private bool _loading = false;
+    private bool _cargado = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        _loading = true;
+        _cargado = false;
+        try
+        {
+            _data = await Mediator.Send(new GetPalletsContramarcaQuery());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            _cargado = true;
+            StateHasChanged();
+        }
+    }
+}
