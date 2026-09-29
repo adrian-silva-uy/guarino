@@ -1,193 +1,196 @@
 is_global = true
 build_property.TargetFramework = net8.0
+build_property.TargetFrameworkIdentifier = .NETCoreApp
+build_property.TargetFrameworkVersion = v8.0
 build_property.TargetPlatformMinVersion = 
 build_property.UsingMicrosoftNETSdkWeb = true
 build_property.ProjectTypeGuids = 
 build_property.InvariantGlobalization = 
 build_property.PlatformNeutralAssembly = 
 build_property.EnforceExtendedAnalyzerRules = 
+build_property.EntryPointFilePath = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = GuarinoApp.Web
 build_property.RootNamespace = GuarinoApp.Web
-build_property.ProjectDir = C:\Guarino\GuarinoApp.Web\
+build_property.ProjectDir = C:\Claude-Proyectos\Guarino\GuarinoApp.Web\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.RazorLangVersion = 8.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
-build_property.MSBuildProjectDirectory = C:\Guarino\GuarinoApp.Web
+build_property.MSBuildProjectDirectory = C:\Claude-Proyectos\Guarino\GuarinoApp.Web
 build_property._RazorSourceGeneratorDebug = 
-build_property.EffectiveAnalysisLevelStyle = 9.0
+build_property.EffectiveAnalysisLevelStyle = 10.0
 build_property.EnableCodeStyleSeverity = 
 
-[C:/Guarino/GuarinoApp.Web/App.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/App.razor]
 build_metadata.AdditionalFiles.TargetPath = QXBwLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/Basculas.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/Basculas.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQmFzY3VsYXMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/CamionesZorras.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/CamionesZorras.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ2FtaW9uZXNab3JyYXMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/Counter.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/Counter.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ291bnRlci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/Dashboard.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/Dashboard.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRGFzaGJvYXJkLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/Empaque.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/Empaque.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRW1wYXF1ZS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/Facturacion.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/Facturacion.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRmFjdHVyYWNpb24ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/FrutaVolcar.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/FrutaVolcar.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRnJ1dGFWb2xjYXIucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/Gerencia.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/Gerencia.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcR2VyZW5jaWEucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/GestionRiesgosClimaticos.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/GestionRiesgosClimaticos.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcR2VzdGlvblJpZXNnb3NDbGltYXRpY29zLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/GraficaProcesos.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/GraficaProcesos.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcR3JhZmljYVByb2Nlc29zLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/IAChat.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/IAChat.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSUFDaGF0LnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/Index.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/Index.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSW5kZXgucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/LiquidacionesQuinta.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/LiquidacionesQuinta.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTGlxdWlkYWNpb25lc1F1aW50YS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/LotesVolcados.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/LotesVolcados.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTG90ZXNWb2xjYWRvcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/Lugares.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/Lugares.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTHVnYXJlcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/LugaresDestino.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/LugaresDestino.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTHVnYXJlc0Rlc3Rpbm8ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/LugaresOrigen.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/LugaresOrigen.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTHVnYXJlc09yaWdlbi5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/PalletsContramarca.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/PalletsContramarca.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUGFsbGV0c0NvbnRyYW1hcmNhLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/PalletsDefinitivos.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/PalletsDefinitivos.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUGFsbGV0c0RlZmluaXRpdm9zLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/PalletsSinCliente.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/PalletsSinCliente.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUGFsbGV0c1NpbkNsaWVudGUucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/ProyeccionVolcados.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/ProyeccionVolcados.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUHJveWVjY2lvblZvbGNhZG9zLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/ProyeccionZafra.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/ProyeccionZafra.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUHJveWVjY2lvblphZnJhLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/RegistroPesadas.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/RegistroPesadas.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUmVnaXN0cm9QZXNhZGFzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/ResumenLiquidaciones.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/ResumenLiquidaciones.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUmVzdW1lbkxpcXVpZGFjaW9uZXMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/ResumenMensual.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/ResumenMensual.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUmVzdW1lbk1lbnN1YWwucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/StockGeneral.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/StockGeneral.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU3RvY2tHZW5lcmFsLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/StockPalletsSinCliente.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/StockPalletsSinCliente.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU3RvY2tQYWxsZXRzU2luQ2xpZW50ZS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/StockPlaya.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/StockPlaya.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU3RvY2tQbGF5YS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/Transportistas.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/Transportistas.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVHJhbnNwb3J0aXN0YXMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Shared/CurrentUserDisplay.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Shared/CurrentUserDisplay.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXEN1cnJlbnRVc2VyRGlzcGxheS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Shared/DataSourceFooter.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Shared/DataSourceFooter.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXERhdGFTb3VyY2VGb290ZXIucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Shared/ExportToolbar.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Shared/ExportToolbar.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXEV4cG9ydFRvb2xiYXIucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Shared/InteractiveChart.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Shared/InteractiveChart.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXEludGVyYWN0aXZlQ2hhcnQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Shared/SendEmailDialog.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Shared/SendEmailDialog.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXFNlbmRFbWFpbERpYWxvZy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Shared/SimpleDialog.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Shared/SimpleDialog.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXFNpbXBsZURpYWxvZy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Shared/SurveyPrompt.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Shared/SurveyPrompt.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXFN1cnZleVByb21wdC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/_Imports.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/_Imports.razor]
 build_metadata.AdditionalFiles.TargetPath = X0ltcG9ydHMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Shared/MainLayout.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Shared/MainLayout.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXE1haW5MYXlvdXQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = b-24ilkifscj
 
-[C:/Guarino/GuarinoApp.Web/Shared/NavMenu.razor]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Shared/NavMenu.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXE5hdk1lbnUucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = b-m0ascx3i4q
 
-[C:/Guarino/GuarinoApp.Web/Pages/Error.cshtml]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/Error.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXJyb3IuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/_Host.cshtml]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/_Host.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX0hvc3QuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Guarino/GuarinoApp.Web/Pages/_Layout.cshtml]
+[C:/Claude-Proyectos/Guarino/GuarinoApp.Web/Pages/_Layout.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX0xheW91dC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 

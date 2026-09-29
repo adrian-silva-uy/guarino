@@ -14,11 +14,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Guarino\\GuarinoApp.Domain\\GuarinoApp.Domain.csproj",
+      "projectUniqueName": "C:\\Claude-Proyectos\\Guarino\\GuarinoApp.Domain\\GuarinoApp.Domain.csproj",
       "projectName": "GuarinoApp.Domain",
-      "projectPath": "C:\\Guarino\\GuarinoApp.Domain\\GuarinoApp.Domain.csproj",
+      "projectPath": "C:\\Claude-Proyectos\\Guarino\\GuarinoApp.Domain\\GuarinoApp.Domain.csproj",
       "packagesPath": "C:\\Users\\ADRIA\\.nuget\\packages\\",
-      "outputPath": "C:\\Guarino\\GuarinoApp.Domain\\obj\\",
+      "outputPath": "C:\\Claude-Proyectos\\Guarino\\GuarinoApp.Domain\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

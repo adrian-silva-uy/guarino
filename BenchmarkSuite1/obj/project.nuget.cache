@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "g2iBDb1lKME=",
+  "dgSpecHash": "etf0koRK3zc=",
   "success": true,
-  "projectFilePath": "C:\\Guarino\\BenchmarkSuite1\\BenchmarkSuite1.csproj",
+  "projectFilePath": "C:\\Claude-Proyectos\\Guarino\\BenchmarkSuite1\\BenchmarkSuite1.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\ADRIA\\.nuget\\packages\\benchmarkdotnet\\0.15.2\\benchmarkdotnet.0.15.2.nupkg.sha512",
     "C:\\Users\\ADRIA\\.nuget\\packages\\benchmarkdotnet.annotations\\0.15.2\\benchmarkdotnet.annotations.0.15.2.nupkg.sha512",

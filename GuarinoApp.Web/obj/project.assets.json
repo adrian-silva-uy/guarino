@@ -6824,11 +6824,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Guarino\\GuarinoApp.Web\\GuarinoApp.Web.csproj",
+      "projectUniqueName": "C:\\Claude-Proyectos\\Guarino\\GuarinoApp.Web\\GuarinoApp.Web.csproj",
       "projectName": "GuarinoApp.Web",
-      "projectPath": "C:\\Guarino\\GuarinoApp.Web\\GuarinoApp.Web.csproj",
+      "projectPath": "C:\\Claude-Proyectos\\Guarino\\GuarinoApp.Web\\GuarinoApp.Web.csproj",
       "packagesPath": "C:\\Users\\ADRIA\\.nuget\\packages\\",
-      "outputPath": "C:\\Guarino\\GuarinoApp.Web\\obj\\",
+      "outputPath": "C:\\Claude-Proyectos\\Guarino\\GuarinoApp.Web\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -6849,11 +6849,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\Guarino\\GuarinoApp.Application\\GuarinoApp.Application.csproj": {
-              "projectPath": "C:\\Guarino\\GuarinoApp.Application\\GuarinoApp.Application.csproj"
+            "C:\\Claude-Proyectos\\Guarino\\GuarinoApp.Application\\GuarinoApp.Application.csproj": {
+              "projectPath": "C:\\Claude-Proyectos\\Guarino\\GuarinoApp.Application\\GuarinoApp.Application.csproj"
             },
-            "C:\\Guarino\\GuarinoApp.Infrastructure\\GuarinoApp.Infrastructure.csproj": {
-              "projectPath": "C:\\Guarino\\GuarinoApp.Infrastructure\\GuarinoApp.Infrastructure.csproj"
+            "C:\\Claude-Proyectos\\Guarino\\GuarinoApp.Infrastructure\\GuarinoApp.Infrastructure.csproj": {
+              "projectPath": "C:\\Claude-Proyectos\\Guarino\\GuarinoApp.Infrastructure\\GuarinoApp.Infrastructure.csproj"
             }
           }
         }
