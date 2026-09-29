@@ -93,6 +93,48 @@
             </div>
         </div>
 
+        <!-- KPIs Financieros Detallados -->
+        <MudCard Class="mb-4" Outlined="true" Style="border-left: 4px solid var(--mud-palette-primary);">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">💰 Impacto Financiero Estimado</MudText>
+                    <MudText Typo="Typo.caption">Cálculos basados en umbrales configurados y datos históricos</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">Kilos Perdidos Totales</MudText>
+                        <MudText Typo="Typo.h5" Class="fw-bold text-danger">
+                            @resumen.KilosPerdidosTotales.ToString("N0") kg
+                        </MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">% Pérdida Total</MudText>
+                        <MudText Typo="Typo.h5" Class="fw-bold text-warning">
+                            @(resumen.PorcentajePerdidaTotal > 0 ? $"{resumen.PorcentajePerdidaTotal:0.##}%" : "N/D")
+                        </MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">Kilos en Riesgo (Pronóstico)</MudText>
+                        <MudText Typo="Typo.h5" Class="fw-bold text-info">
+                            @resumen.KilosEnRiesgoPronosticado.ToString("N0") kg
+                        </MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">Tipo Más Frecuente</MudText>
+                        <MudText Typo="Typo.h5" Class="fw-bold">
+                            @resumen.TipoEventoMasFrecuente
+                        </MudText>
+                    </MudItem>
+                </MudGrid>
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.body2" Color="Color.Tertiary">
+                    <strong>Observaciones:</strong> @resumen.Observaciones
+                </MudText>
+            </MudCardContent>
+        </MudCard>
+
         <MudCard Class="mb-4">
             <MudCardHeader><CardHeaderContent><MudText Typo="Typo.h6">Resumen por Severidad y Tipo</MudText></CardHeaderContent></MudCardHeader>
             <MudCardContent>

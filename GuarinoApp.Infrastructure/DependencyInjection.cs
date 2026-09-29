@@ -1,6 +1,7 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Infrastructure.Data;
 using GuarinoApp.Infrastructure.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -82,6 +83,9 @@ namespace GuarinoApp.Infrastructure
 
             // Registrar servicio de auditoría
             services.AddScoped<IAuditService, AuditService>();
+
+            // Registrar proveedor de estado de autenticación personalizado
+            services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
 
             return services;
             }
