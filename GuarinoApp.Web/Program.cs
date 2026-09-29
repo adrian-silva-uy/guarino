@@ -206,6 +206,15 @@ app.Use(async (context, next) =>
 });
 
 // ============================================================================
+// PERMISOS ADICIONALES PARA BLAZOR SERVER
+// ============================================================================
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("Feature-Policy", "unload 'self'");
+    await next();
+});
+
+// ============================================================================
 // HEALTH CHECKS ENDPOINTS
 // ============================================================================
 app.MapHealthChecks("/health");
