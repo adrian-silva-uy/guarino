@@ -1,21 +1,25 @@
-﻿@inject AuthenticationStateProvider AuthProvider
-@inject GuarinoApp.Application.Common.Interfaces.ICurrentUserService CurrentUserService
+﻿@inject GuarinoApp.Application.Common.Interfaces.ICurrentUserService CurrentUserService
 
 <MudText Typo="Typo.body2" Class="d-inline-flex align-items-center">
     <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Class="mr-1" Size="Size.Small" />
-    @_name
-    @if (CurrentUserService.IsInRole("Gerencia"))
+    @if (CurrentUserService.IsAuthenticated)
     {
-        <MudChip Color="Color.Primary" Size="Size.Small" Class="ml-2">Gerencia</MudChip>
+        <span>@CurrentUserService.UserName</span>
+        @if (CurrentUserService.IsInRole("Gerencia"))
+        {
+            <MudChip Color="Color.Primary" Size="Size.Small" Class="ml-2">Gerencia</MudChip>
+        }
+        else if (CurrentUserService.IsInRole("Contador"))
+        {
+            <MudChip Color="Color.Success" Size="Size.Small" Class="ml-2">Contador</MudChip>
+        }
+        else if (CurrentUserService.IsInRole("Operador"))
+        {
+            <MudChip Color="Color.Warning" Size="Size.Small" Class="ml-2">Operador</MudChip>
+        }
+    }
+    else
+    {
+        <span class="text-muted">Sin autenticar</span>
     }
 </MudText>
-
-@code {
-    private string? _name;
-    protected override async Task OnInitializedAsync()
-    {
-        var authState = await AuthProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-        _name = user.Identity?.Name ?? "Sin autenticar";
-    }
-}
