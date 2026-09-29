@@ -182,17 +182,8 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
-app.UseResponseCompression();
-app.UseStaticFiles();
-app.UseRouting();
-app.UseCors();
-app.UseRateLimiter();
-app.UseAuthentication();
-app.UseAuthorization();
-
 // ============================================================================
-// HEADERS DE SEGURIDAD
+// HEADERS DE SEGURIDAD - Debe estar al inicio del pipeline para aplicar a todas las respuestas
 // ============================================================================
 app.Use(async (context, next) =>
 {
@@ -202,17 +193,18 @@ app.Use(async (context, next) =>
     context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
     // Permitir evento unload para Blazor Server (necesario para el funcionamiento correcto)
     context.Response.Headers.Append("Permissions-Policy", "unload=(), camera=(), microphone=(), geolocation=()");
-    await next();
-});
-
-// ============================================================================
-// PERMISOS ADICIONALES PARA BLAZOR SERVER
-// ============================================================================
-app.Use(async (context, next) =>
-{
     context.Response.Headers.Append("Feature-Policy", "unload 'self'");
     await next();
 });
+
+app.UseHttpsRedirection();
+app.UseResponseCompression();
+app.UseStaticFiles();
+app.UseRouting();
+app.UseCors();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
 
 // ============================================================================
 // HEALTH CHECKS ENDPOINTS
