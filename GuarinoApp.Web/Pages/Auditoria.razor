@@ -1,0 +1,197 @@
+@page "/auditoria"
+@using MediatR
+@using MudBlazor
+@using GuarinoApp.Application.Modules.Auditoria.Queries.GetLogs
+@using GuarinoApp.Application.Modules.Auditoria.Dtos
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject Microsoft.Extensions.Logging.ILogger<Auditoria> Logger
+
+<PageTitle>Auditoría - Logs del Sistema</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark">📋 Auditoría del Sistema</h2>
+            <p class="text-muted mb-0">Registro de actividad de usuarios - Quién, cuándo y qué hizo</p>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CargarLogs" StartIcon="@Icons.Material.Filled.Refresh">
+            Actualizar
+        </MudButton>
+    </div>
+
+    <!-- Filtros -->
+    <MudCard Elevation="1" Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" GutterBottom="true">Filtros de Búsqueda</MudText>
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudDatePicker Label="Fecha Desde" Date="_fechaDesde" DateChanged="OnFechaDesdeChanged" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudDatePicker Label="Fecha Hasta" Date="_fechaHasta" DateChanged="OnFechaHastaChanged" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudTextField @bind-Value="_userName" Label="Usuario" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudTextField @bind-Value="_action" Label="Acción" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+            <div class="d-flex justify-content-end mt-3">
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="LimpiarFiltros" Class="me-2">
+                    Limpiar
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CargarLogs">
+                    Buscar
+                </MudButton>
+            </div>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Tabla de Logs -->
+    @if (_loading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <MudProgressCircular Color="Color.Primary" Size="Size.Large" />
+        </div>
+    }
+    else if (_logs == null || !_logs.Items.Any())
+    {
+        <MudAlert Severity="Severity.Info">No se encontraron registros con los filtros seleccionados.</MudAlert>
+    }
+    else
+    {
+        <MudCard Elevation="1">
+            <MudCardContent>
+                <MudText Typo="Typo.h6" GutterBottom="true">
+                    Registros (@_logs.TotalCount total)
+                </MudText>
+                <MudTable Items="@_logs.Items" Hover="true" Dense="true" Striped="true" Breakpoint="Breakpoint.Sm">
+                    <HeaderContent>
+                        <MudTh>Fecha/Hora</MudTh>
+                        <MudTh>Usuario</MudTh>
+                        <MudTh>Rol</MudTh>
+                        <MudTh>Acción</MudTh>
+                        <MudTh>Módulo</MudTh>
+                        <MudTh>Descripción</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Fecha/Hora">@context.Timestamp.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                        <MudTd DataLabel="Usuario">
+                            <MudText Typo="Typo.body2" Class="fw-bold">@context.UserName</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Rol">
+                            <MudChip Size="Size.Small" Color="@GetRoleColor(context.Role)">@context.Role</MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Acción">
+                            <MudChip Size="Size.Small" Color="@GetActionColor(context.Action)">@context.Action</MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Módulo">@context.Module</MudTd>
+                        <MudTd DataLabel="Descripción">
+                            <MudText Typo="Typo.body2">@context.Description</MudText>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+
+                <!-- Paginación -->
+                @if (_logs.TotalPages > 1)
+                {
+                    <div class="d-flex justify-content-center mt-4">
+                        <MudPagination Total="_logs.TotalPages" SelectedPage="_page" SelectedPageChanged="OnPageChanged" />
+                    </div>
+                }
+            </MudCardContent>
+        </MudCard>
+    }
+</div>
+
+@code {
+    private bool _loading = false;
+    private PagedResult<LogDto>? _logs;
+    private int _page = 1;
+    private const int PageSize = 50;
+
+    private DateTime? _fechaDesde = null;
+    private DateTime? _fechaHasta = null;
+    private string? _userName = null;
+    private string? _action = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarLogs();
+    }
+
+    private async Task CargarLogs()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var query = new GetLogsQuery(
+                FechaDesde: _fechaDesde,
+                FechaHasta: _fechaHasta,
+                UserName: _userName,
+                Action: _action,
+                Page: _page,
+                PageSize: PageSize
+            );
+
+            _logs = await Mediator.Send(query);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al cargar logs de auditoría");
+            Snackbar.Add("Error al cargar los registros", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnFechaDesdeChanged(DateTime? date)
+    {
+        _fechaDesde = date;
+    }
+
+    private void OnFechaHastaChanged(DateTime? date)
+    {
+        _fechaHasta = date;
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await CargarLogs();
+    }
+
+    private void LimpiarFiltros()
+    {
+        _fechaDesde = null;
+        _fechaHasta = null;
+        _userName = null;
+        _action = null;
+        _page = 1;
+    }
+
+    private static Color GetRoleColor(string? role) => role switch
+    {
+        "Gerencia" => Color.Primary,
+        "Contador" => Color.Success,
+        "Operador" => Color.Warning,
+        _ => Color.Default
+    };
+
+    private static Color GetActionColor(string action) => action switch
+    {
+        "Create" => Color.Success,
+        "Update" => Color.Warning,
+        "Delete" => Color.Error,
+        "Export" => Color.Info,
+        "View" => Color.Default,
+        _ => Color.Default
+    };
+}

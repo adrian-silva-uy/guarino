@@ -27,6 +27,8 @@ namespace GuarinoApp.Application.Common.Interfaces
         // Lectura keyless / vistas externas
         DbSet<RitmoCalibradora> RitmosCalibradora { get; }
         DbSet<EventoClimatico> EventosClimaticos { get; }
+        DbSet<FinancialData> FinancialData { get; }
+        DbSet<LogEntry> LogEntries { get; }
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
         }
     }

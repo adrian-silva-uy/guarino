@@ -154,7 +154,13 @@
                     @if (_isLoading)
                     {
                         <div class="chat-row chat-row-bot">
-                            <MudProgressCircular Color="Color.Primary" Size="Size.Small" Class="ml-2" />
+                            <div class="chat-bubble chat-bubble-bot">
+                                <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" Class="chat-bubble-icon" />
+                                <span class="chat-bubble-text">
+                                    <MudProgressCircular Color="Color.Primary" Size="Size.Small" Class="mr-2" />
+                                    <span>Escribiendo...</span>
+                                </span>
+                            </div>
                         </div>
                     }
                 </MudPaper>

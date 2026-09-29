@@ -5,6 +5,8 @@
 @using GuarinoApp.Application.Modules.Proyeccion.Dtos
 @using GuarinoApp.Application.Modules.ClimateRisk.Queries
 @using GuarinoApp.Application.Modules.ClimateRisk.Dtos
+@using GuarinoApp.Application.Modules.Contaduria.Queries.GetFinancialData
+@using GuarinoApp.Application.Modules.Contaduria.Dtos
 @using GuarinoApp.Application.Common.Interfaces
 @using GuarinoApp.Application.Common.Dtos
 @using System.Globalization
@@ -104,12 +106,12 @@
                                         else if (_kpiFinanciero != null)
                                         {
                                             <MudText Typo="Typo.h4" Class="mt-1 fw-bold text-primary">
-                                                @_kpiFinanciero.CapitalNecesario.ToString("N0", CultureInfo.InvariantCulture)
+                                                $@_kpiFinanciero.CapitalNecesario.ToString("N0", CultureInfo.InvariantCulture)
                                             </MudText>
                                             @if (_kpiFinanciero.BrechaLiquidez > 0)
                                             {
                                                 <MudText Typo="Typo.caption" Color="Color.Error">
-                                                    +@(_kpiFinanciero.BrechaLiquidez.ToString("N0", CultureInfo.InvariantCulture)) vs. Caja Actual
+                                                    +$@_kpiFinanciero.BrechaLiquidez.ToString("N0", CultureInfo.InvariantCulture) vs. Caja Actual
                                                 </MudText>
                                             }
                                             else
@@ -128,7 +130,14 @@
                                 </div>
                                 <MudDivider Class="my-2" />
                                 <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="font-size: 0.8rem;">
-                                    Calculado con Costos Históricos Reales y Proyección de Volumen.
+                                    @if (_kpiFinanciero != null && _kpiFinanciero.CapitalNecesario == 0)
+                                    {
+                                        <span>⚠️ Requiere datos de Contaduría (costo/kg, flujo de caja) para calcular.</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Calculado con Costos Históricos Reales y Proyección de Volumen.</span>
+                                    }
                                 </MudText>
                             </MudCardContent>
                         </MudCard>
@@ -396,6 +405,7 @@
     private List<BusinessSuggestionDto>? _estrategiaZafra;
     private FinancialKpiDto? _kpiFinanciero;
     private List<ScenarioDto> _escenarios = new();
+    private FinancialDataDto? _datosFinancieros;
 
     private decimal? _porcentajeManual = null;
 
@@ -459,6 +469,9 @@
         // su propio indicador y no bloquea el resto de la pantalla.
         StateHasChanged();
 
+        // Cargar datos financieros de Contaduría para cálculos de KPIs
+        await CargarDatosFinancierosAsync();
+
         // Impacto climático sobre la proyección: se espera (no fire-and-forget) porque comparte
         // la misma instancia de DbContext (scoped al circuito Blazor) que DashboardService y el
         // resto de esta página. Lanzarlo en paralelo con esas otras llamadas rompe con
@@ -478,6 +491,12 @@
         {
             var capacidadMax = ordenadas.Max(z => z.TotalKgs);
             var stockActual = await DashboardService.GetTotalStockAsync(DateTime.Now);
+
+            // Si hay datos financieros de Contaduría, calcular KPIs directamente
+            if (_datosFinancieros != null)
+            {
+                CalcularKPIsLocales(proyectada, capacidadMax, stockActual);
+            }
 
             var resultadoIA = await AIService.GetZafraInteligentStrategyAsync(
                 proyectada,
@@ -524,6 +543,66 @@
         {
             Logger.LogWarning(ex, "No se pudo calcular el impacto climático sobre la proyección de zafra");
         }
+    }
+
+    private async Task CargarDatosFinancierosAsync()
+    {
+        try
+        {
+            _datosFinancieros = await Mediator.Send(new GetFinancialDataQuery());
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "No se pudieron cargar los datos financieros de Contaduría");
+        }
+    }
+
+    /// <summary>
+    /// Calcula KPIs financieros localmente usando los datos de Contaduría.
+    /// Esto permite mostrar valores reales sin depender de la IA.
+    /// </summary>
+    private void CalcularKPIsLocales(ZafraDto proyectada, decimal capacidadMax, int stockActual)
+    {
+        if (_datosFinancieros == null) return;
+
+        var costoPorKg = _datosFinancieros.CostoPorKg;
+        var flujoCaja = _datosFinancieros.FlujoCaja;
+        var capacidadInstalada = _datosFinancieros.CapacidadInstalada;
+
+        // Capital necesario = (Proyección * CostoPorKg) - StockActual
+        var capitalNecesario = (proyectada.TotalKgs * costoPorKg) - stockActual;
+
+        // Brecha de liquidez = Capital necesario - Flujo de caja
+        var brechaLiquidez = capitalNecesario - flujoCaja;
+
+        // Riesgo de liquidez
+        string riesgoLiquidez;
+        if (flujoCaja > 0)
+        {
+            var porcentajeBrecha = (brechaLiquidez / flujoCaja) * 100;
+            riesgoLiquidez = porcentajeBrecha > 30 ? "ALTO" : porcentajeBrecha > 10 ? "MEDIO" : "BAJO";
+        }
+        else
+        {
+            riesgoLiquidez = "N/D";
+        }
+
+        // Oportunidad CAPEX
+        var oportunidadCapex = capacidadInstalada > 0 && proyectada.TotalKgs > capacidadInstalada * 1.15m
+            ? "ALTA"
+            : "BAJA";
+
+        _kpiFinanciero = new FinancialKpiDto
+        {
+            CapitalNecesario = Math.Max(0, capitalNecesario),
+            BrechaLiquidez = brechaLiquidez,
+            RiesgoLiquidez = riesgoLiquidez,
+            OportunidadCAPEX = oportunidadCapex,
+            ComparativaBenchmark = "Datos calculados con información de Contaduría actualizada."
+        };
+
+        CalcularEstilos();
     }
 
     private void CalcularEstilos()

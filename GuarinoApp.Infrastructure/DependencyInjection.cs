@@ -1,6 +1,9 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Infrastructure.Data;
 using GuarinoApp.Infrastructure.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -76,6 +79,9 @@ namespace GuarinoApp.Infrastructure
 
             // Registrar generador de PDFs con QuestPDF
             services.AddScoped<IPdfGenerator, QuestPdfGenerator>();
+
+            // Registrar servicio de auditoría
+            services.AddScoped<IAuditService, AuditService>();
 
             return services;
             }

@@ -40,6 +40,8 @@ namespace GuarinoApp.Infrastructure.Data
         public DbSet<RitmoCalibradora> RitmosCalibradora { get; set; }
 
         public DbSet<EventoClimatico> EventosClimaticos => Set<EventoClimatico>();
+        public DbSet<FinancialData> FinancialData => Set<FinancialData>();
+        public DbSet<LogEntry> LogEntries => Set<LogEntry>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
             {

@@ -8,7 +8,7 @@ DATOS REALES Y TELEMETRÍA EN TIEMPO REAL (al {Date}):
 - Proyección de la Próxima Zafra: {ProyeccionZafra}
 
 OBJETIVO ANALÍTICO:
-Responder la consulta del usuario combinando datos operativos internos con métricas de eficiencia operativa (velocidad de rotación, riesgo de merma/pudrición por días en stock, costo of capital inmovilizado y ventanas de exportación). 
+Responder la consulta del usuario combinando datos operativos internos con métricas de eficiencia operativa (velocidad de rotación, riesgo de merma/pudrición por días en stock, costo de capital inmovilizado y ventanas de exportación). 
 Cuando la consulta toque volumen futuro, capacidad, planificación de zafra o presupuesto, usá el dato de Proyección de la Próxima Zafra como ancla cuantitativa para justificar la estrategia.
 
 REGLAS OBLIGATORIAS DE RESPUESTA EJECUTIVA:

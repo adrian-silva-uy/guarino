@@ -1,0 +1,254 @@
+@page "/contaduria"
+@using MediatR
+@using MudBlazor
+@using GuarinoApp.Application.Modules.Contaduria.Queries.GetFinancialData
+@using GuarinoApp.Application.Modules.Contaduria.Commands.UpdateFinancialData
+@using GuarinoApp.Application.Modules.Contaduria.Dtos
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject Microsoft.Extensions.Logging.ILogger<Contaduria> Logger
+
+<PageTitle>Contaduría - Datos Financieros</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark">📊 Contaduría</h2>
+            <p class="text-muted mb-0">Ingreso de datos financieros para KPIs y proyecciones</p>
+        </div>
+        @if (_data != null)
+        {
+            <span class="badge bg-info text-white">Última actualización: @(_data.FechaActualizacion.ToString("dd/MM/yyyy HH:mm"))</span>
+        }
+    </div>
+
+    <MudAlert Severity="Severity.Info" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Info" Class="me-2" />
+        Estos datos alimentan los cálculos de <strong>Capital de Trabajo</strong>, <strong>Riesgo de Liquidez</strong> y <strong>CAPEX</strong> en el tablero de Proyección de Zafra.
+    </MudAlert>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <MudProgressCircular Color="Color.Primary" Size="Size.Large" />
+        </div>
+    }
+    else
+    {
+        <MudCard Elevation="1">
+            <MudCardContent>
+                <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-3">Datos Financieros</MudText>
+
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal"
+                                         @bind-Value="_costoPorKg"
+                                         Label="Costo por Kg ($)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Step="0.01m"
+                                         Format="N2"
+                                         Required="true"
+                                         HelperText="Costo operativo promedio por kg (últimos 3 años)" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal"
+                                         @bind-Value="_flujoCaja"
+                                         Label="Flujo de Caja ($)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Step="1000m"
+                                         Format="N0"
+                                         Required="true"
+                                         HelperText="Caja disponible actual" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal"
+                                         @bind-Value="_margenBruto"
+                                         Label="Margen Bruto (%)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Max="100m"
+                                         Step="0.1m"
+                                         Format="N1"
+                                         Required="true"
+                                         HelperText="Margen bruto histórico promedio" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal?"
+                                         @bind-Value="_costoFlete"
+                                         Label="Costo Flete por Contenedor ($)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Step="100m"
+                                         Format="N0"
+                                         HelperText="Opcional - costo promedio de flete" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal"
+                                         @bind-Value="_capacidadInstalada"
+                                         Label="Capacidad Instalada (kg)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Step="1000m"
+                                         Format="N0"
+                                         Required="true"
+                                         HelperText="Máximo que la empresa puede procesar sin tercerizar" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_observaciones"
+                                      Label="Observaciones"
+                                      Variant="Variant.Outlined"
+                                      Lines="3"
+                                      HelperText="Notas adicionales sobre los datos ingresados" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <div class="d-flex justify-content-end gap-2">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               OnClick="LimpiarFormulario"
+                               Disabled="_loading">
+                        Limpiar
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="GuardarDatos"
+                               Disabled="_loading"
+                               StartIcon="@Icons.Material.Filled.Save">
+                        @(_loading ? "Guardando..." : "Guardar Datos")
+                    </MudButton>
+                </div>
+            </MudCardContent>
+        </MudCard>
+
+        @if (_data != null)
+        {
+            <MudCard Elevation="1" Class="mt-4">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" GutterBottom="true">Resumen de Datos Actuales</MudText>
+                    <MudGrid>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Costo/Kg</MudText>
+                            <MudText Typo="Typo.h6" Class="fw-bold">$@_data.CostoPorKg.ToString("N2")</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Flujo de Caja</MudText>
+                            <MudText Typo="Typo.h6" Class="fw-bold">$@_data.FlujoCaja.ToString("N0")</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Margen Bruto</MudText>
+                            <MudText Typo="Typo.h6" Class="fw-bold">@_data.MargenBruto.ToString("N1")%</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Capacidad</MudText>
+                            <MudText Typo="Typo.h6" Class="fw-bold">@_data.CapacidadInstalada.ToString("N0") kg</MudText>
+                        </MudItem>
+                    </MudGrid>
+                    @if (!string.IsNullOrEmpty(_data.ActualizadoPor))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-2">
+                            Actualizado por: @_data.ActualizadoPor
+                        </MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        }
+    }
+</div>
+
+@code {
+    private bool _loading = false;
+    private FinancialDataDto? _data;
+
+    private decimal _costoPorKg = 0;
+    private decimal _flujoCaja = 0;
+    private decimal _margenBruto = 0;
+    private decimal? _costoFlete = null;
+    private decimal _capacidadInstalada = 0;
+    private string? _observaciones = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            _data = await Mediator.Send(new GetFinancialDataQuery());
+
+            if (_data != null)
+            {
+                _costoPorKg = _data.CostoPorKg;
+                _flujoCaja = _data.FlujoCaja;
+                _margenBruto = _data.MargenBruto;
+                _costoFlete = _data.CostoFlete;
+                _capacidadInstalada = _data.CapacidadInstalada;
+                _observaciones = _data.Observaciones;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al cargar datos financieros");
+            Snackbar.Add("Error al cargar los datos", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GuardarDatos()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var command = new UpdateFinancialDataCommand(
+                _costoPorKg,
+                _flujoCaja,
+                _margenBruto,
+                _costoFlete,
+                _capacidadInstalada,
+                _observaciones
+            );
+
+            _data = await Mediator.Send(command);
+            Snackbar.Add("Datos financieros guardados correctamente", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al guardar datos financieros");
+            Snackbar.Add("Error al guardar los datos", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void LimpiarFormulario()
+    {
+        _costoPorKg = 0;
+        _flujoCaja = 0;
+        _margenBruto = 0;
+        _costoFlete = null;
+        _capacidadInstalada = 0;
+        _observaciones = null;
+    }
+}
