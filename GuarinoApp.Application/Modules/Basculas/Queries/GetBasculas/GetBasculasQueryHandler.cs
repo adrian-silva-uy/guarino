@@ -1,6 +1,7 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Basculas.Dtos;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GuarinoApp.Application.Modules.Basculas.Queries.GetBasculas;
 public class GetBasculasQueryHandler : IRequestHandler<GetBasculasQuery, List<BasculaDto>>
@@ -16,8 +17,18 @@ public class GetBasculasQueryHandler : IRequestHandler<GetBasculasQuery, List<Ba
         {
         try
             {
-            var sql = "SELECT Id, Descripcion, Ubicacion, Estado FROM Bascula";
-            var result = await _context.ExecuteSqlRawAsync<BasculaDto>(sql);
+            var result = await _context.Basculas
+                .AsNoTracking()
+                .Where(b => !b.IsDeleted)
+                .Select(b => new BasculaDto
+                    {
+                    Id = b.IdBascula,
+                    Descripcion = b.Descripcion,
+                    Ubicacion = string.Empty,
+                    Estado = "Activa"
+                    })
+                .ToListAsync(cancellationToken);
+
             if (result == null || result.Count == 0)
                 return GetDummyData();
             return result;

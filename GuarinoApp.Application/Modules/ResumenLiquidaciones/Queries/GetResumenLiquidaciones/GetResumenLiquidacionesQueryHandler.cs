@@ -1,6 +1,7 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.ResumenLiquidaciones.Dtos;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GuarinoApp.Application.Modules.ResumenLiquidaciones.Queries.GetResumenLiquidaciones;
 public class GetResumenLiquidacionesQueryHandler : IRequestHandler<GetResumenLiquidacionesQuery, List<ResumenLiquidacionDto>>
@@ -16,21 +17,21 @@ public class GetResumenLiquidacionesQueryHandler : IRequestHandler<GetResumenLiq
         {
         try
             {
-            var sql = @"
-                SELECT 
-                    P.RazonSocial as Productor,
-                    V.Descripcion as Variedad,
-                    YEAR(L.FechaIngreso) as Año,
-                    SUM(L.KilosNetos) as TotalKgs,
-                    SUM(L.CantidadBins) as TotalBins,
-                    SUM(L.KilosNetos * 10) as TotalPagar
-                FROM Lote L
-                INNER JOIN Productor P ON L.IdProductor = P.IdProductor
-                INNER JOIN Variedad V ON L.IdVariedad = V.IdVariedad AND L.IdEspecie = V.IdEspecie
-                GROUP BY P.RazonSocial, V.Descripcion, YEAR(L.FechaIngreso)
-            ";
+            var result = await _context.Lotes
+                .AsNoTracking()
+                .Where(l => !l.IsDeleted && l.FechaIngreso.HasValue)
+                .GroupBy(l => new { Productor = l.Productor.Nombre, Variedad = l.Variedad.Nombre, Año = l.FechaIngreso.Value.Year })
+                .Select(g => new ResumenLiquidacionDto
+                    {
+                    Productor = g.Key.Productor,
+                    Variedad = g.Key.Variedad,
+                    Año = g.Key.Año,
+                    TotalKgs = g.Sum(l => l.KilosNetos),
+                    TotalBins = g.Sum(l => l.CantidadBins),
+                    TotalPagar = g.Sum(l => l.KilosNetos * 10)
+                    })
+                .ToListAsync(cancellationToken);
 
-            var result = await _context.ExecuteSqlRawAsync<ResumenLiquidacionDto>(sql);
             if (result == null || !result.Any())
                 return GetDummyData();
             return result;

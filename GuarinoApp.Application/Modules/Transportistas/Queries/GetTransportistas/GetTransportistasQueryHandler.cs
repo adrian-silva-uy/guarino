@@ -1,6 +1,7 @@
 ﻿using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Transportistas.Dtos;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GuarinoApp.Application.Modules.Transportistas.Queries.GetTransportistas;
 public class GetTransportistasQueryHandler : IRequestHandler<GetTransportistasQuery, List<TransportistaDto>>
@@ -16,8 +17,18 @@ public class GetTransportistasQueryHandler : IRequestHandler<GetTransportistasQu
         {
         try
             {
-            var sql = "SELECT Id, Nombre, Ruc, Telefono FROM Transportista";
-            var result = await _context.ExecuteSqlRawAsync<TransportistaDto>(sql);
+            var result = await _context.Productores
+                .AsNoTracking()
+                .Where(p => !p.IsDeleted)
+                .Select(p => new TransportistaDto
+                    {
+                    Id = p.Id,
+                    Nombre = p.Nombre,
+                    Ruc = p.Ruc,
+                    Telefono = string.Empty
+                    })
+                .ToListAsync(cancellationToken);
+
             if (result == null || !result.Any())
                 return GetDummyData();
             return result;

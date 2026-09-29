@@ -1,6 +1,7 @@
 ﻿using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.ResumenMensual.Dtos;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GuarinoApp.Application.Modules.ResumenMensual.Queries.GetResumenMensual;
 public class GetResumenMensualQueryHandler : IRequestHandler<GetResumenMensualQuery, List<ResumenMensualDto>>
@@ -16,25 +17,22 @@ public class GetResumenMensualQueryHandler : IRequestHandler<GetResumenMensualQu
         {
         try
             {
-            var sql = @"
-                SELECT 
-                    YEAR(LE.fechaProduccion) as Año,
-                    MONTH(LE.fechaProduccion) as Mes,
-                    MAX(DATENAME(month, LE.fechaProduccion)) as Nombre,
-                    SUM(ISNULL(LE.KilosNetos,0)) as Kgs_Volcados,
-                    SUM(LE.CantidadBins) as BinsVolcados,
-                    MAX(Ba.descripcion) as Balanza
-                FROM LoteEmboquille LE
-                INNER JOIN Lote L ON LE.idLote = L.IdLote
-                INNER JOIN TipoLote TL ON L.idTipoLote = TL.idTipoLote
-                INNER JOIN Emboquille Eb ON LE.IdEmboquille = Eb.IdEmboquille
-                INNER JOIN Especie E ON L.IdEspecie = E.IdEspecie
-                INNER JOIN Variedad V ON L.IdEspecie = V.IdEspecie AND L.IdVariedad = V.IdVariedad
-                LEFT JOIN Bascula Ba ON L.IdBascula = Ba.idBascula
-                GROUP BY YEAR(LE.fechaProduccion), MONTH(LE.fechaProduccion), Ba.IdBascula
-            ";
-
-            var result = await _context.ExecuteSqlRawAsync<ResumenMensualDto>(sql);
+            var result = await _context.LotesEmboquille
+                .AsNoTracking()
+                .Where(le => !le.Lote.IsDeleted)
+                .GroupBy(le => new { le.FechaProduccion.Year, le.FechaProduccion.Month })
+                .Select(g => new ResumenMensualDto
+                    {
+                    Año = g.Key.Year,
+                    Mes = g.Key.Month,
+                    Nombre = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMMM"),
+                    Kgs_Volcados = g.Sum(le => le.KilosNetos),
+                    BinsVolcados = g.Sum(le => le.CantidadBins),
+                    Balanza = string.Empty
+                    })
+                .OrderBy(r => r.Año)
+                .ThenBy(r => r.Mes)
+                .ToListAsync(cancellationToken);
 
             if (result == null || !result.Any())
                 return GetDummyData(request.FechaDesde, request.FechaHasta);
@@ -52,7 +50,6 @@ public class GetResumenMensualQueryHandler : IRequestHandler<GetResumenMensualQu
         var meses = new[] { "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre" };
         var data = new List<ResumenMensualDto>();
 
-        // Usar el año actual y filtrar por mes según fechaDesde/fechaHasta
         int year = DateTime.Now.Year;
         int mesInicio = 1;
         int mesFin = 12;
@@ -62,10 +59,8 @@ public class GetResumenMensualQueryHandler : IRequestHandler<GetResumenMensualQu
         if (fechaHasta.HasValue)
             mesFin = fechaHasta.Value.Month;
 
-        // Si el rango es válido, generamos solo esos meses
         for (int mes = mesInicio; mes <= mesFin; mes++)
             {
-            // Solo generar hasta el mes actual (no futuro)
             if (mes > DateTime.Now.Month && year == DateTime.Now.Year)
                 break;
 

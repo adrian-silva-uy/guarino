@@ -1,6 +1,7 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.CamionesZorras.Dtos;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GuarinoApp.Application.Modules.CamionesZorras.Queries.GetCamionesZorras;
 public class GetCamionesZorrasQueryHandler : IRequestHandler<GetCamionesZorrasQuery, List<CamionZorraDto>>
@@ -16,8 +17,21 @@ public class GetCamionesZorrasQueryHandler : IRequestHandler<GetCamionesZorrasQu
         {
         try
             {
-            var sql = "SELECT Id, Matricula, Tipo, Transportista, Capacidad FROM CamionZorra";
-            var result = await _context.ExecuteSqlRawAsync<CamionZorraDto>(sql);
+            // Usamos Productores como proxy de transportistas/camiones
+            // ya que no hay entidad CamionZorra en el modelo
+            var result = await _context.Productores
+                .AsNoTracking()
+                .Where(p => !p.IsDeleted)
+                .Select(p => new CamionZorraDto
+                    {
+                    Id = p.Id,
+                    Matricula = "N/A",
+                    Tipo = "Camión",
+                    Transportista = p.Nombre,
+                    Capacidad = 0
+                    })
+                .ToListAsync(cancellationToken);
+
             if (result == null || !result.Any())
                 return GetDummyData();
             return result;

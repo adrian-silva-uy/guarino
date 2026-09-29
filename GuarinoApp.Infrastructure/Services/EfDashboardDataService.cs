@@ -1,219 +1,127 @@
-using System.Data;
 using GuarinoApp.Application.Common.Interfaces;
-using GuarinoApp.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
-namespace GuarinoApp.Infrastructure.Services;
-
-/// <summary>
-/// Implementación real de IDashboardDataService: consulta directamente las tablas
-/// sembradas por DbInitializer (Lotes, Volcados, Pallets, Variedades, Productores)
-/// usando SQL parametrizado sobre la conexión de EF Core.
-///
-/// IMPORTANTE: NO se debe hacer `using`/dispose sobre la conexión que devuelve
-/// context.Database.GetDbConnection() — esa conexión es propiedad del DbContext
-/// (Scoped) y se reutiliza en el resto del request; solo se abre si hace falta.
-/// </summary>
-public class EfDashboardDataService : IDashboardDataService
-{
-    private readonly ApplicationDbContext _context;
-
-    public EfDashboardDataService(ApplicationDbContext context)
+namespace GuarinoApp.Infrastructure.Services
     {
-        _context = context;
-    }
-
-    /// <summary>
-    /// Stock por variedad "a fin del mes seleccionado": suma los bins de los lotes
-    /// ingresados hasta el último día de ese mes (inclusive). Si no se pasa fecha,
-    /// usa el estado actual (todos los lotes, sin corte de fecha).
-    /// </summary>
-    public async Task<Dictionary<string, int>> GetStockByVarietyAsync(DateTime? referenceDate = null)
-    {
-        var finDeMes = FinDeMes(referenceDate);
-
-        var sql = @"
-            SELECT v.Nombre AS Variedad, SUM(l.CantidadBins) AS Bins
-            FROM Lotes l
-            INNER JOIN Variedades v ON v.IdVariedad = l.IdVariedad
-            WHERE (@finDeMes IS NULL OR l.FechaIngreso <= @finDeMes)
-            GROUP BY v.Nombre
-            ORDER BY Bins DESC";
-
-        var result = new Dictionary<string, int>();
-
-        var connection = _context.Database.GetDbConnection();
-        if (connection.State != ConnectionState.Open)
-            await connection.OpenAsync();
-
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        AddParam(command, "@finDeMes", (object?)finDeMes ?? DBNull.Value);
-
-        using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
+    public class EfDashboardDataService : IDashboardDataService
         {
-            var variedad = reader.IsDBNull(0) ? "Sin variedad" : reader.GetString(0);
-            var bins = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetValue(1));
-            result[variedad] = bins;
-        }
+        private readonly IApplicationDbContext _context;
 
-        return result;
-    }
+        public EfDashboardDataService(IApplicationDbContext context) => _context = context;
 
-    /// <summary>
-    /// Volcados de los 12 meses que terminan en el mes seleccionado (inclusive).
-    /// Si no se pasa fecha, los 12 meses terminan en el mes actual.
-    /// </summary>
-    public async Task<List<MonthlyVolcado>> GetMonthlyVolcadosAsync(DateTime? referenceDate = null)
-    {
-        var fin = FinDeMes(referenceDate) ?? FinDeMes(DateTime.Now)!.Value;
-        var inicio = fin.AddMonths(-11).AddDays(1 - fin.AddMonths(-11).Day); // primer día, 12 meses atrás
-
-        const string sql = @"
-            SELECT
-                FORMAT(FechaVolcado, 'yyyy-MM') AS Periodo,
-                DATENAME(MONTH, FechaVolcado) AS MesNombre,
-                SUM(PesoKilos) AS Kgs
-            FROM Volcados
-            WHERE FechaVolcado >= @inicio AND FechaVolcado <= @fin
-            GROUP BY FORMAT(FechaVolcado, 'yyyy-MM'), DATENAME(MONTH, FechaVolcado)
-            ORDER BY Periodo ASC";
-
-        var result = new List<MonthlyVolcado>();
-
-        var connection = _context.Database.GetDbConnection();
-        if (connection.State != ConnectionState.Open)
-            await connection.OpenAsync();
-
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        AddParam(command, "@inicio", inicio);
-        AddParam(command, "@fin", fin);
-
-        using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            result.Add(new MonthlyVolcado
+        public async Task<Dictionary<string, int>> GetStockByVarietyAsync(DateTime? referenceDate = null)
             {
-                Month = reader.IsDBNull(1) ? reader.GetString(0) : reader.GetString(1),
-                Kgs = reader.IsDBNull(2) ? 0 : Convert.ToInt32(reader.GetValue(2))
-            });
-        }
+            var fecha = referenceDate ?? DateTime.Now;
+            var ultimaFecha = await _context.StocksVariedad
+                .Where(x => x.Fecha <= fecha)
+                .OrderByDescending(x => x.Fecha)
+                .Select(x => (DateTime?)x.Fecha)
+                .FirstOrDefaultAsync();
 
-        return result;
-    }
+            if (!ultimaFecha.HasValue)
+                return new Dictionary<string, int>();
 
-    public async Task<int> GetTotalStockAsync(DateTime? referenceDate = null)
-    {
-        var finDeMes = FinDeMes(referenceDate);
-        return await ExecuteScalarIntAsync(
-            "SELECT ISNULL(SUM(CantidadBins), 0) FROM Lotes WHERE (@finDeMes IS NULL OR FechaIngreso <= @finDeMes)",
-            ("@finDeMes", (object?)finDeMes ?? DBNull.Value));
-    }
+            return await _context.StocksVariedad
+                .Where(x => x.Fecha.Year == ultimaFecha.Value.Year && x.Fecha.Month == ultimaFecha.Value.Month)
+                .GroupBy(x => x.Variedad ?? "Sin variedad")
+                .ToDictionaryAsync(g => g.Key, g => g.Sum(x => x.Cantidad));
+            }
 
-    public async Task<int> GetPalletsWithoutClientAsync(DateTime? referenceDate = null)
-    {
-        // Métrica de estado operativo actual: no se filtra por período, ya que
-        // "sin cliente asignado" es una condición del momento, no histórica.
-        return await ExecuteScalarIntAsync(
-            "SELECT COUNT(*) FROM Pallets WHERE Cliente IS NULL OR Cliente = ''");
-    }
-
-    public async Task<decimal> GetProjectedGrowthAsync(DateTime? referenceDate = null)
-    {
-        // Compara el mes seleccionado contra el anterior, usando los mismos datos
-        // que alimentan el gráfico de volcados mensuales — nada hardcodeado.
-        var monthly = await GetMonthlyVolcadosAsync(referenceDate);
-        if (monthly.Count < 2) return 0m;
-
-        var ultimo = monthly[^1].Kgs;
-        var anterior = monthly[^2].Kgs;
-        if (anterior == 0) return 0m;
-
-        return Math.Round((decimal)(ultimo - anterior) / anterior * 100m, 1);
-    }
-
-    /// <summary>
-    /// Detalle de volcados por productor/variedad DEL MES seleccionado (no acumulado).
-    /// Si no se pasa fecha, muestra el mes actual.
-    /// </summary>
-    public async Task<List<VolcadoDetalle>> GetVolcadosDetailAsync(DateTime? referenceDate = null, int take = 20)
-    {
-        var fin = FinDeMes(referenceDate) ?? FinDeMes(DateTime.Now)!.Value;
-        var inicio = new DateTime(fin.Year, fin.Month, 1);
-
-        const string sql = @"
-            SELECT TOP (@take)
-                p.Nombre AS Productor,
-                v.Nombre AS Variedad,
-                SUM(vo.PesoKilos) AS KgsVolcados,
-                SUM(vo.CantidadBins) AS Bins,
-                l.Zafra AS Zafra
-            FROM Volcados vo
-            INNER JOIN Lotes l ON l.Id = vo.LoteId
-            INNER JOIN Productores p ON p.Id = l.IdProductor
-            INNER JOIN Variedades v ON v.IdVariedad = l.IdVariedad
-            WHERE vo.FechaVolcado >= @inicio AND vo.FechaVolcado <= @fin
-            GROUP BY p.Nombre, v.Nombre, l.Zafra
-            ORDER BY KgsVolcados DESC";
-
-        var result = new List<VolcadoDetalle>();
-
-        var connection = _context.Database.GetDbConnection();
-        if (connection.State != ConnectionState.Open)
-            await connection.OpenAsync();
-
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        AddParam(command, "@take", take);
-        AddParam(command, "@inicio", inicio);
-        AddParam(command, "@fin", fin);
-
-        using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            result.Add(new VolcadoDetalle
+        public async Task<List<MonthlyVolcado>> GetMonthlyVolcadosAsync(DateTime from, DateTime to)
             {
-                Productor = reader.IsDBNull(0) ? "Sin productor" : reader.GetString(0),
-                Variedad = reader.IsDBNull(1) ? "Sin variedad" : reader.GetString(1),
-                KgsVolcados = reader.IsDBNull(2) ? 0m : Convert.ToDecimal(reader.GetValue(2)),
-                Bins = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3)),
-                Zafra = reader.IsDBNull(4) ? "Sin zafra" : reader.GetString(4)
-            });
+            var fechaInicio = from.Date;
+            var fechaFinExclusiva = to.Date.AddDays(1);
+            var data = await _context.VolcadosHistoricos
+                .Where(v => v.Fecha >= fechaInicio && v.Fecha < fechaFinExclusiva)
+                .GroupBy(v => new { v.Año, v.Mes })
+                .Select(g => new { g.Key.Año, g.Key.Mes, Kgs = g.Sum(v => v.KgsVolcados) })
+                .OrderBy(x => x.Año).ThenBy(x => x.Mes)
+                .ToListAsync();
+
+            return data.Select(x => new MonthlyVolcado
+                {
+                Month = new DateTime(x.Año, x.Mes, 1).ToString("MMM yy"),
+                Kgs = (int)x.Kgs
+                }).ToList();
+            }
+
+        public Task<List<MonthlyVolcado>> GetMonthlyVolcadosAsync(DateTime? referenceDate = null)
+            {
+            var to = referenceDate ?? DateTime.Today;
+            return GetMonthlyVolcadosAsync(to.AddMonths(-11), to);
+            }
+
+        public async Task<int> GetTotalStockAsync(DateTime? referenceDate = null)
+            => (await GetStockByVarietyAsync(referenceDate)).Values.Sum();
+
+        public async Task<int> GetPalletsWithoutClientAsync(DateTime? referenceDate = null)
+            {
+            var fechaFinExclusiva = (referenceDate ?? DateTime.Now).Date.AddDays(1);
+            return await _context.Pallets
+                .Where(p =>
+                    !p.IsDeleted &&
+                    (p.Cliente == null || p.Cliente.Trim() == string.Empty) &&
+                    (p.Fecha ?? p.CreatedAt) < fechaFinExclusiva)
+                .CountAsync();
+            }
+
+        public async Task<decimal> GetProjectedGrowthAsync(DateTime from, DateTime to)
+            {
+            var fechaInicio = from.Date;
+            var fechaFinExclusiva = to.Date.AddDays(1);
+            var duracion = fechaFinExclusiva - fechaInicio;
+            var anteriorFinExclusiva = fechaInicio;
+            var anteriorInicio = anteriorFinExclusiva - duracion;
+
+            var totalActual = await _context.VolcadosHistoricos
+                .Where(v => v.Fecha >= fechaInicio && v.Fecha < fechaFinExclusiva)
+                .SumAsync(v => v.KgsVolcados);
+            var totalAnterior = await _context.VolcadosHistoricos
+                .Where(v => v.Fecha >= anteriorInicio && v.Fecha < anteriorFinExclusiva)
+                .SumAsync(v => v.KgsVolcados);
+
+            return totalAnterior == 0 ? 0m : Math.Round(((totalActual - totalAnterior) / totalAnterior) * 100, 1);
+            }
+
+        public Task<decimal> GetProjectedGrowthAsync(DateTime? referenceDate = null)
+            {
+            var to = referenceDate ?? DateTime.Today;
+            return GetProjectedGrowthAsync(new DateTime(to.Year, to.Month, 1), to);
+            }
+
+        public async Task<List<VolcadoDetalle>> GetVolcadosDetailAsync(DateTime from, DateTime to, int top = 10)
+            {
+            var fechaInicio = from.Date;
+            var fechaFinExclusiva = to.Date.AddDays(1);
+            return await _context.VolcadosHistoricos
+                .Where(v => v.Fecha >= fechaInicio && v.Fecha < fechaFinExclusiva)
+                .GroupBy(v => new
+                    {
+                    Productor = v.Productor ?? "Desconocido",
+                    Variedad = v.Variedad ?? "Sin variedad",
+                    Zafra = v.Zafra ?? string.Empty
+                    })
+                .Select(g => new VolcadoDetalle
+                    {
+                    Productor = g.Key.Productor,
+                    Variedad = g.Key.Variedad,
+                    KgsVolcados = g.Sum(v => v.KgsVolcados),
+                    Bins = g.Sum(v => v.Bins),
+                    Zafra = g.Key.Zafra
+                    })
+                .OrderByDescending(v => v.KgsVolcados)
+                .Take(top)
+                .ToListAsync();
+            }
+
+        public async Task<DateTime?> GetLastStockDateAsync()
+            => await _context.StocksVariedad.OrderByDescending(x => x.Fecha).Select(x => (DateTime?)x.Fecha).FirstOrDefaultAsync();
+
+        public async Task<DateTime?> GetLastStockDateAsync(DateTime referenceDate)
+            => await _context.StocksVariedad
+                .Where(x => x.Fecha <= referenceDate)
+                .OrderByDescending(x => x.Fecha)
+                .Select(x => (DateTime?)x.Fecha)
+                .FirstOrDefaultAsync();
         }
-
-        return result;
     }
-
-    /// <summary>Último instante del mes de la fecha dada (23:59:59.997), o null si la fecha es null.</summary>
-    private static DateTime? FinDeMes(DateTime? date)
-    {
-        if (date is null) return null;
-        var d = date.Value;
-        var primerDiaSiguiente = new DateTime(d.Year, d.Month, 1).AddMonths(1);
-        return primerDiaSiguiente.AddMilliseconds(-3);
-    }
-
-    private static void AddParam(System.Data.Common.DbCommand command, string name, object value)
-    {
-        var param = command.CreateParameter();
-        param.ParameterName = name;
-        param.Value = value;
-        command.Parameters.Add(param);
-    }
-
-    private async Task<int> ExecuteScalarIntAsync(string sql, params (string name, object value)[] parameters)
-    {
-        var connection = _context.Database.GetDbConnection();
-        if (connection.State != ConnectionState.Open)
-            await connection.OpenAsync();
-
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        foreach (var (name, value) in parameters)
-            AddParam(command, name, value);
-
-        var value2 = await command.ExecuteScalarAsync();
-        return value2 is null || value2 is DBNull ? 0 : Convert.ToInt32(value2);
-    }
-}

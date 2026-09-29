@@ -1,9 +1,6 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
-using System.Data;
-using System.Data.Common;
-using System.Reflection;
 
 namespace GuarinoApp.Infrastructure.Data
     {
@@ -43,73 +40,6 @@ namespace GuarinoApp.Infrastructure.Data
         public DbSet<RitmoCalibradora> RitmosCalibradora { get; set; }
 
         public DbSet<EventoClimatico> EventosClimaticos => Set<EventoClimatico>();
-
-        /// <summary>
-        /// Ejecuta SQL crudo y mapea el resultado a cualquier DTO plano, SIN requerir que
-        /// ese DTO esté registrado como entidad en el modelo de EF Core.
-        /// Mantener por compatibilidad con handlers que aún dependen de consultas ad-hoc.
-        /// </summary>
-        public async Task<List<T>> ExecuteSqlRawAsync<T>(string sql, params object[] parameters) where T : class, new()
-            {
-            var result = new List<T>();
-
-            var connection = Database.GetDbConnection();
-            if (connection.State != ConnectionState.Open)
-                await connection.OpenAsync();
-
-            using var command = connection.CreateCommand();
-            command.CommandText = sql;
-            command.CommandType = CommandType.Text;
-
-            foreach (var param in parameters)
-                {
-                if (param is DbParameter dbParam)
-                    command.Parameters.Add(dbParam);
-                }
-
-            var properties = typeof(T)
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.CanWrite)
-                .ToDictionary(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase);
-
-            using var reader = await command.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-                {
-                var item = new T();
-
-                for (int i = 0; i < reader.FieldCount; i++)
-                    {
-                    var columnName = reader.GetName(i);
-                    if (!properties.TryGetValue(columnName, out var prop))
-                        continue;
-
-                    var value = reader.GetValue(i);
-                    if (value is DBNull)
-                        {
-                        prop.SetValue(item, null);
-                        continue;
-                        }
-
-                    var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
-
-                    try
-                        {
-                        var convertedValue = targetType.IsEnum
-                            ? Enum.ToObject(targetType, value)
-                            : Convert.ChangeType(value, targetType);
-                        prop.SetValue(item, convertedValue);
-                        }
-                    catch
-                        {
-                        // ignorar conversión fallida para esa columna
-                        }
-                    }
-
-                result.Add(item);
-                }
-
-            return result;
-            }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
             {

@@ -1,6 +1,7 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.LiquidacionesQuinta.Dtos;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GuarinoApp.Application.Modules.LiquidacionesQuinta.Queries.GetLiquidacionesQuinta;
 public class GetLiquidacionesQuintaQueryHandler : IRequestHandler<GetLiquidacionesQuintaQuery, List<LiquidacionQuintaDto>>
@@ -16,22 +17,21 @@ public class GetLiquidacionesQuintaQueryHandler : IRequestHandler<GetLiquidacion
         {
         try
             {
-            var sql = @"
-                SELECT 
-                    Q.Nombre as Quinta,
-                    P.RazonSocial as Productor,
-                    V.Descripcion as Variedad,
-                    YEAR(L.FechaIngreso) as Año,
-                    SUM(L.KilosNetos) as TotalKgs,
-                    SUM(L.KilosNetos * 10) as TotalPagar
-                FROM Lote L
-                INNER JOIN Quinta Q ON L.IdChacra = Q.Id
-                INNER JOIN Productor P ON L.IdProductor = P.IdProductor
-                INNER JOIN Variedad V ON L.IdVariedad = V.IdVariedad AND L.IdEspecie = V.IdEspecie
-                GROUP BY Q.Nombre, P.RazonSocial, V.Descripcion, YEAR(L.FechaIngreso)
-            ";
+            var result = await _context.Lotes
+                .AsNoTracking()
+                .Where(l => !l.IsDeleted && l.FechaIngreso.HasValue)
+                .GroupBy(l => new { Quinta = l.Quinta.Nombre, Productor = l.Productor.Nombre, Variedad = l.Variedad.Nombre, Año = l.FechaIngreso.Value.Year })
+                .Select(g => new LiquidacionQuintaDto
+                    {
+                    Quinta = g.Key.Quinta,
+                    Productor = g.Key.Productor,
+                    Variedad = g.Key.Variedad,
+                    Año = g.Key.Año,
+                    TotalKgs = g.Sum(l => l.KilosNetos),
+                    TotalPagar = g.Sum(l => l.KilosNetos * 10)
+                    })
+                .ToListAsync(cancellationToken);
 
-            var result = await _context.ExecuteSqlRawAsync<LiquidacionQuintaDto>(sql);
             if (result == null || !result.Any())
                 return GetDummyData();
             return result;

@@ -85,7 +85,7 @@ Debes calcular:
 
 2. **Genera el plan:**
    - Combina acciones de corto plazo (Prevencion) con protecciones de mediano plazo (Seguro, Diversificación).
-   - Prioriza por impacto en producción y disponibilidad de recursos.
+   - Prioriza por impacto en producción y disponibilidad of recursos.
 
 3. **Formato de salida:**
    - **SOLO JSON válido**, sin explicaciones antes ni después.
@@ -113,5 +113,4 @@ Debes calcular:
 ---
 
 **Genera tu respuesta ahora:**
-
 

@@ -1,7 +1,7 @@
 ﻿using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Gerencia.Dtos;
 using MediatR;
-using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 
 namespace GuarinoApp.Application.Modules.Gerencia.Queries.GetIndicadoresGerencia;
 public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadoresGerenciaQuery, List<IndicadorGerenciaDto>>
@@ -15,44 +15,59 @@ public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadores
 
     public async Task<List<IndicadorGerenciaDto>> Handle(GetIndicadoresGerenciaQuery request, CancellationToken cancellationToken)
         {
-        var sql = @"
-            SELECT 
-                'Total Volcados' as Indicador,
-                SUM(LE.KilosNetos) as Valor,
-                MAX(LE.FechaProduccion) as Fecha,
-                'Producción' as Categoria
-            FROM LoteEmboquille LE
-            WHERE 1=1 {whereClause}
-            UNION ALL
-            SELECT 
-                'Total Pallets' as Indicador,
-                COUNT(PP.IdProduccionPallet) as Valor,
-                MAX(PP.FechaHora) as Fecha,
-                'Stock' as Categoria
-            FROM ProduccionPallet PP
-            WHERE 1=1 {whereClause2}
-            UNION ALL
-            SELECT 
-                'Stock en Playa' as Indicador,
-                SUM(L.CantidadBins - L.cantidadBinsDesp - L.CantidadBinsEmb) as Valor,
-                MAX(L.FechaIngreso) as Fecha,
-                'Stock' as Categoria
-            FROM Lote L
-            WHERE L.Estado = 'M'
-        ";
+        var result = new List<IndicadorGerenciaDto>();
 
-        // Simplificamos: sin filtros por ahora, solo dummy
-        var parameters = new List<SqlParameter>();
-        if (request.FechaDesde.HasValue)
-            {
-            parameters.Add(new SqlParameter("@FechaDesde", request.FechaDesde.Value));
-            }
-        if (request.FechaHasta.HasValue)
-            {
-            parameters.Add(new SqlParameter("@FechaHasta", request.FechaHasta.Value));
-            }
+        // Total Volcados
+        var totalVolcados = await _context.LotesEmboquille
+            .AsNoTracking()
+            .Where(le => !le.Lote.IsDeleted)
+            .GroupBy(le => 1)
+            .Select(g => new IndicadorGerenciaDto
+                {
+                Indicador = "Total Volcados",
+                Valor = g.Sum(le => le.KilosNetos),
+                Fecha = g.Max(le => le.FechaProduccion),
+                Categoria = "Producción"
+                })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        var result = await _context.ExecuteSqlRawAsync<IndicadorGerenciaDto>(sql, parameters.ToArray());
+        if (totalVolcados != null)
+            result.Add(totalVolcados);
+
+        // Total Pallets
+        var totalPallets = await _context.Pallets
+            .AsNoTracking()
+            .Where(p => !p.IsDeleted)
+            .GroupBy(p => 1)
+            .Select(g => new IndicadorGerenciaDto
+                {
+                Indicador = "Total Pallets",
+                Valor = g.Count(),
+                Fecha = g.Max(p => p.Fecha ?? p.CreatedAt),
+                Categoria = "Stock"
+                })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (totalPallets != null)
+            result.Add(totalPallets);
+
+        // Stock en Playa
+        var stockEnPlaya = await _context.Lotes
+            .AsNoTracking()
+            .Where(l => !l.IsDeleted)
+            .GroupBy(l => 1)
+            .Select(g => new IndicadorGerenciaDto
+                {
+                Indicador = "Stock en Playa",
+                Valor = g.Sum(l => l.CantidadBins - l.CantidadBinsDesp - l.CantidadBinsEmb),
+                Fecha = g.Max(l => l.FechaIngreso ?? l.CreatedAt),
+                Categoria = "Stock"
+                })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (stockEnPlaya != null)
+            result.Add(stockEnPlaya);
+
         return result;
         }
     }

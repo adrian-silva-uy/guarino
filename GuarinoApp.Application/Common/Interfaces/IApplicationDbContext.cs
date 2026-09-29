@@ -28,7 +28,5 @@ namespace GuarinoApp.Application.Common.Interfaces
         DbSet<RitmoCalibradora> RitmosCalibradora { get; }
         DbSet<EventoClimatico> EventosClimaticos { get; }
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
-        // Compatibilidad: dejar firma para ejecutables ADO que aún la usen en handlers.
-        Task<List<T>> ExecuteSqlRawAsync<T>(string sql, params object[] parameters) where T : class, new();
         }
     }
