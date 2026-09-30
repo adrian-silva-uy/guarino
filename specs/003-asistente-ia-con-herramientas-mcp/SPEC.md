@@ -1,6 +1,6 @@
 # SPEC 003 — Asistente IA con herramientas MCP externas
 
-**Estado**: 🟡 borrador (pendiente revisión)
+**Estado**: ✅ implementada y verificada en runtime (2026-09-30)
 
 ## Contexto
 
@@ -70,10 +70,27 @@ Usuario → /iachat → Asistente IA
 - **AC-4** Dada una llamada saliente, entonces queda auditada con resultado y
   latencia.
 
+## Verificación (2026-09-30, runtime local: Ollama + DeepWiki/Context7)
+
+- **AC-1 ✅** Consulta trigger "¿Qué es MudSelect y cómo se usa?" → el cliente
+  MCP ejecutó `DeepWiki/ask_wiki_question` (**OK, 23 903 ms**) y la respuesta
+  del asistente termina con el pie determinista
+  **"Fuente de datos externos: DeepWiki."** (verificado en el DOM de la chat).
+- **AC-2 ✅** Con `Mcp:TimeoutSeconds` reducido a 15 s, la llamada agotó el
+  tiempo (fila **ERROR, 15 037 ms**) y el asistente respondió con datos
+  internos, sin error visible para el usuario (degradación elegante).
+- **AC-3 ✅** Consulta "tipo de cambio dólar" (fuera de allowlist:
+  AlphaVantage deshabilitado) → **0 llamadas** al servidor no permitido y
+  respuesta interna sin error.
+- **AC-4 ✅** Filas `McpCall` en `LogEntries` con servidor, resultado y
+  latencia: **OK** (21 241 ms, 17 143 ms, 23 903 ms) y **ERROR** (15 037 ms).
+
 ## Preguntas abiertas
 
-- **PA-1** ¿Orquestación A, B o C? (ADR-003 — depende de hardware/modelo.)
-- **PA-2** ¿Qué servidores candidatos priorizar? (requiere inventario del
-  ecosistema MCP.)
+- **PA-1** ~~¿Orquestación A, B o C?~~ Resuelta: **A** (ADR-003, aceptada 2026-09-30; camino a C.)
+- **PA-2** ¿Qué servidores candidatos priorizar? Evaluado 2026-09-30:
+  Context7 y DeepWiki responden sin clave (habilitados como muestra viva);
+  tipo de cambio (AlphaVantage) y noticias/búsqueda existen como MCP pero
+  requieren clave de proveedor → pendiente decidir proveedor y habilitar.
 - **PA-3** ¿Habrá consumo externo de nuestras skills (modo servidor) en el
   futuro del cliente?

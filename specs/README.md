@@ -30,7 +30,7 @@ primero (o en el mismo commit).
 |---|---|---|
 | [001-autenticacion-y-roles](001-autenticacion-y-roles/SPEC.md) | ✅ | Login/registro (Local) o Windows, roles, autorización por página/menú/home, reglas del Admin |
 | [002-auditoria](002-auditoria/SPEC.md) | ✅ | Quién / hora / tarea: accesos y cambios de usuario |
-| [003-asistente-ia-con-herramientas-mcp](003-asistente-ia-con-herramientas-mcp/SPEC.md) | 🟡 | La app como **cliente MCP**: el Asistente IA consulta servidores MCP externos y enriquece las respuestas |
+| [003-asistente-ia-con-herramientas-mcp](003-asistente-ia-con-herramientas-mcp/SPEC.md) | ✅ | La app como **cliente MCP**: el Asistente IA consulta servidores MCP externos y enriquece las respuestas |
 | [004-trazabilidad-bins-con-chip](004-trazabilidad-bins-con-chip/SPEC.md) | 🟡 | Cosecha por operario con bins con chip → trazabilidad punta a punta |
 
 ## Índice de ADRs
@@ -39,4 +39,4 @@ primero (o en el mismo commit).
 |---|---|---|
 | [001-autenticacion-dual-local-windows](adr/001-autenticacion-dual-local-windows.md) | Aceptada | `Auth:Mode` Local / Windows |
 | [002-matriz-de-roles](adr/002-matriz-de-roles.md) | Aceptada | Qué ve cada rol, derivado de los perfiles de usuario |
-| [003-estrategia-de-herramientas-del-asistente](adr/003-estrategia-de-herramientas-del-asistente.md) | Propuesta | Orquestación determinista vs agéntica para MCP |
+| [003-estrategia-de-herramientas-del-asistente](adr/003-estrategia-de-herramientas-del-asistente.md) | ✅ Aceptada | Orquestación **A** (determinista en código) con camino a C; ADR-003 |

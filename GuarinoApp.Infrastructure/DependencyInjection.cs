@@ -70,6 +70,15 @@ namespace GuarinoApp.Infrastructure
             services.AddScoped<IAIService, FallbackAIService>();
             services.AddHostedService<OllamaStartupService>();
 
+            // --- MCP: cliente de servidores externos (SPEC 003) ---
+            // Solo lectura, allowlist por configuración y orquestación
+            // determinista (ADR-003). Cada llamada saliente queda auditada.
+            services.AddOptions<McpOptions>()
+                .Bind(configuration.GetSection(McpOptions.SectionName))
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+            services.AddScoped<IMcpDataService, McpDataService>();
+
             services.AddHostedService<ClimateMonitoringHostedService>();
 
             // Prompts: única fuente de verdad para cargar plantillas desde

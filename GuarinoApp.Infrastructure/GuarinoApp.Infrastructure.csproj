@@ -26,6 +26,7 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
+    <PackageReference Include="ModelContextProtocol.Core" Version="2.2.0" />
     <PackageReference Include="OllamaSharp" Version="5.4.27" ExcludeAssets="analyzers" />
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="QuestPDF" Version="2024.6.0" />

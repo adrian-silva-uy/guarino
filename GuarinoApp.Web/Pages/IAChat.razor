@@ -138,6 +138,14 @@
                     @_textoIntroductorio
                 </MudAlert>
 
+                <div class="d-flex justify-end mb-1">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Refresh" OnClick="@NuevaConversacion"
+                               Disabled="@(_isLoading || _messages.Count == 0)">
+                        Nueva conversación
+                    </MudButton>
+                </div>
+
                 <!-- Historial de mensajes -->
                 <MudPaper Class="pa-4 mb-4 chat-history" Style="max-height: 400px; overflow-y: auto;">
                     @foreach (var msg in _messages)
@@ -171,7 +179,7 @@
                     <MudItem xs="10">
                         <MudTextField @bind-Value="_currentInput"
                                       Immediate="true"
-                                      Label="Escribe tu consulta operativa o de empaque..."
+                                      Label="Escribe tu consulta: stock, empaque, logística, tendencias..."
                                       Variant="Variant.Outlined"
                                       T="string"
                                       @onkeydown="@HandleKeyDown"
@@ -269,7 +277,7 @@
                             </MudListItem>
                         }
                     </MudList>
-                    <MudText Typo="Typo.caption" Color="Color.Tertiary">@_sugerencias.Count recomendaciones generadas</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">@(_sugerencias.Count == 1 ? "1 sugerencia" : _sugerencias.Count + " sugerencias") — selecciona una para iniciar la conversación</MudText>
                 }
                 else
                 {
@@ -402,7 +410,7 @@
 
     // Copy de layout (no es prompt ni sugerencia de negocio)
     private const string TextoIntroductorioGeneral =
-        "Puedes hacer preguntas sobre tendencias, stock, empaque, estacionalidad, clientes y más.";
+        "Puedes hacer preguntas sobre tendencias, stock, empaque, estacionalidad, clientes, logística y más —o elegir una sugerencia para empezar. Si hace falta un dato al día de una fuente externa, lo consulto y te indico la fuente.";
     private string _textoIntroductorio = TextoIntroductorioGeneral;
 
     private readonly Dictionary<string, (string Short, string Long)> _recommendedParams = new()
@@ -591,6 +599,14 @@
             "Inventory2" => Icons.Material.Filled.Inventory2,
             _ => null
         };
+    }
+
+    // Limpia el historial para empezar una nueva conversación desde cero.
+    private void NuevaConversacion()
+    {
+        _messages.Clear();
+        _textoIntroductorio = TextoIntroductorioGeneral;
+        StateHasChanged();
     }
 
     private async Task ActualizarSugerencias()

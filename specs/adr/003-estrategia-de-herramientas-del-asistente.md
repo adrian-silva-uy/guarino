@@ -1,6 +1,6 @@
 # ADR-003: Estrategia de herramientas para el Asistente IA (MCP)
 
-**Estado**: Propuesta (a decidir en la revisión de SPEC 003)
+**Estado**: ✅ Aceptada — decisión **A** (orquestación determinista), aprobada en la revisión de SPEC 003 (2026-09-30)
 
 ## Contexto
 
@@ -20,7 +20,7 @@ mayor.
 - **C — Híbrida escalonada**: A ahora; migrar a B cuando el hardware lo
   permita, sin reescribir las skills.
 
-## Decisión propuesta
+## Decisión
 
 **A**, dejando el contrato de orquestación preparado para evolucionar a C.
 

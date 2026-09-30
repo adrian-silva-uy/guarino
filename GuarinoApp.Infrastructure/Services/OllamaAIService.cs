@@ -1,5 +1,6 @@
 namespace GuarinoApp.Infrastructure.Services;
 
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Dtos;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Proyeccion.Dtos;
@@ -14,6 +15,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,6 +31,7 @@ public class OllamaAIService : IAIService
     private readonly IMediator _mediator;
     private readonly ISkillRegistry _skillRegistry;
     private readonly IOptionsMonitor<ClimateRiskSettings> _climateSettings;
+    private readonly IMcpDataService _mcpDataService;
 
     // Tope de tiempo propio para la llamada de estrategia de Zafra -- más corto que el timeout
     // general del HttpClient "Ollama" (60s en appsettings.json). Un JSON estructurado de 5-8
@@ -55,7 +58,7 @@ public class OllamaAIService : IAIService
         "Sos un consultor experto en la industria citrícola, con conocimiento de mejores prácticas de packing houses y exportadoras a nivel internacional. " +
         "Contexto de la empresa en formato JSON: {RequestJson}. " +
         "Parámetros del análisis: confianza mínima {MinConfidence}%, horizonte {HorizonMonths} meses, considerar estacionalidad: {IncludeSeasonality}. " +
-        "Devolvé un ÚNICO array JSON con sugerencias estratégicas con formato: [{\"Text\": \"texto\", \"Color\": \"#RRGGBB\", \"Icon\": \"\"}]";
+        "Devolvé un ÚNICO array JSON con EXACTAMENTE 3 sugerencias estratégicas con formato: [{\"Text\": \"texto\", \"Color\": \"#RRGGBB\", \"Icon\": \"\"}]";
 
     public OllamaAIService(
         IOptionsMonitor<OllamaOptions> optionsMonitor,
@@ -66,7 +69,8 @@ public class OllamaAIService : IAIService
         IPromptProvider promptProvider,
         IMediator mediator,
         ISkillRegistry skillRegistry,
-        IOptionsMonitor<ClimateRiskSettings> climateSettings)
+        IOptionsMonitor<ClimateRiskSettings> climateSettings,
+        IMcpDataService mcpDataService)
         {
         _optionsMonitor = optionsMonitor;
         _connectionState = connectionState;
@@ -77,6 +81,7 @@ public class OllamaAIService : IAIService
         _mediator = mediator;
         _skillRegistry = skillRegistry;
         _climateSettings = climateSettings;
+        _mcpDataService = mcpDataService;
         }
 
     public bool IsAvailable
@@ -156,6 +161,17 @@ public class OllamaAIService : IAIService
             // Skills: si la consulta del usuario corresponde a una habilidad
             // registrada, se ejecuta sobre datos reales y el resultado se
             // inyecta como contexto para que la respuesta no invente cifras.
+            // MCP: datos externos en vivo (orquestación determinista, ADR-003).
+            // Va antes de las skills para que el bloque más volátil quede más
+            // cerca del final del system prompt: con num_ctx acotado, Ollama
+            // conserva los últimos tokens si hubiera que truncar.
+            var mcpContext = await _mcpDataService.GetContextAsync(prompt);
+            if (mcpContext.Count > 0)
+                {
+                system += "\n\nDATOS EXTERNOS EN VIVO (fuentes externas consultadas para esta consulta):\n"
+                    + string.Join("\n", mcpContext.Select(x => $"- [Fuente: {x.Server}] {x.Content}"))
+                    + "\n\nSi usás estos datos, citá la fuente por su nombre (por ejemplo: según DeepWiki). Si contradicen los datos internos de la planta, priorizá los internos.";
+                }
             var skillMatch = await _skillRegistry.MatchAsync(prompt);
             if (skillMatch != null)
                 {
@@ -188,7 +204,16 @@ public class OllamaAIService : IAIService
                 }
 
             var result = await response.Content.ReadFromJsonAsync<OllamaChatResponse>();
-            return result?.Message?.Content ?? string.Empty;
+            var reply = result?.Message?.Content ?? string.Empty;
+
+            // AC-1: el pie de la fuente es determinista (el modelo pequeño no
+            // siempre obedece la instrucción de citar la fuente dentro del prompt).
+            if (reply.Length > 0 && mcpContext.Count > 0)
+                reply += "\n\nFuente de datos externos: "
+                    + string.Join(", ", mcpContext.Select(x => x.Server).Distinct())
+                    + ".";
+
+            return reply;
             }
         catch (Exception ex)
             {
@@ -225,7 +250,7 @@ public class OllamaAIService : IAIService
                     messages.Add(new { role = item.IsUser ? "user" : "assistant", content = item.Text ?? string.Empty });
                 }
 
-            messages.Add(new { role = "user", content = "Genera 3 sugerencias estratégicas en JSON según las instrucciones." });
+            messages.Add(new { role = "user", content = "Genera EXACTAMENTE 3 sugerencias estratégicas en JSON según las instrucciones." });
 
             var requestObj = new { model = options.Model, messages, stream = false };
 
@@ -239,6 +264,7 @@ public class OllamaAIService : IAIService
                 }
 
             var envelopeJson = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("Sugerencias Ollama HTTP {Status}, respuesta ({Len} chars).", response.StatusCode, envelopeJson.Length);
             string rawContent;
             try
                 {
@@ -251,21 +277,24 @@ public class OllamaAIService : IAIService
                 return empty;
                 }
 
+            _logger.LogInformation("Sugerencias Ollama: rawContent={Len} chars, IsAvailable={Avail}.", rawContent?.Length ?? 0, IsAvailable);
             if (string.IsNullOrWhiteSpace(rawContent))
                 return empty;
 
             var suggestions = ExtractSuggestionsArray(rawContent);
+            _logger.LogInformation("Sugerencias Ollama: {Count} parseadas de rawContent.", suggestions.Count);
             if (suggestions.Any())
-                return suggestions;
+                return CompletarHastaTres(suggestions, request);
 
             var lines = rawContent
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Where(l => l.Length > 10 && !l.TrimStart().StartsWith("```"))
+                .Where(l => l.Length > 10 && !l.TrimStart().StartsWith("```") && !EsRechazoDelModelo(l) && !EsLineaDeEstructura(l))
                 .Take(3)
-                .Select(l => new BusinessSuggestionDto { Text = l, Color = "#9c27b0", Icon = string.Empty })
+                .Select(l => new BusinessSuggestionDto { Text = LimpiarLineaDeSugerencia(l), Color = "#9c27b0", Icon = string.Empty })
+                .Where(d => !string.IsNullOrWhiteSpace(d.Text) && d.Text.Length > 10)
                 .ToList();
 
-            return lines;
+            return CompletarHastaTres(lines, request);
             }
         catch (Exception ex)
             {
@@ -393,7 +422,7 @@ public class OllamaAIService : IAIService
 
             var lines = rawContent
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Where(l => l.Length > 10 && !l.TrimStart().StartsWith("```"))
+                .Where(l => l.Length > 10 && !l.TrimStart().StartsWith("```") && !EsRechazoDelModelo(l) && !EsLineaDeEstructura(l))
                 .Take(3)
                 .Select(l => new BusinessSuggestionDto { Text = l, Color = "#1976d2", Icon = "strategy", Origen = "Checklist" })
                 .ToList();
@@ -413,6 +442,80 @@ public class OllamaAIService : IAIService
             }
         }
 
+    /// <summary>
+    /// El modelo pequeño a veces devuelve menos objetos de los pedidos. Completa
+    /// hasta 3 sugerencias con alternativas deterministas derivadas de los datos
+    /// reales del request (mismo contrato Text/Color/Icon de la paleta).
+    /// </summary>
+    /// <summary>Rechazos típicos del modelo pequeño: no constituyen una sugerencia
+    /// ni una estrategia aprovechables (el modelo declina la petición).</summary>
+    private static bool EsRechazoDelModelo(string linea) =>
+        linea.Contains("no puedo cumplir", StringComparison.OrdinalIgnoreCase)
+        || linea.StartsWith("Lo siento", StringComparison.OrdinalIgnoreCase)
+        || linea.StartsWith("I'm sorry", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Líneas de estructura/markdown del modelo (metadatos como
+    /// "* **Color**: Azul (#007bff)"): no son sugerencias accionables.</summary>
+    private static bool EsLineaDeEstructura(string linea)
+        {
+        var t = linea.TrimStart();
+        return t.StartsWith("*", StringComparison.Ordinal)
+            || t.StartsWith("#", StringComparison.Ordinal)
+            || linea.Contains("**", StringComparison.Ordinal);
+        }
+
+    /// <summary>Deja el texto accionable de una chip: quita viñetas, el
+    /// encabezado "Sugerencia N:" (aunque venga como clave casi-JSON
+    /// "Sugerencia1": "..."), comillas/coma final y acorta a 200 caracteres
+    /// para que la chip no se convierta en un párrafo.</summary>
+    private static string LimpiarLineaDeSugerencia(string linea)
+        {
+        var t = Regex.Replace(linea, @"^[-*\s]+", string.Empty);
+        t = Regex.Replace(t, @"^""?Sugerencia\s*\d+""?\s*:\s*""?", string.Empty, RegexOptions.IgnoreCase);
+        t = t.Trim().TrimStart('"').Trim().TrimEnd(',', ';', '"').Trim();
+        if (t.Length > 200)
+            t = t[..197].TrimEnd() + "…";
+        return t;
+        }
+
+    private static List<BusinessSuggestionDto> CompletarHastaTres(
+        List<BusinessSuggestionDto> sugerencias,
+        BusinessSuggestionRequest request)
+        {
+        if (sugerencias.Count >= 3)
+            return sugerencias;
+
+        var respaldo = new List<BusinessSuggestionDto>
+            {
+            new()
+                {
+                Text = $"Gestionar {request.PalletsWithoutClient:N0} pallets sin cliente asignado. Liberar espacio con oferta comercial prioritaria.",
+                Color = "#ff9800",
+                Icon = "Inventory2"
+                },
+            new()
+                {
+                Text = $"Stock actual en planta: {request.TotalStock:N0} bins. Verificar compromisos de compra activos contra el plan de {request.PeriodLabel}.",
+                Color = "#1976d2",
+                Icon = "Warning"
+                },
+            new()
+                {
+                Text = $"Crecimiento proyectado: {request.GrowthPercent:0.0}%. Revisar capacidad de empaque y contratación estacional para absorber el incremento.",
+                Color = "#388e3c",
+                Icon = "TrendingUp"
+                }
+            };
+
+        foreach (var item in respaldo)
+            {
+            if (sugerencias.Count >= 3)
+                break;
+            sugerencias.Add(item);
+            }
+
+        return sugerencias;
+        }
     private List<BusinessSuggestionDto> ExtractSuggestionsArray(string raw)
         {
         var result = new List<BusinessSuggestionDto>();
@@ -738,6 +841,15 @@ public class OllamaAIService : IAIService
         public string Riesgo { get; set; } = string.Empty;
         }
 
-    public class OllamaChatResponse { public OllamaMessage? Message { get; set; } }
-    public class OllamaMessage { public string? Content { get; set; } }
+    public class OllamaChatResponse
+        {
+        [JsonPropertyName("message")]
+        public OllamaMessage? Message { get; set; }
+        }
+
+    public class OllamaMessage
+        {
+        [JsonPropertyName("content")]
+        public string? Content { get; set; }
+        }
     }

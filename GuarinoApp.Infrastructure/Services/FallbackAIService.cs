@@ -112,6 +112,7 @@ public class FallbackAIService : IAIService
                 }
             }
 
+        _logger.LogInformation("Sugerencias: Ollama no aportó resultados; usando fallback de reglas.");
         return await BuildFallbackSuggestionsAsync(request);
         }
 
@@ -168,6 +169,37 @@ public class FallbackAIService : IAIService
                 Color = "#009688",
                 Icon = "check_circle"
                 });
+            }
+
+        // El panel promete "sugerencias" (plural): aunque las reglas activen
+        // pocos puntos, se completa hasta 3 con alternativas derivadas de datos.
+        var extras = new List<BusinessSuggestionDto>
+            {
+            new()
+                {
+                Text = $"Stock actual en planta: {request.TotalStock:N0} bins. Verificar compromisos de compra vigentes contra el plan.",
+                Color = "#1976D2",
+                Icon = "inventory"
+                },
+            new()
+                {
+                Text = "Monitorear clima y riesgo agrícola antes de comprometer volúmenes de compra.",
+                Color = "#009688",
+                Icon = "wb_sunny"
+                },
+            new()
+                {
+                Text = "Revisar semanalmente indicadores de empaque, logística y liquidaciones con la última data disponible.",
+                Color = "#9C27B0",
+                Icon = "assessment"
+                }
+            };
+
+        foreach (var extra in extras)
+            {
+            if (result.Count >= 3)
+                break;
+            result.Add(extra);
             }
 
         return result;
