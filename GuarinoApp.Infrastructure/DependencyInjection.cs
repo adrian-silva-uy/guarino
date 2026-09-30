@@ -84,6 +84,9 @@ namespace GuarinoApp.Infrastructure
             // Registrar servicio de auditoría
             services.AddScoped<IAuditService, AuditService>();
 
+            // Registrar servicio de autorización
+            services.AddScoped<IAuthorizationService, AuthorizationService>();
+
             // Registrar proveedor de estado de autenticación personalizado
             // Debe ser Scoped porque ICurrentUserService es Scoped
             services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
