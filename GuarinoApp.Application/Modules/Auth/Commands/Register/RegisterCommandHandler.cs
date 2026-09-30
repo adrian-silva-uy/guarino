@@ -1,0 +1,95 @@
+using GuarinoApp.Application.Common.Interfaces;
+using GuarinoApp.Application.Modules.Auth.Dtos;
+using GuarinoApp.Application.Settings;
+using GuarinoApp.Domain.Entities;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
+namespace GuarinoApp.Application.Modules.Auth.Commands.Register;
+
+public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthSessionDto>
+{
+    private const string AdminRole = "Gerencia";
+
+    private readonly IApplicationDbContext _context;
+    private readonly IPasswordHasher _passwordHasher;
+    private readonly IAuthTokenService _tokenService;
+    private readonly IAuditService _audit;
+    private readonly AuthSettings _authSettings;
+
+    public RegisterCommandHandler(
+        IApplicationDbContext context,
+        IPasswordHasher passwordHasher,
+        IAuthTokenService tokenService,
+        IAuditService audit,
+        IOptions<AuthSettings> authSettings)
+    {
+        _context = context;
+        _passwordHasher = passwordHasher;
+        _tokenService = tokenService;
+        _audit = audit;
+        _authSettings = authSettings.Value;
+    }
+
+    public async Task<AuthSessionDto> Handle(RegisterCommand request, CancellationToken ct)
+    {
+        if (!_authSettings.AllowRegistration)
+            return AuthSessionDto.Fail("El registro de usuarios está deshabilitado. Contactá al administrador.");
+
+        var userName = request.UserName.Trim();
+        var fullName = request.FullName.Trim();
+
+        if (userName.Length < 3)
+            return AuthSessionDto.Fail("El usuario debe tener al menos 3 caracteres.");
+
+        if (string.IsNullOrWhiteSpace(fullName))
+            return AuthSessionDto.Fail("Ingresá tu nombre completo.");
+
+        if ((request.Password ?? string.Empty).Length < 6)
+            return AuthSessionDto.Fail("La contraseña debe tener al menos 6 caracteres.");
+
+        var exists = await _context.Users
+            .AnyAsync(u => u.UserName == userName && !u.IsDeleted, ct);
+        if (exists)
+            return AuthSessionDto.Fail("Ese usuario ya existe. Elegí otro.");
+
+        // El primer usuario de la organización siempre queda como Gerencia.
+        var hasUsers = await _context.Users.AnyAsync(u => !u.IsDeleted, ct);
+        var role = hasUsers ? _authSettings.DefaultRole : AdminRole;
+
+        var user = new AppUser
+        {
+            UserName = userName,
+            FullName = fullName,
+            PasswordHash = _passwordHasher.Hash(request.Password),
+            Role = role,
+            IsActive = true
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync(ct);
+
+        var token = _tokenService.Issue(new AuthTokenPayload
+        {
+            UserName = user.UserName,
+            FullName = user.FullName,
+            Role = user.Role,
+            ExpiresAtUtc = DateTime.UtcNow.AddHours(Math.Max(1, _authSettings.TokenValidityHours))
+        });
+
+        await _audit.LogAsync(
+            "Register",
+            "Acceso",
+            $"Alta de usuario {user.UserName} con rol {user.Role}.");
+
+        return new AuthSessionDto
+        {
+            Success = true,
+            UserName = user.UserName,
+            FullName = user.FullName,
+            Role = user.Role,
+            Token = token
+        };
+    }
+}

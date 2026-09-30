@@ -27,6 +27,7 @@ public class OllamaAIService : IAIService
     private readonly OllamaConnectionState _connectionState;
     private readonly IPromptProvider _promptProvider;
     private readonly IMediator _mediator;
+    private readonly ISkillRegistry _skillRegistry;
     private readonly IOptionsMonitor<ClimateRiskSettings> _climateSettings;
 
     // Tope de tiempo propio para la llamada de estrategia de Zafra -- más corto que el timeout
@@ -64,6 +65,7 @@ public class OllamaAIService : IAIService
         IDashboardDataService dashboardService,
         IPromptProvider promptProvider,
         IMediator mediator,
+        ISkillRegistry skillRegistry,
         IOptionsMonitor<ClimateRiskSettings> climateSettings)
         {
         _optionsMonitor = optionsMonitor;
@@ -73,6 +75,7 @@ public class OllamaAIService : IAIService
         _dashboardService = dashboardService;
         _promptProvider = promptProvider;
         _mediator = mediator;
+        _skillRegistry = skillRegistry;
         _climateSettings = climateSettings;
         }
 
@@ -149,6 +152,22 @@ public class OllamaAIService : IAIService
                 .Replace("{GrowthPercent}", crecimiento.ToString("0.0"))
                 .Replace("{PalletsWithoutClient}", palletsSinCliente.ToString("N0"))
                 .Replace("{ProyeccionZafra}", proyeccionZafra);
+
+            // Skills: si la consulta del usuario corresponde a una habilidad
+            // registrada, se ejecuta sobre datos reales y el resultado se
+            // inyecta como contexto para que la respuesta no invente cifras.
+            var skillMatch = await _skillRegistry.MatchAsync(prompt);
+            if (skillMatch != null)
+                {
+                system += skillMatch.Success
+                    ? "\n\nDATOS REALES CONSULTADOS AL SISTEMA (habilidad: " + skillMatch.SkillName + "):\n"
+                      + skillMatch.Text
+                      + "\n\nUsá estos datos reales para responder. No inventes cifras: si un dato no está "
+                      + "en esta información, aclará que no está disponible."
+                    : "\n\nEl usuario consultó datos del sistema (habilidad: " + skillMatch.SkillName
+                      + ") pero no hay información disponible: " + skillMatch.Text
+                      + " Aclará en tu respuesta que ese dato todavía no está cargado.";
+                }
 
             var messages = new List<object> { new { role = "system", content = system } };
             foreach (var item in history.TakeLast(10))

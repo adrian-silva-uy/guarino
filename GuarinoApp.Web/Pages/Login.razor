@@ -1,0 +1,139 @@
+@page "/login"
+@using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.Extensions.Options
+@using GuarinoApp.Application.Common
+@using GuarinoApp.Application.Settings
+@using GuarinoApp.Application.Modules.Auth.Commands.Login
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthProvider
+@inject IAuthenticationStateNotifier AuthNotifier
+@inject IJSRuntime JS
+@inject IOptions<AuthSettings> AuthOptions
+
+<PageTitle>Ingresar - Guarino App</PageTitle>
+
+<MudPaper Elevation="2" Class="mx-auto mt-8 pa-6" Style="max-width: 420px;">
+    <MudText Typo="Typo.h5" Class="mb-1">Ingresar</MudText>
+    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+        Iniciá sesión para acceder a la aplicación.
+    </MudText>
+
+    <MudTextField @bind-Value="_userName"
+                  Label="Usuario"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Person"
+                  Immediate="true"
+                  OnKeyUp="OnKeyUpAsync" />
+
+    <MudTextField @bind-Value="_password"
+                  Label="Contraseña"
+                  InputType="InputType.Password"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Lock"
+                  Immediate="true"
+                  OnKeyUp="OnKeyUpAsync"
+                  Class="mt-3" />
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+    }
+
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               FullWidth="true"
+               Class="mt-4"
+               Disabled="_loading"
+               OnClick="LoginAsync">
+        @(_loading ? "Ingresando..." : "Ingresar")
+    </MudButton>
+
+    @if (_allowRegistration)
+    {
+        <MudText Typo="Typo.body2" Class="mt-4 mud-text-align-center">
+            ¿No tenés usuario? <MudLink Href="/register">Registrate acá</MudLink>
+        </MudText>
+    }
+</MudPaper>
+
+@code {
+    private string? _userName;
+    private string? _password;
+    private string? _error;
+    private bool _loading;
+    private bool _allowRegistration = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allowRegistration = AuthOptions.Value.AllowRegistration;
+
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+            Navigation.NavigateTo(GetReturnUrl(), replace: true);
+    }
+
+    private async Task OnKeyUpAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+            await LoginAsync();
+    }
+
+    private async Task LoginAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_userName) || string.IsNullOrWhiteSpace(_password))
+        {
+            _error = "Ingresá tu usuario y contraseña.";
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            var result = await Mediator.Send(new LoginCommand(_userName.Trim(), _password));
+            if (!result.Success)
+            {
+                _error = result.Error;
+                return;
+            }
+
+            await JS.InvokeVoidAsync("localStorage.setItem", AuthStorage.TokenKey, result.Token);
+            AuthNotifier.NotifyChanged();
+            Navigation.NavigateTo(GetReturnUrl(), replace: true);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>URL de origen a la que volver tras iniciar sesión (solo rutas locales).</summary>
+    private string GetReturnUrl()
+    {
+        var query = new Uri(Navigation.Uri).Query;
+        if (string.IsNullOrEmpty(query))
+            return "/";
+
+        var returnUrl = QueryHelpers.ParseQuery(query).TryGetValue("returnUrl", out var values)
+            ? values.FirstOrDefault()
+            : null;
+
+        if (string.IsNullOrWhiteSpace(returnUrl))
+            return "/";
+
+        // Si vino como URL absoluta, quedarse solo con la ruta de la app.
+        if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absolute))
+            returnUrl = absolute.PathAndQuery;
+
+        // Solo rutas locales (evita redireccionar a otros sitios).
+        return returnUrl.StartsWith('/') && !returnUrl.StartsWith("//")
+            ? returnUrl
+            : "/";
+    }
+}

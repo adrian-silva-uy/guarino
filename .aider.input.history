@@ -61,3 +61,37 @@
 
 # 2026-09-29 14:56:40.034830
 +aplica las mejoras que me has detallado comenzando en "1 Mejora de la Configuración"
+
+# 2026-09-30 10:31:58.025138
++y
+
+# 2026-09-30 10:32:56.530821
++corrige el error porque la aplicación muestra 'Sin autenticar', no está teniendo el comportamiento esperado. tampoco veo el manejo de usuarios y roles. Esto se hizo previamante pero no se está viendo: "¡Commit y push exitosos!
++
++**Commit:** **`fb17197`** - **`feat: agregar sistema de autorización basado en roles`**
++
++**4 archivos** modificados:
++
++| **ArchivoCambio**            |                                                                       |
++| ---------------------------- | --------------------------------------------------------------------- |
++| **IAuthorizationService.cs** | Interfaz del servicio de autorización                                 |
++| **AuthorizationService.cs**  | Implementación usando **`ICurrentUserService`**                       |
++| **DependencyInjection.cs**   | Registrado el servicio de autorización                                |
++| **NavMenu.razor**            | Actualizado con **`AuthorizeView`** para mostrar opciones según rol"  |
+
+# 2026-09-30 10:33:05.381499
++y
+
+# 2026-09-30 10:36:13.223530
++corrige el error porque la aplicación muestra 'Sin autenticar', no está teniendo el comportamiento esperado. tampoco veo el manejo de usuarios y roles. Esto se hizo previamante pero no se está viendo: "¡Commit y push exitosos!
++
++**Commit:** **`fb17197`** - **`feat: agregar sistema de autorización basado en roles`**
++
++**4 archivos** modificados:
++
++| **ArchivoCambio**            |                                                                       |
++| ---------------------------- | --------------------------------------------------------------------- |
++| **IAuthorizationService.cs** | Interfaz del servicio de autorización                                 |
++| **AuthorizationService.cs**  | Implementación usando **`ICurrentUserService`**                       |
++| **DependencyInjection.cs**   | Registrado el servicio de autorización                                |
++| **NavMenu.razor**            | Actualizado con **`AuthorizeView`** para mostrar opciones según rol"  |

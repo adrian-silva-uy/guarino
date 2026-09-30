@@ -29,6 +29,7 @@ namespace GuarinoApp.Application.Common.Interfaces
         DbSet<EventoClimatico> EventosClimaticos { get; }
         DbSet<FinancialData> FinancialData { get; }
         DbSet<LogEntry> LogEntries { get; }
+        DbSet<AppUser> Users { get; }
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
         }
     }

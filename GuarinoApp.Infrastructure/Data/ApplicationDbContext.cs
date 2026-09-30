@@ -42,6 +42,7 @@ namespace GuarinoApp.Infrastructure.Data
         public DbSet<EventoClimatico> EventosClimaticos => Set<EventoClimatico>();
         public DbSet<FinancialData> FinancialData => Set<FinancialData>();
         public DbSet<LogEntry> LogEntries => Set<LogEntry>();
+        public DbSet<AppUser> Users => Set<AppUser>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
             {
@@ -178,6 +179,20 @@ namespace GuarinoApp.Infrastructure.Data
                 eb.Property(l => l.Nombre).HasColumnName("Nombre");
                 eb.Property(l => l.Direccion).HasColumnName("Direccion");
                 eb.Property(l => l.Localidad).HasColumnName("Localidad");
+            });
+
+            // --- Usuarios de la aplicación (autenticación local) ---
+            modelBuilder.Entity<AppUser>(entity =>
+            {
+                entity.ToTable("AppUsers");
+                entity.HasKey(u => u.Id);
+                entity.Property(u => u.UserName).IsRequired().HasMaxLength(100);
+                entity.Property(u => u.FullName).IsRequired().HasMaxLength(200);
+                entity.Property(u => u.PasswordHash).IsRequired().HasMaxLength(200);
+                entity.Property(u => u.Role).IsRequired().HasMaxLength(50);
+                // La collation por defecto de SQL Server es case-insensitive,
+                // por lo que el índice único impedirá "ADRIA" y "adria" a la vez.
+                entity.HasIndex(u => u.UserName).IsUnique();
             });
 
             // --- Entidad keyless ---

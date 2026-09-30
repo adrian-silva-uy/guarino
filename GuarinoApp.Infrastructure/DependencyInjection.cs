@@ -2,6 +2,8 @@ using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Settings;
 using GuarinoApp.Infrastructure.Data;
 using GuarinoApp.Infrastructure.Services;
+using GuarinoApp.Infrastructure.Services.Auth;
+using GuarinoApp.Infrastructure.Services.Skills;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -82,6 +84,14 @@ namespace GuarinoApp.Infrastructure
             // Registrar servicio de auditoría
             services.AddScoped<IAuditService, AuditService>();
 
+            // Skills consultables por la IA: consultas reales de negocio que se
+            // inyectan como contexto en el prompt (enrutamiento por intención).
+            services.AddScoped<ISkill, FinancialDataSkill>();
+            services.AddScoped<ISkill, ProyeccionZafraSkill>();
+            services.AddScoped<ISkill, ResumenLiquidacionesSkill>();
+            services.AddScoped<ISkill, ActividadAuditoriaSkill>();
+            services.AddScoped<ISkillRegistry, SkillRegistry>();
+
             // Registrar servicio de autorización
             services.AddScoped<IAuthorizationService, AuthorizationService>();
 
@@ -89,9 +99,22 @@ namespace GuarinoApp.Infrastructure
             // no entrega identidad, p. ej. durante la vida del circuito).
             services.Configure<SecuritySettings>(configuration.GetSection(SecuritySettings.SectionName));
 
+            // Configuración del modo de autenticación (Local con login / Windows con AD).
+            services.Configure<AuthSettings>(configuration.GetSection(AuthSettings.SectionName));
+
+            // Protección de datos para los tokens de sesión (claves del servidor).
+            services.AddDataProtection();
+
+            // Sesión del circuito: fuente de verdad del usuario autenticado.
+            services.AddScoped<ICurrentUserState, CurrentUserState>();
+            services.AddScoped<IAuthTokenService, AuthTokenService>();
+            services.AddScoped<IPasswordHasher, PasswordHasher>();
+
             // Registrar proveedor de estado de autenticación personalizado
             // Debe ser Scoped porque ICurrentUserService es Scoped
             services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
+            services.AddScoped<IAuthenticationStateNotifier>(sp =>
+                (IAuthenticationStateNotifier)sp.GetRequiredService<AuthenticationStateProvider>());
 
             return services;
             }

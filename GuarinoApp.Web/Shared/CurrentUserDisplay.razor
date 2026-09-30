@@ -1,10 +1,15 @@
-﻿@inject AuthenticationStateProvider AuthProvider
+﻿@using System.Security.Claims
+@using GuarinoApp.Application.Common
+@inject AuthenticationStateProvider AuthProvider
+@inject IAuthenticationStateNotifier AuthNotifier
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 <MudText Typo="Typo.body2" Class="d-inline-flex align-items-center">
-    <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Class="mr-1" Size="Size.Small" />
     @if (_isAuthenticated)
     {
-        <span>@_userName</span>
+        <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Class="mr-1" Size="Size.Small" />
+        <span>@_displayName</span>
         @if (_isGerencia)
         {
             <MudChip Color="Color.Primary" Size="Size.Small" Class="ml-2">Gerencia</MudChip>
@@ -17,33 +22,58 @@
         {
             <MudChip Color="Color.Warning" Size="Size.Small" Class="ml-2">Operador</MudChip>
         }
-    }
-    else
-    {
-        <span class="text-muted">Sin autenticar</span>
+        <MudIconButton Icon="@Icons.Material.Filled.Logout"
+                       Title="Cerrar sesión"
+                       Size="Size.Small"
+                       Color="Color.Inherit"
+                       Class="ml-1"
+                       OnClick="LogoutAsync" />
     }
 </MudText>
 
 @code {
     private bool _isAuthenticated = false;
     private string? _userName = null;
+    private string? _fullName = null;
     private bool _isGerencia = false;
     private bool _isContador = false;
     private bool _isOperador = false;
 
+    private string? _displayName => string.IsNullOrWhiteSpace(_fullName) ? _userName : _fullName;
+
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
+        AuthProvider.AuthenticationStateChanged += OnAuthStateChanged;
 
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        Apply(authState.User);
+    }
+
+    private void OnAuthStateChanged(Task<AuthenticationState> task)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            var authState = await task;
+            Apply(authState.User);
+            StateHasChanged();
+        });
+    }
+
+    private void Apply(ClaimsPrincipal user)
+    {
         _isAuthenticated = user.Identity?.IsAuthenticated ?? false;
         _userName = user.Identity?.Name;
+        _fullName = user.Claims.FirstOrDefault(c => c.Type == AuthClaims.FullName)?.Value;
 
-        if (_isAuthenticated)
-        {
-            _isGerencia = user.IsInRole("Gerencia");
-            _isContador = user.IsInRole("Contador");
-            _isOperador = user.IsInRole("Operador");
-        }
+        _isGerencia = _isAuthenticated && user.IsInRole("Gerencia");
+        _isContador = _isAuthenticated && user.IsInRole("Contador");
+        _isOperador = _isAuthenticated && user.IsInRole("Operador");
+    }
+
+    private async Task LogoutAsync()
+    {
+        await JS.InvokeVoidAsync("localStorage.removeItem", AuthStorage.TokenKey);
+        Navigation.NavigateTo("/login", replace: true);
+        AuthNotifier.NotifyChanged();
     }
 }

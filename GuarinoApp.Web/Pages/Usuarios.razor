@@ -1,0 +1,122 @@
+@page "/usuarios"
+@using GuarinoApp.Application.Modules.Auth.Dtos
+@using GuarinoApp.Application.Modules.Auth.Queries.GetUsers
+@using GuarinoApp.Application.Modules.Auth.Commands.UpdateUser
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Usuarios - Guarino App</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Usuarios</MudText>
+<MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+    Administración de usuarios, roles y accesos de la aplicación.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-4" />
+}
+else if (_users.Count == 0)
+{
+    <MudAlert Severity="Severity.Info" Class="mt-4">Todavía no hay usuarios cargados.</MudAlert>
+}
+else
+{
+    <MudTable Items="_users" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Class="mt-2">
+        <HeaderContent>
+            <MudTh>Usuario</MudTh>
+            <MudTh>Nombre</MudTh>
+            <MudTh>Rol</MudTh>
+            <MudTh>Activo</MudTh>
+            <MudTh>Último acceso</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Usuario">
+                <MudText Typo="Typo.body2">@context.UserName</MudText>
+            </MudTd>
+            <MudTd DataLabel="Nombre">@context.FullName</MudTd>
+            <MudTd DataLabel="Rol">
+                <MudSelect T="string"
+                           Value="@context.Role"
+                           ValueChanged="@(role => ChangeRoleAsync(context, role))"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Dense="true"
+                           Disabled="_saving">
+                    <MudSelectItem Value="@("Gerencia")">Gerencia</MudSelectItem>
+                    <MudSelectItem Value="@("Contador")">Contador</MudSelectItem>
+                    <MudSelectItem Value="@("Operador")">Operador</MudSelectItem>
+                </MudSelect>
+            </MudTd>
+            <MudTd DataLabel="Activo">
+                <MudSwitch T="bool"
+                           Checked="@context.IsActive"
+                           CheckedChanged="(active => ChangeActiveAsync(context, active))"
+                           Color="Color.Success"
+                           Disabled="_saving" />
+            </MudTd>
+            <MudTd DataLabel="Último acceso">
+                @(context.LastLoginAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Nunca")
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private List<AppUserDto> _users = new();
+    private bool _loading = true;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+        => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _users = await Mediator.Send(new GetUsersQuery());
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ChangeRoleAsync(AppUserDto user, string role)
+    {
+        await SaveAsync(user, role: role);
+    }
+
+    private async Task ChangeActiveAsync(AppUserDto user, bool isActive)
+    {
+        await SaveAsync(user, isActive: isActive);
+    }
+
+    private async Task SaveAsync(AppUserDto user, string? role = null, bool? isActive = null)
+    {
+        _saving = true;
+        try
+        {
+            var result = await Mediator.Send(new UpdateUserCommand(
+                user.Id,
+                role ?? user.Role,
+                isActive ?? user.IsActive));
+
+            if (result.Success)
+            {
+                Snackbar.Add("Cambios guardados.", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "No se pudieron guardar los cambios.", Severity.Error);
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

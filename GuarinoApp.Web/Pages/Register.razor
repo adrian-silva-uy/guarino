@@ -1,0 +1,141 @@
+@page "/register"
+@using Microsoft.Extensions.Options
+@using GuarinoApp.Application.Common
+@using GuarinoApp.Application.Settings
+@using GuarinoApp.Application.Modules.Auth.Commands.Register
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthProvider
+@inject IAuthenticationStateNotifier AuthNotifier
+@inject IJSRuntime JS
+@inject IOptions<AuthSettings> AuthOptions
+
+<PageTitle>Registro - Guarino App</PageTitle>
+
+<MudPaper Elevation="2" Class="mx-auto mt-8 pa-6" Style="max-width: 460px;">
+    <MudText Typo="Typo.h5" Class="mb-1">Crear usuario</MudText>
+    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+        Completá tus datos para crear tu cuenta e ingresar a la aplicación.
+    </MudText>
+
+    <MudTextField @bind-Value="_fullName"
+                  Label="Nombre completo"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Immediate="true"
+                  OnKeyUp="OnKeyUpAsync" />
+
+    <MudTextField @bind-Value="_userName"
+                  Label="Usuario"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Person"
+                  Immediate="true"
+                  OnKeyUp="OnKeyUpAsync"
+                  Class="mt-3" />
+
+    <MudTextField @bind-Value="_password"
+                  Label="Contraseña"
+                  InputType="InputType.Password"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Lock"
+                  Immediate="true"
+                  OnKeyUp="OnKeyUpAsync"
+                  Class="mt-3"
+                  HelperText="Mínimo 6 caracteres" />
+
+    <MudTextField @bind-Value="_passwordConfirm"
+                  Label="Repetir contraseña"
+                  InputType="InputType.Password"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Lock"
+                  Immediate="true"
+                  OnKeyUp="OnKeyUpAsync"
+                  Class="mt-3" />
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+    }
+
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               FullWidth="true"
+               Class="mt-4"
+               Disabled="_loading"
+               OnClick="RegisterAsync">
+        @(_loading ? "Creando cuenta..." : "Crear cuenta")
+    </MudButton>
+
+    <MudText Typo="Typo.body2" Class="mt-4 mud-text-align-center">
+        ¿Ya tenés usuario? <MudLink Href="/login">Ingresá acá</MudLink>
+    </MudText>
+</MudPaper>
+
+@code {
+    private string? _fullName;
+    private string? _userName;
+    private string? _password;
+    private string? _passwordConfirm;
+    private string? _error;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthOptions.Value.AllowRegistration)
+        {
+            Navigation.NavigateTo("/login", replace: true);
+            return;
+        }
+
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+            Navigation.NavigateTo("/", replace: true);
+    }
+
+    private async Task OnKeyUpAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+            await RegisterAsync();
+    }
+
+    private async Task RegisterAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_password) || _password != _passwordConfirm)
+        {
+            _error = "Las contraseñas no coinciden.";
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            var result = await Mediator.Send(new RegisterCommand(
+                _userName ?? string.Empty,
+                _fullName ?? string.Empty,
+                _password ?? string.Empty));
+
+            if (!result.Success)
+            {
+                _error = result.Error;
+                return;
+            }
+
+            // Registro exitoso: queda con sesión iniciada.
+            await JS.InvokeVoidAsync("localStorage.setItem", AuthStorage.TokenKey, result.Token);
+            AuthNotifier.NotifyChanged();
+            Navigation.NavigateTo("/", replace: true);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

@@ -1,21 +1,29 @@
 @inherits LayoutComponentBase
 @using MudBlazor
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Navigation
 
 <MudThemeProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1" >
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" OnClick="@((e) => DrawerToggle())" />
+    <MudAppBar Elevation="1">
+        @if (_isAuthenticated)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" OnClick="@((e) => DrawerToggle())" />
+        }
         <MudText Typo="Typo.h6" Class="ml-2">Guarino App</MudText>
         <MudSpacer />
         <MudText Typo="Typo.body2" Class="d-none d-sm-block"><CurrentUserDisplay /></MudText>
     </MudAppBar>
-    
-    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Variant="DrawerVariant.Responsive">
-        <NavMenu />
-    </MudDrawer>
+
+    @if (_isAuthenticated)
+    {
+        <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Variant="DrawerVariant.Responsive">
+            <NavMenu />
+        </MudDrawer>
+    }
 
     <MudMainContent>
         <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 my-sm-8 px-2 px-sm-4">
@@ -25,6 +33,45 @@
 </MudLayout>
 
 @code {
-    bool _drawerOpen = true;
+    private bool _drawerOpen = true;
+    private bool _isAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthProvider.AuthenticationStateChanged += OnAuthStateChanged;
+        await EnforceAuthenticationAsync();
+    }
+
+    /// <summary>
+    /// Control de acceso global: sin sesión no se puede navegar fuera de las
+    /// páginas de acceso y registro; se redirige conservando la URL de origen.
+    /// </summary>
+    private async Task EnforceAuthenticationAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        _isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+
+        if (_isAuthenticated)
+            return;
+
+        var path = new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/');
+        if (path is "/login" or "/register")
+            return;
+
+        Navigation.NavigateTo(
+            $"/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}",
+            replace: true);
+    }
+
+    private void OnAuthStateChanged(Task<AuthenticationState> task)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            var authState = await task;
+            _isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+            StateHasChanged();
+        });
+    }
+
     void DrawerToggle() => _drawerOpen = !_drawerOpen;
 }
