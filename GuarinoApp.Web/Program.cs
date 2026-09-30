@@ -100,7 +100,10 @@ builder.Services.AddHttpClient("Ollama", (sp, client) =>
 .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
 {
     PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-    MaxConnectionsPerServer = 4
+    // Concurrencia: varias sesiones pueden consultar la IA a la vez.
+    // Ollama serializa la inferencia en el servidor; más conexiones evitan
+    // que las consultas esperen en cola del lado del cliente agotando su timeout.
+    MaxConnectionsPerServer = 8
 });
 
 // ============================================================================

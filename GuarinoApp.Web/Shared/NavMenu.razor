@@ -24,8 +24,8 @@
 
     <MudDivider Class="my-2" />
 
-    @* INTELIGENCIA ARTIFICIAL - Gerencia y Contador *@
-    <AuthorizeView Roles="Gerencia, Contador">
+    @* INTELIGENCIA ARTIFICIAL - Admin, Gerencia y Contador *@
+    <AuthorizeView Roles="Admin, Gerencia, Contador">
         <Authorized>
             <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Secondary">🤖 INTELIGENCIA ARTIFICIAL</MudText>
             <MudNavLink Href="/proyeccion-volcados" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.TrendingUp" IconColor="Color.Secondary">Proyección de Volcados</MudNavLink>
@@ -36,8 +36,8 @@
 
     <MudDivider Class="my-2" />
 
-    @* REPORTES Y ANÁLISIS - Gerencia y Contador *@
-    <AuthorizeView Roles="Gerencia, Contador">
+    @* REPORTES Y ANÁLISIS - Admin, Gerencia y Contador *@
+    <AuthorizeView Roles="Admin, Gerencia, Contador">
         <Authorized>
             <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Warning">📊 REPORTES Y ANÁLISIS</MudText>
             <MudNavLink Href="/resumenliquidaciones" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.ReceiptLong" IconColor="Color.Warning">Resumen de Liquidaciones</MudNavLink>
@@ -55,8 +55,8 @@
 
     <MudDivider Class="my-2" />
 
-    @* LOGÍSTICA Y RECURSOS - Gerencia y Contador *@
-    <AuthorizeView Roles="Gerencia, Contador">
+    @* LOGÍSTICA Y RECURSOS - Admin, Gerencia y Contador *@
+    <AuthorizeView Roles="Admin, Gerencia, Contador">
         <Authorized>
             <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Info">🚛 LOGÍSTICA Y RECURSOS</MudText>
             <MudNavLink Href="/transportistas" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.LocalShipping" IconColor="Color.Info">Transportistas</MudNavLink>
@@ -68,8 +68,8 @@
 
     <MudDivider Class="my-2" />
 
-    @* ADMINISTRACIÓN - Solo Gerencia *@
-    <AuthorizeView Roles="Gerencia">
+    @* ADMINISTRACIÓN - Admin y Gerencia *@
+    <AuthorizeView Roles="Admin, Gerencia">
         <Authorized>
             <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Error">⚙️ ADMINISTRACIÓN</MudText>
             <MudNavLink Href="/empaque" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Widgets" IconColor="Color.Error">Gestión de Empaque</MudNavLink>

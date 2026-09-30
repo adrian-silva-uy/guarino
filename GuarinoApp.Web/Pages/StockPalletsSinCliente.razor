@@ -1,4 +1,5 @@
 @page "/stockpalletssincliente"
+@attribute [Authorize(Roles = "Admin, Gerencia, Contador")]
 @using MediatR
 @using MudBlazor
 @using GuarinoApp.Application.Modules.StockPalletsSinCliente.Queries.GetStockPalletsSinCliente

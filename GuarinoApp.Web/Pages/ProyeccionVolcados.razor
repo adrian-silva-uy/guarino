@@ -1,4 +1,5 @@
 @page "/proyeccion-volcados"
+@attribute [Authorize(Roles = "Admin, Gerencia, Contador")]
 @using MediatR
 @using MudBlazor
 @using Microsoft.AspNetCore.Components

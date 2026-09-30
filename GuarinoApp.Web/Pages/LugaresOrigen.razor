@@ -1,4 +1,5 @@
 @page "/lugaresorigen"
+@attribute [Authorize(Roles = "Admin, Gerencia, Contador")]
 @using MediatR
 @using MudBlazor
 @using GuarinoApp.Application.Modules.LugaresOrigen.Queries.GetLugaresOrigen

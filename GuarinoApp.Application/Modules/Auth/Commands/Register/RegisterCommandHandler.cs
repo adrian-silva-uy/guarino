@@ -10,7 +10,8 @@ namespace GuarinoApp.Application.Modules.Auth.Commands.Register;
 
 public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthSessionDto>
 {
-    private const string AdminRole = "Gerencia";
+    /// <summary>Rol del primer usuario registrado: el super-usuario de la aplicación.</summary>
+    private const string AdminRole = "Admin";
 
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
@@ -46,7 +47,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthSessi
         if (string.IsNullOrWhiteSpace(fullName))
             return AuthSessionDto.Fail("Ingresá tu nombre completo.");
 
-        if ((request.Password ?? string.Empty).Length < 6)
+        var password = request.Password ?? string.Empty;
+        if (password.Length < 6)
             return AuthSessionDto.Fail("La contraseña debe tener al menos 6 caracteres.");
 
         var exists = await _context.Users
@@ -54,7 +56,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthSessi
         if (exists)
             return AuthSessionDto.Fail("Ese usuario ya existe. Elegí otro.");
 
-        // El primer usuario de la organización siempre queda como Gerencia.
+        // El primer usuario de la organización siempre queda como Admin.
         var hasUsers = await _context.Users.AnyAsync(u => !u.IsDeleted, ct);
         var role = hasUsers ? _authSettings.DefaultRole : AdminRole;
 
@@ -62,9 +64,10 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthSessi
         {
             UserName = userName,
             FullName = fullName,
-            PasswordHash = _passwordHasher.Hash(request.Password),
+            PasswordHash = _passwordHasher.Hash(password),
             Role = role,
-            IsActive = true
+            IsActive = true,
+            ActivatedAt = DateTime.UtcNow
         };
 
         _context.Users.Add(user);

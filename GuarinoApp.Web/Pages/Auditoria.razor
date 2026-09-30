@@ -1,4 +1,5 @@
 @page "/auditoria"
+@attribute [Authorize(Roles = "Admin, Gerencia")]
 @using MediatR
 @using MudBlazor
 @using GuarinoApp.Application.Common.Interfaces
@@ -181,6 +182,7 @@
     private static Color GetRoleColor(string? role) => role switch
     {
         "Gerencia" => Color.Primary,
+        "Admin" => Color.Error,
         "Contador" => Color.Success,
         "Operador" => Color.Warning,
         _ => Color.Default

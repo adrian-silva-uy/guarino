@@ -24,6 +24,18 @@ public class AppUser : BaseEntity
     /// <summary>Indica si el usuario puede ingresar.</summary>
     public bool IsActive { get; set; } = true;
 
+    /// <summary>Fecha y hora desde la que el usuario está activo.</summary>
+    public DateTime? ActivatedAt { get; set; }
+
+    /// <summary>Fecha y hora desde la que el usuario está inactivo (null si está activo).</summary>
+    public DateTime? DeactivatedAt { get; set; }
+
+    /// <summary>
+    /// Marca de concurrencia optimista: si otra sesión modifica la fila
+    /// mientras se edita, la guardada falla en vez de pisar el cambio.
+    /// </summary>
+    public byte[]? RowVersion { get; set; }
+
     /// <summary>Fecha y hora del último inicio de sesión exitoso.</summary>
     public DateTime? LastLoginAt { get; set; }
 }

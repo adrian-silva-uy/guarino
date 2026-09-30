@@ -1,7 +1,23 @@
 ﻿<CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
-            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            @* AuthorizeRouteView aplica los @attribute [Authorize(...)] de cada
+               página. Sin atributo, la página queda protegida por el gate de
+               MainLayout (cualquier usuario autenticado), igual que antes. *@
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                @* AuthorizeRouteView ya envuelve Authorizing y NotAuthorized con
+                   DefaultLayout (MainLayout): no agregar otro LayoutView acá o se
+                   monta MainLayout dos veces y MudBlazor falla con "Duplicate
+                   MudPopoverProvider". El gate de MainLayout también corre igual. *@
+                <NotAuthorized>
+                    <MudAlert Severity="Severity.Warning" Class="mt-4">
+                        No tenés permiso para acceder a esta sección. Consultá a un Administrador.
+                    </MudAlert>
+                </NotAuthorized>
+                <Authorizing>
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-4" />
+                </Authorizing>
+            </AuthorizeRouteView>
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />
         </Found>
         <NotFound>

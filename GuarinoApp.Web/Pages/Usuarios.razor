@@ -1,4 +1,5 @@
 @page "/usuarios"
+@attribute [Authorize(Roles = "Admin, Gerencia")]
 @using GuarinoApp.Application.Modules.Auth.Dtos
 @using GuarinoApp.Application.Modules.Auth.Queries.GetUsers
 @using GuarinoApp.Application.Modules.Auth.Commands.UpdateUser
@@ -12,6 +13,10 @@
     Administración de usuarios, roles y accesos de la aplicación.
 </MudText>
 
+@* La página solo renderiza para Admin y Gerencia gracias al [Authorize] de arriba
+   (la URL directa de otro rol responde con el aviso de App.razor).
+   Las reglas de negocio (quién activa, quién cambia roles) se validan server-side
+   en UpdateUserCommandHandler. *@
 @if (_loading)
 {
     <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-4" />
@@ -28,6 +33,7 @@ else
             <MudTh>Nombre</MudTh>
             <MudTh>Rol</MudTh>
             <MudTh>Activo</MudTh>
+            <MudTh>Estado desde</MudTh>
             <MudTh>Último acceso</MudTh>
         </HeaderContent>
         <RowTemplate>
@@ -43,17 +49,30 @@ else
                            Margin="Margin.Dense"
                            Dense="true"
                            Disabled="_saving">
+                    <MudSelectItem Value="@("Admin")">Admin</MudSelectItem>
                     <MudSelectItem Value="@("Gerencia")">Gerencia</MudSelectItem>
                     <MudSelectItem Value="@("Contador")">Contador</MudSelectItem>
                     <MudSelectItem Value="@("Operador")">Operador</MudSelectItem>
                 </MudSelect>
             </MudTd>
             <MudTd DataLabel="Activo">
-                <MudSwitch T="bool"
-                           Checked="@context.IsActive"
-                           CheckedChanged="(active => ChangeActiveAsync(context, active))"
-                           Color="Color.Success"
-                           Disabled="_saving" />
+                @* Activar/desactivar es potestad exclusiva del Admin;
+                   Gerencia solo consulta el estado. *@
+                <AuthorizeView Roles="Admin" Context="authCtx">
+                    <Authorized>
+                        <MudSwitch T="bool"
+                                   Checked="@context.IsActive"
+                                   CheckedChanged="(active => ChangeActiveAsync(context, active))"
+                                   Color="Color.Success"
+                                   Disabled="_saving" />
+                    </Authorized>
+                    <NotAuthorized>
+                        <MudText Typo="Typo.body2">@(context.IsActive ? "Sí" : "No")</MudText>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </MudTd>
+            <MudTd DataLabel="Estado desde">
+                @StateLabel(context)
             </MudTd>
             <MudTd DataLabel="Último acceso">
                 @(context.LastLoginAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Nunca")
@@ -69,6 +88,12 @@ else
 
     protected override async Task OnInitializedAsync()
         => await LoadAsync();
+
+    /// <summary>Estado con su fecha: "desde cuándo" está activo o inactivo.</summary>
+    private static string StateLabel(AppUserDto user) =>
+        user.IsActive
+            ? $"Activo desde {user.ActivatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "—"}"
+            : $"Inactivo desde {user.DeactivatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "—"}";
 
     private async Task LoadAsync()
     {

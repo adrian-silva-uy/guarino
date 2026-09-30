@@ -20,7 +20,7 @@ public class GetResumenLiquidacionesQueryHandler : IRequestHandler<GetResumenLiq
             var result = await _context.Lotes
                 .AsNoTracking()
                 .Where(l => !l.IsDeleted && l.FechaIngreso.HasValue)
-                .GroupBy(l => new { Productor = l.Productor.Nombre, Variedad = l.Variedad.Nombre, Año = l.FechaIngreso.Value.Year })
+                .GroupBy(l => new { Productor = l.Productor.Nombre, Variedad = l.Variedad.Nombre, Año = l.FechaIngreso.HasValue ? l.FechaIngreso.Value.Year : 0 })
                 .Select(g => new ResumenLiquidacionDto
                     {
                     Productor = g.Key.Productor,

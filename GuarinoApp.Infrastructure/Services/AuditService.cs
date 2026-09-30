@@ -28,7 +28,8 @@ public class AuditService : IAuditService
             var logEntry = new GuarinoApp.Domain.Entities.LogEntry
             {
                 UserName = _currentUser.UserName ?? "Sistema",
-                Role = _currentUser.IsInRole("Gerencia") ? "Gerencia" :
+                Role = _currentUser.IsInRole("Admin") ? "Admin" :
+                       _currentUser.IsInRole("Gerencia") ? "Gerencia" :
                        _currentUser.IsInRole("Contador") ? "Contador" :
                        _currentUser.IsInRole("Operador") ? "Operador" : "Usuario",
                 Action = action,

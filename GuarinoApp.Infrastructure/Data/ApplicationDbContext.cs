@@ -190,6 +190,9 @@ namespace GuarinoApp.Infrastructure.Data
                 entity.Property(u => u.FullName).IsRequired().HasMaxLength(200);
                 entity.Property(u => u.PasswordHash).IsRequired().HasMaxLength(200);
                 entity.Property(u => u.Role).IsRequired().HasMaxLength(50);
+                // Concurrencia optimista: dos sesiones que editen al mismo
+                // usuario no se pisan; la segunda recibe un error controlado.
+                entity.Property(u => u.RowVersion).IsRowVersion();
                 // La collation por defecto de SQL Server es case-insensitive,
                 // por lo que el índice único impedirá "ADRIA" y "adria" a la vez.
                 entity.HasIndex(u => u.UserName).IsUnique();

@@ -23,6 +23,8 @@ public class GetUsersQueryHandler : IRequestHandler<GetUsersQuery, List<AppUserD
                 FullName = u.FullName,
                 Role = u.Role,
                 IsActive = u.IsActive,
+                ActivatedAt = u.ActivatedAt,
+                DeactivatedAt = u.DeactivatedAt,
                 LastLoginAt = u.LastLoginAt,
                 CreatedAt = u.CreatedAt
             })

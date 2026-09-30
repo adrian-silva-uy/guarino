@@ -10,7 +10,11 @@
     {
         <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Class="mr-1" Size="Size.Small" />
         <span>@_displayName</span>
-        @if (_isGerencia)
+        @if (_isAdmin)
+        {
+            <MudChip Color="Color.Error" Size="Size.Small" Class="ml-2">Admin</MudChip>
+        }
+        else if (_isGerencia)
         {
             <MudChip Color="Color.Primary" Size="Size.Small" Class="ml-2">Gerencia</MudChip>
         }
@@ -35,6 +39,7 @@
     private bool _isAuthenticated = false;
     private string? _userName = null;
     private string? _fullName = null;
+    private bool _isAdmin = false;
     private bool _isGerencia = false;
     private bool _isContador = false;
     private bool _isOperador = false;
@@ -65,6 +70,7 @@
         _userName = user.Identity?.Name;
         _fullName = user.Claims.FirstOrDefault(c => c.Type == AuthClaims.FullName)?.Value;
 
+        _isAdmin = _isAuthenticated && user.IsInRole("Admin");
         _isGerencia = _isAuthenticated && user.IsInRole("Gerencia");
         _isContador = _isAuthenticated && user.IsInRole("Contador");
         _isOperador = _isAuthenticated && user.IsInRole("Operador");

@@ -53,8 +53,17 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthSessionDto>
             return AuthSessionDto.Fail("Tu usuario está deshabilitado. Contactá al administrador.");
         }
 
-        user.LastLoginAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync(ct);
+        // Registro de actividad del acceso: es best-effort, no debe impedir
+        // el inicio de sesión si hay una colación con otra actualización.
+        try
+        {
+            user.LastLoginAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Otra sesión actualizó el usuario al mismo tiempo: no bloquear el ingreso.
+        }
 
         var token = _tokenService.Issue(new AuthTokenPayload
         {

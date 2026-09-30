@@ -1,5 +1,5 @@
 @page "/gerencia"
-@attribute [Authorize(Policy = "Gerencia")]
+@attribute [Authorize(Roles = "Admin, Gerencia")]
 @using MediatR
 @using MudBlazor
 @using GuarinoApp.Application.Modules.Gerencia.Queries.GetIndicadoresGerencia

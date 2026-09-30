@@ -20,7 +20,7 @@ public class GetLiquidacionesQuintaQueryHandler : IRequestHandler<GetLiquidacion
             var result = await _context.Lotes
                 .AsNoTracking()
                 .Where(l => !l.IsDeleted && l.FechaIngreso.HasValue)
-                .GroupBy(l => new { Quinta = l.Quinta.Nombre, Productor = l.Productor.Nombre, Variedad = l.Variedad.Nombre, Año = l.FechaIngreso.Value.Year })
+                .GroupBy(l => new { Quinta = l.Quinta.Nombre, Productor = l.Productor.Nombre, Variedad = l.Variedad.Nombre, Año = l.FechaIngreso.HasValue ? l.FechaIngreso.Value.Year : 0 })
                 .Select(g => new LiquidacionQuintaDto
                     {
                     Quinta = g.Key.Quinta,
