@@ -197,15 +197,6 @@ app.Use(async (context, next) =>
     await next();
 });
 
-// ============================================================================
-// PERMISOS ADICIONALES PARA BLAZOR SERVER - Solución alternativa
-// ============================================================================
-app.Use(async (context, next) =>
-{
-    context.Response.Headers.Append("Permissions-Policy", "unload=()");
-    await next();
-});
-
 app.UseHttpsRedirection();
 app.UseResponseCompression();
 app.UseStaticFiles();
