@@ -64,6 +64,27 @@ namespace GuarinoApp.Infrastructure.Data
                 .Property(x => x.KilosNetos)
                 .HasPrecision(18, 2);
 
+            // --- Precisión para decimales de Contaduría (FinancialData) ---
+            modelBuilder.Entity<FinancialData>()
+                .Property(f => f.CostoPorKg)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<FinancialData>()
+                .Property(f => f.FlujoCaja)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<FinancialData>()
+                .Property(f => f.MargenBruto)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<FinancialData>()
+                .Property(f => f.CostoFlete)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<FinancialData>()
+                .Property(f => f.CapacidadInstalada)
+                .HasPrecision(18, 2);
+
             // corregir advertencia en Lote
             modelBuilder.Entity<Lote>()
                 .Property(l => l.KilosNetos)

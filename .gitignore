@@ -2047,3 +2047,4 @@ ClientBin/
 *.fsproj.suo
 *.sqlproj.suo
 *.vcxproj.s
+.aider*

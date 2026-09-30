@@ -1,10 +1,8 @@
 using GuarinoApp.Application.Common.Interfaces;
+using GuarinoApp.Application.Settings;
 using GuarinoApp.Infrastructure.Data;
 using GuarinoApp.Infrastructure.Services;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -86,6 +84,10 @@ namespace GuarinoApp.Infrastructure
 
             // Registrar servicio de autorización
             services.AddScoped<IAuthorizationService, AuthorizationService>();
+
+            // Configuración de identidad y roles (respaldo cuando Windows Auth
+            // no entrega identidad, p. ej. durante la vida del circuito).
+            services.Configure<SecuritySettings>(configuration.GetSection(SecuritySettings.SectionName));
 
             // Registrar proveedor de estado de autenticación personalizado
             // Debe ser Scoped porque ICurrentUserService es Scoped

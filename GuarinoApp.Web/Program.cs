@@ -6,6 +6,7 @@ using GuarinoApp.Infrastructure;
 using GuarinoApp.Infrastructure.Data;
 using GuarinoApp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using MudBlazor.Services;
@@ -191,9 +192,9 @@ app.Use(async (context, next) =>
     context.Response.Headers.Append("X-Frame-Options", "DENY");
     context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
     context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
-    // Permitir evento unload para Blazor Server (necesario para el funcionamiento correcto)
-    context.Response.Headers.Append("Permissions-Policy", "unload=(), camera=(), microphone=(), geolocation=()");
-    context.Response.Headers.Append("Feature-Policy", "unload 'self'");
+    // No se restringe 'unload' porque Blazor Server lo necesita y el navegador
+    // emite el warning "Permissions policy violation: unload is not allowed".
+    context.Response.Headers.Append("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
     await next();
 });
 
@@ -233,11 +234,14 @@ logger.LogInformation(
 
 // ============================================================================
 // SEED DE BASE DE DATOS (solo Development)
+// Database.Migrate aplica las migraciones pendientes automáticamente en
+// Development, de modo que entornos locales siempre tengan el esquema actual.
 // ============================================================================
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    context.Database.Migrate();
     DbInitializer.Initialize(context);
 }
 
