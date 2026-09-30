@@ -60,9 +60,17 @@
             <MudCardContent>
                 <div class="d-flex flex-column gap-1">
                     <MudLink Href="/dashboard" Typo="Typo.body2">Dashboard Ejecutivo</MudLink>
-                    <MudLink Href="/gerencia" Typo="Typo.body2">Panel Gerencial</MudLink>
+                    <AuthorizeView Roles="Admin, Gerencia">
+                        <Authorized>
+                            <MudLink Href="/gerencia" Typo="Typo.body2">Panel Gerencial</MudLink>
+                        </Authorized>
+                    </AuthorizeView>
                     <MudLink Href="/proyeccion-volcados" Typo="Typo.body2">Proyección de Fruta</MudLink>
-                    <MudLink Href="/proyeccion-zafra" Typo="Typo.body2">Proyección de Zafra</MudLink>
+                    <AuthorizeView Roles="Admin, Gerencia, Contador">
+                        <Authorized>
+                            <MudLink Href="/proyeccion-zafra" Typo="Typo.body2">Proyección de Zafra</MudLink>
+                        </Authorized>
+                    </AuthorizeView>
                     <MudLink Href="/resumenmensual" Typo="Typo.body2">Resumen Mensual</MudLink>
                 </div>
             </MudCardContent>
