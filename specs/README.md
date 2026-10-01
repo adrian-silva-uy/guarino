@@ -40,3 +40,4 @@ primero (o en el mismo commit).
 | [001-autenticacion-dual-local-windows](adr/001-autenticacion-dual-local-windows.md) | Aceptada | `Auth:Mode` Local / Windows |
 | [002-matriz-de-roles](adr/002-matriz-de-roles.md) | Aceptada | Qué ve cada rol, derivado de los perfiles de usuario |
 | [003-estrategia-de-herramientas-del-asistente](adr/003-estrategia-de-herramientas-del-asistente.md) | ✅ Aceptada | Orquestación **A** (determinista en código) con camino a C; ADR-003 |
+| [004-nomenclatura-y-metadatos-origen-scriptcase](adr/004-nomenclatura-y-metadatos-origen-scriptcase.md) | ✅ Aceptada | Nombres de módulos = etiquetas de los `.bkp` de ScriptCase, regla de duplicados y trazabilidad (catálogo + dump de DB); ADR-004 |

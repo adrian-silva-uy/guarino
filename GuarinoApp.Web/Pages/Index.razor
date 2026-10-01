@@ -24,7 +24,7 @@
         <MudCard Elevation="2" Style="border-top: 4px solid var(--mud-palette-success);">
             <MudCardContent>
                 <MudText Typo="Typo.button" Class="mud-text-secondary">Control de Stock</MudText>
-                <MudButton Variant="Variant.Text" Color="Color.Success" Href="/stockgeneral" Class="mt-2 p-0" StartIcon="@Icons.Material.Filled.ArrowForward">Ver stock en playa</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Success" Href="/stockgeneral" Class="mt-2 p-0" StartIcon="@Icons.Material.Filled.ArrowForward">Ver stock general</MudButton>
             </MudCardContent>
         </MudCard>
     </MudItem>
@@ -62,13 +62,13 @@
                     <MudLink Href="/dashboard" Typo="Typo.body2">Dashboard Ejecutivo</MudLink>
                     <AuthorizeView Roles="Admin, Gerencia">
                         <Authorized>
-                            <MudLink Href="/gerencia" Typo="Typo.body2">Panel Gerencial</MudLink>
+                            <MudLink Href="/gerencia" Typo="Typo.body2">Panel de Gerencia</MudLink>
                         </Authorized>
                     </AuthorizeView>
-                    <MudLink Href="/proyeccion-volcados" Typo="Typo.body2">Proyección de Fruta</MudLink>
+                    <MudLink Href="/proyeccion-volcados" Typo="Typo.body2">Proyección de Volcados</MudLink>
                     <AuthorizeView Roles="Admin, Gerencia, Contador">
                         <Authorized>
-                            <MudLink Href="/proyeccion-zafra" Typo="Typo.body2">Proyección de Zafra</MudLink>
+                            <MudLink Href="/proyeccion-zafra" Typo="Typo.body2">Proyección de Zafra Siguiente</MudLink>
                         </Authorized>
                     </AuthorizeView>
                     <MudLink Href="/resumenmensual" Typo="Typo.body2">Resumen Mensual</MudLink>
@@ -93,8 +93,8 @@
             <MudCardContent>
                 <div class="d-flex flex-column gap-1">
                     <MudLink Href="/frutavolcar" Typo="Typo.body2">Fruta a Volcar</MudLink>
-                    <MudLink Href="/empaque" Typo="Typo.body2">Línea de Empaque</MudLink>
-                    <MudLink Href="/basculas" Typo="Typo.body2">Control de Básculas</MudLink>
+                    <MudLink Href="/empaque" Typo="Typo.body2">Gestión de Empaque</MudLink>
+                    <MudLink Href="/basculas" Typo="Typo.body2">Básculas</MudLink>
                     <MudLink Href="/registropesadas" Typo="Typo.body2">Registro de Pesadas</MudLink>
                     <MudLink Href="/camioneszorras" Typo="Typo.body2">Camiones y Zorras</MudLink>
                     <MudLink Href="/graficaprocesos" Typo="Typo.body2">Gráfica de Procesos</MudLink>
@@ -121,8 +121,8 @@
                     <MudLink Href="/stockgeneral" Typo="Typo.body2">Stock General</MudLink>
                     <MudLink Href="/stockplaya" Typo="Typo.body2">Stock en Playa</MudLink>
                     <MudLink Href="/pallets-definitivos" Typo="Typo.body2">Pallets Definitivos</MudLink>
-                    <MudLink Href="/palletssincliente" Typo="Typo.body2">Pallets sin Cliente</MudLink>
-                    <MudLink Href="/palletscontramarca" Typo="Typo.body2">Pallets Contramarca</MudLink>
+                    <MudLink Href="/palletssincliente" Typo="Typo.body2">Pallets Sin Clientes</MudLink>
+                    <MudLink Href="/palletscontramarca" Typo="Typo.body2">Pallets por Contramarca</MudLink>
                 </div>
             </MudCardContent>
         </MudCard>

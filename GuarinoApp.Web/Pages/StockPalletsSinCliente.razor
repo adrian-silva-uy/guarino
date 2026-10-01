@@ -6,55 +6,93 @@
 @using GuarinoApp.Application.Modules.StockPalletsSinCliente.Dtos
 @inject IMediator Mediator
 
-<MudText Typo="Typo.h4" GutterBottom="true">📊 Stock Pallets sin Cliente</MudText>
-<MudText Typo="Typo.body2" Class="mb-4">Listado de Stock Pallets sin Cliente</MudText>
+<MudText Typo="Typo.h4" GutterBottom="true">📊 Stock de Pallets Sin Cliente</MudText>
+<MudText Typo="Typo.body2" Class="mb-4">Resumen de pallets sin cliente agrupado por variedad y estado (cantidad y peso total)</MudText>
 
-<MudCard>
-    <MudCardContent>
-        <MudGrid>
-            <MudItem xs="12" sm="4">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
-                    @(_loading ? "Cargando..." : "Actualizar")
-                </MudButton>
-            </MudItem>
-        </MudGrid>
+<div class="d-flex justify-end mb-4">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+               OnClick="@LoadData" Disabled="@_loading">
+        @(_loading ? "Actualizando..." : "Actualizar")
+    </MudButton>
+</div>
 
-        @if (_data.Any())
-        {
-            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
-                <HeaderContent>
-                    @foreach (var prop in typeof(StockPalletSinClienteDto).GetProperties())
-                    {
-                        <MudTh>@prop.Name</MudTh>
-                    }
-                </HeaderContent>
-                <RowTemplate>
-                    @foreach (var prop in typeof(StockPalletSinClienteDto).GetProperties())
-                    {
-                        var value = prop.GetValue(context);
-                        <MudTd>@value</MudTd>
-                    }
-                </RowTemplate>
-            </MudTable>
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
 
-            <DataSourceFooter EsDummy="true" Origen="Base de datos DTrace" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
-        }
-        else if (!_loading && _cargado)
-        {
-            <MudAlert Severity="Severity.Info">No se encontraron registros.</MudAlert>
-        }
-    </MudCardContent>
-</MudCard>
+@if (_data.Any())
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Style="border-top: 4px solid var(--mud-palette-primary);">
+                <MudCardContent>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">PALLETS SIN CLIENTE</MudText>
+                    <MudText Typo="Typo.h5">@TotalPallets.ToString("N0")</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Style="border-top: 4px solid var(--mud-palette-success);">
+                <MudCardContent>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">PESO TOTAL (KG)</MudText>
+                    <MudText Typo="Typo.h5">@TotalPeso.ToString("N0")</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Style="border-top: 4px solid var(--mud-palette-warning);">
+                <MudCardContent>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">GRUPOS (VARIEDAD × ESTADO)</MudText>
+                    <MudText Typo="Typo.h5">@_data.Count.ToString("N0")</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudTable Items="@_vista" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Variedad</MudTh>
+            <MudTh>Estado</MudTh>
+            <MudTh Style="text-align:right">Pallets</MudTh>
+            <MudTh Style="text-align:right">Peso Total (kg)</MudTh>
+            <MudTh Style="text-align:right">% del Peso</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Variedad">@context.Variedad</MudTd>
+            <MudTd DataLabel="Estado">
+                <MudChip T="string" Size="Size.Small" Color="@ColorEstado(context.Estado)">@context.Estado</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Pallets" Numeric="true" Style="text-align:right">@context.Cantidad.ToString("N0")</MudTd>
+            <MudTd DataLabel="Peso Total (kg)" Numeric="true" Style="text-align:right">@context.PesoTotal.ToString("N0")</MudTd>
+            <MudTd DataLabel="% del Peso" Numeric="true">
+                <div class="d-flex align-center" style="gap: 8px; min-width: 110px;">
+                    <div style="flex:1; height:8px; border-radius:4px; background:var(--mud-palette-lines-default); overflow:hidden;">
+                        <div style="width:@(AnchoBarra(context))%; height:100%; background:var(--mud-palette-info);"></div>
+                    </div>
+                    <MudText Typo="Typo.caption" Style="min-width:36px; text-align:right;">@Porcentaje(context)%</MudText>
+                </div>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+
+    <DataSourceFooter EsDummy="true" Origen="Base de datos DTrace" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
+}
+else if (!_loading && _cargado)
+{
+    <MudAlert Severity="Severity.Info" Class="mt-2">No se encontraron registros.</MudAlert>
+}
 
 @code {
     private List<StockPalletSinClienteDto> _data = new();
-    private bool _loading = false;
-    private bool _cargado = false;
+    private List<StockPalletSinClienteDto> _vista = new();
+    private bool _loading;
+    private bool _cargado;
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadData();
-    }
+    private int TotalPallets => _data.Sum(x => x.Cantidad);
+    private decimal TotalPeso => _data.Sum(x => x.PesoTotal);
+
+    protected override async Task OnInitializedAsync() => await LoadData();
 
     async Task LoadData()
     {
@@ -63,6 +101,11 @@
         try
         {
             _data = await Mediator.Send(new GetStockPalletsSinClienteQuery());
+            // Vista ordenada: variedad alfabética y luego estado, para lectura de reporte.
+            _vista = _data
+                .OrderBy(x => x.Variedad, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.Estado, StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -75,4 +118,22 @@
             StateHasChanged();
         }
     }
+
+    /// <summary>Color del chip de estado — misma semántica que el resto de la app.</summary>
+    private static Color ColorEstado(string? estado) => estado switch
+    {
+        "Despachado" => Color.Info,
+        "En Frío" => Color.Primary,
+        "Pre Frío" => Color.Secondary,
+        "Rearmado" => Color.Warning,
+        _ => Color.Default
+    };
+
+    private double PorcentajeDoble(StockPalletSinClienteDto row)
+        => TotalPeso <= 0 ? 0 : (double)row.PesoTotal / (double)TotalPeso * 100;
+
+    private string AnchoBarra(StockPalletSinClienteDto row)
+        => PorcentajeDoble(row).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    private string Porcentaje(StockPalletSinClienteDto row) => PorcentajeDoble(row).ToString("N0");
 }
