@@ -3,6 +3,7 @@
 @using GuarinoApp.Application.Modules.Auth.Dtos
 @using GuarinoApp.Application.Modules.Auth.Queries.GetUsers
 @using GuarinoApp.Application.Modules.Auth.Commands.UpdateUser
+@using GuarinoApp.Application.Modules.Auth.Commands.CreateUser
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
 
@@ -12,6 +13,77 @@
 <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
     Administración de usuarios, roles y accesos de la aplicación.
 </MudText>
+
+@* Alta de usuarios: exclusiva del Admin (el handler también lo valida
+   server-side, la UI solo oculta la opción a los demás roles). *@
+<AuthorizeView Roles="Admin">
+    <Authorized>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="ToggleForm"
+                   Disabled="_saving"
+                   Class="mb-3">
+            @(_showForm ? "Cerrar formulario" : "Nuevo usuario")
+        </MudButton>
+
+        @if (_showForm)
+        {
+            <MudPaper Elevation="1" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Nuevo usuario</MudText>
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudTextField @bind-Value="_newUser.UserName"
+                                      Label="Usuario"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      HelperText="Mínimo 3 caracteres" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudTextField @bind-Value="_newUser.FullName"
+                                      Label="Nombre completo"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudTextField @bind-Value="_newUser.Password"
+                                      Label="Contraseña"
+                                      InputType="InputType.Password"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      HelperText="Mínimo 6 caracteres" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudSelect T="string"
+                                   @bind-Value="_newUser.Role"
+                                   Label="Rol"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   Dense="true">
+                            <MudSelectItem Value="@("Operador")">Operador</MudSelectItem>
+                            <MudSelectItem Value="@("Gerencia")">Gerencia</MudSelectItem>
+                            <MudSelectItem Value="@("Contador")">Contador</MudSelectItem>
+                            <MudSelectItem Value="@("Admin")">Admin</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+                <MudStack Row="true" Spacing="2" Class="mt-3">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="CrearUsuarioAsync"
+                               Disabled="_saving">
+                        Crear usuario
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               OnClick="CancelarForm"
+                               Disabled="_saving">
+                        Cancelar
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+    </Authorized>
+</AuthorizeView>
 
 @* La página solo renderiza para Admin y Gerencia gracias al [Authorize] de arriba
    (la URL directa de otro rol responde con el aviso de App.razor).
@@ -85,6 +157,59 @@ else
     private List<AppUserDto> _users = new();
     private bool _loading = true;
     private bool _saving;
+    private bool _showForm;
+    private NuevoUsuario _newUser = new();
+
+    /// <summary>Datos del formulario de alta (la contraseña solo vive en
+    /// memoria hasta hashearse en el servidor).</summary>
+    private sealed class NuevoUsuario
+    {
+        public string UserName { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string Role { get; set; } = "Operador";
+    }
+
+    private void ToggleForm()
+    {
+        _showForm = !_showForm;
+        if (_showForm)
+            _newUser = new NuevoUsuario();
+    }
+
+    private void CancelarForm()
+    {
+        _showForm = false;
+        _newUser = new NuevoUsuario();
+    }
+
+    private async Task CrearUsuarioAsync()
+    {
+        _saving = true;
+        try
+        {
+            var result = await Mediator.Send(new CreateUserCommand(
+                _newUser.UserName,
+                _newUser.FullName,
+                _newUser.Password,
+                _newUser.Role));
+
+            if (result.Success)
+            {
+                Snackbar.Add("Usuario creado correctamente.", Severity.Success);
+                CancelarForm();
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "No se pudo crear el usuario.", Severity.Error);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
         => await LoadAsync();
