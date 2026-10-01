@@ -5,6 +5,8 @@
 @using GuarinoApp.Application.Common.Interfaces
 @using GuarinoApp.Application.Modules.Auditoria.Queries.GetLogs
 @using GuarinoApp.Application.Modules.Auditoria.Dtos
+@using GuarinoApp.Application.Modules.Auth.Queries.GetUsers
+@using GuarinoApp.Application.Modules.Auth.Dtos
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
 @inject Microsoft.Extensions.Logging.ILogger<Auditoria> Logger
@@ -34,7 +36,21 @@
                     <MudDatePicker Label="Fecha Hasta" Date="_fechaHasta" DateChanged="OnFechaHastaChanged" Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudTextField @bind-Value="_userName" Label="Usuario" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    @* Allowlist: se elige entre los usuarios existentes de la
+                       app, no texto libre. "Todos los usuarios" = filtro vacío. *@
+                    <MudSelect T="string"
+                               @bind-Value="_userName"
+                               Label="Usuario"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Dense="true"
+                               Clearable="true">
+                        <MudSelectItem Value="@string.Empty">Todos los usuarios</MudSelectItem>
+                        @foreach (var u in _usuarios)
+                        {
+                            <MudSelectItem Value="@u.UserName">@u.UserName</MudSelectItem>
+                        }
+                    </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudTextField @bind-Value="_action" Label="Acción" Variant="Variant.Outlined" Margin="Margin.Dense" />
@@ -116,12 +132,29 @@
 
     private DateTime? _fechaDesde = null;
     private DateTime? _fechaHasta = null;
-    private string? _userName = null;
+    private string _userName = string.Empty;
     private string? _action = null;
+    private List<AppUserDto> _usuarios = new();
 
     protected override async Task OnInitializedAsync()
     {
+        await CargarUsuarios();
         await CargarLogs();
+    }
+
+    /// <summary>Carga los usuarios existentes para el filtro desplegable
+    /// (si falla, el filtro queda sin opciones pero la auditoría sigue
+    /// funcionando).</summary>
+    private async Task CargarUsuarios()
+    {
+        try
+        {
+            _usuarios = await Mediator.Send(new GetUsersQuery());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al cargar usuarios para el filtro de auditoría");
+        }
     }
 
     private async Task CargarLogs()
@@ -174,7 +207,7 @@
     {
         _fechaDesde = null;
         _fechaHasta = null;
-        _userName = null;
+        _userName = string.Empty;
         _action = null;
         _page = 1;
     }
