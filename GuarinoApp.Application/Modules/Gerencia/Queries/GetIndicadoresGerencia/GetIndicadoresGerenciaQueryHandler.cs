@@ -1,5 +1,6 @@
 ﻿using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Gerencia.Dtos;
+using GuarinoApp.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,6 +35,25 @@ public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadores
         if (totalVolcados != null)
             result.Add(totalVolcados);
 
+        // Volcados de la zafra en curso (año calendario): la lectura que a Gerencia le
+        // importa comparar contra la proyección de la próxima zafra.
+        var anioActual = DateTime.Now.Year;
+        var volcadosZafra = await _context.LotesEmboquille
+            .AsNoTracking()
+            .Where(le => le.FechaProduccion.Year == anioActual && !le.Lote.IsDeleted)
+            .GroupBy(le => 1)
+            .Select(g => new IndicadorGerenciaDto
+                {
+                Indicador = "Volcados Zafra Actual",
+                Valor = g.Sum(le => le.KilosNetos),
+                Fecha = g.Max(le => le.FechaProduccion),
+                Categoria = "Producción"
+                })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (volcadosZafra != null)
+            result.Add(volcadosZafra);
+
         // Total Pallets
         var totalPallets = await _context.Pallets
             .AsNoTracking()
@@ -51,6 +71,38 @@ public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadores
         if (totalPallets != null)
             result.Add(totalPallets);
 
+        // Pallets por estado crítico del flujo exportación (Despachado / En Frío)
+        var palletsDespachados = await _context.Pallets
+            .AsNoTracking()
+            .Where(p => !p.IsDeleted && p.Estado == EstadoPallet.Despachado)
+            .GroupBy(p => 1)
+            .Select(g => new IndicadorGerenciaDto
+                {
+                Indicador = "Pallets Despachados",
+                Valor = g.Count(),
+                Categoria = "Logística"
+                })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (palletsDespachados != null)
+            result.Add(palletsDespachados);
+
+        var palletsEnFrio = await _context.Pallets
+            .AsNoTracking()
+            .Where(p => !p.IsDeleted && p.Estado == EstadoPallet.EnFrio)
+            .GroupBy(p => 1)
+            .Select(g => new IndicadorGerenciaDto
+                {
+                Indicador = "Pallets en Frío",
+                Valor = g.Count(),
+                Fecha = g.Max(p => p.Fecha ?? p.CreatedAt),
+                Categoria = "Stock"
+                })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (palletsEnFrio != null)
+            result.Add(palletsEnFrio);
+
         // Stock en Playa
         var stockEnPlaya = await _context.Lotes
             .AsNoTracking()
@@ -67,6 +119,27 @@ public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadores
 
         if (stockEnPlaya != null)
             result.Add(stockEnPlaya);
+
+        // Ritmo promedio de la línea de calibrado (últimos 30 registros con ritmo):
+        // el indicador operativo que Gerencia mira para detectar cuellos de planta.
+        var ritmos = await _context.RitmosCalibradora
+            .AsNoTracking()
+            .Where(r => r.Ritmo1 != null)
+            .OrderByDescending(r => r.Fecha)
+            .Take(30)
+            .Select(r => new { r.Fecha, Valor = (decimal)r.Ritmo1!.Value })
+            .ToListAsync(cancellationToken);
+
+        if (ritmos.Count > 0)
+            {
+            result.Add(new IndicadorGerenciaDto
+                {
+                Indicador = "Ritmo Promedio Línea",
+                Valor = ritmos.Average(r => r.Valor),
+                Fecha = ritmos.Max(r => r.Fecha),
+                Categoria = "Operación"
+                });
+            }
 
         return result;
         }

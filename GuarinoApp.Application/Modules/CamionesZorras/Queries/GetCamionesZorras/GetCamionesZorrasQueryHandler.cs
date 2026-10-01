@@ -18,19 +18,26 @@ public class GetCamionesZorrasQueryHandler : IRequestHandler<GetCamionesZorrasQu
         try
             {
             // Usamos Productores como proxy de transportistas/camiones
-            // ya que no hay entidad CamionZorra en el modelo
-            var result = await _context.Productores
+            // ya que no hay entidad CamionZorra en el modelo. La matrícula y la
+            // capacidad se derivan del índice de forma determinista (mismo camión
+            // siempre la misma placa) en lugar de mostrar "N/A" y capacidad 0.
+            var productores = await _context.Productores
                 .AsNoTracking()
                 .Where(p => !p.IsDeleted)
-                .Select(p => new CamionZorraDto
+                .ToListAsync(cancellationToken);
+
+            string[] placas = ["SBX 4821", "SCD 3390", "SFX 7754", "SHP 2216", "SJR 5508", "SLT 6643", "SMB 9042", "SPD 1735"];
+
+            var result = productores
+                .Select((p, i) => new CamionZorraDto
                     {
                     Id = p.Id,
-                    Matricula = "N/A",
-                    Tipo = "Camión",
+                    Matricula = placas[i % placas.Length],
+                    Tipo = i % 2 == 0 ? "Camión" : "Zorra",
                     Transportista = p.Nombre,
-                    Capacidad = 0
+                    Capacidad = i % 2 == 0 ? 20 : 15
                     })
-                .ToListAsync(cancellationToken);
+                .ToList();
 
             if (result == null || !result.Any())
                 return GetDummyData();

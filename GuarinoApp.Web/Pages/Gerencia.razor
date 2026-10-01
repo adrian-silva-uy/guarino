@@ -2,47 +2,115 @@
 @attribute [Authorize(Roles = "Admin, Gerencia")]
 @using MediatR
 @using MudBlazor
+@using GuarinoApp.Application.Common.Dtos
+@using GuarinoApp.Application.Common.Interfaces
 @using GuarinoApp.Application.Modules.Gerencia.Queries.GetIndicadoresGerencia
 @using GuarinoApp.Application.Modules.Gerencia.Dtos
+@using GuarinoApp.Application.Modules.Gerencia.Services
+@using GuarinoApp.Application.Modules.Contaduria.Queries.GetFinancialData
+@using GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccionZafra
 @inject IMediator Mediator
+@inject IAIService AIService
+@inject Microsoft.Extensions.Logging.ILogger<Gerencia> Logger
 
-<MudText Typo="Typo.h4" GutterBottom="true">📊 Panel de Gerencia</MudText>
-<MudText Typo="Typo.body2" Class="mb-4">Indicadores clave de la operación</MudText>
+<PageTitle>Panel de Gerencia - Guarino</PageTitle>
 
-<MudCard>
-    <MudCardContent>
-        <MudGrid>
-            <MudItem xs="12" sm="6" md="4" lg="3">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
-                    @(_loading ? "Cargando..." : "Actualizar indicadores")
-                </MudButton>
-            </MudItem>
-        </MudGrid>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-0">📊 Panel de Gerencia</h4>
+        <p class="text-muted mb-0">Indicadores clave de la operación y lectura estratégica</p>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading">
+        @(_loading ? "Cargando..." : "Actualizar indicadores")
+    </MudButton>
+</div>
 
-        @if (_data.Any())
+@if (_data.Any())
+{
+    @* ===== Tarjetas de indicadores por categoría ===== *@
+    <MudGrid Class="mb-4">
+        @foreach (var item in _data)
         {
-            <MudGrid>
-                @foreach (var group in _data.GroupBy(x => x.Categoria))
-                {
-                    <MudItem xs="12" md="6">
-                        <MudText Typo="Typo.h6" GutterBottom="true">@group.Key</MudText>
-                        @foreach (var item in group)
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardContent Class="pb-3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">@item.Categoria</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-1">@item.Indicador</MudText>
+                        <MudText Typo="Typo.h5" Color="@ColorDeIndicador(item)">@item.Valor.ToString("N0")</MudText>
+                        @if (item.Fecha.HasValue)
                         {
-                            <MudCard Class="mb-2" Elevation="0" Style="border-left: 4px solid #3d6fb0;">
-                                <MudCardContent>
-                                    <MudText Typo="Typo.body1">@item.Indicador</MudText>
-                                    <MudText Typo="Typo.h5">@item.Valor.ToString("N0")</MudText>
-                                    <MudText Typo="Typo.body2" Color="Color.Tertiary">@item.Fecha?.ToShortDateString()</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">@item.Fecha.Value.ToShortDateString()</MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+else if (!_loading && _cargado)
+{
+    <MudAlert Severity="Severity.Info" Class="mb-4">No se encontraron indicadores.</MudAlert>
+}
+
+@* ===== Lectura estratégica: contenido local de inmediato, la IA refina en segundo plano ===== *@
+<MudCard Elevation="2" Class="mb-4">
+    <MudCardContent>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <MudText Typo="Typo.h6">🧠 Lectura Estratégica para Gerencia</MudText>
+            @if (_refinadoConIA)
+            {
+                <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Icon="@Icons.Material.Filled.AutoAwesome">
+                    Plan refinado con análisis de IA
+                </MudChip>
+            }
+            else if (_analizando)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-1" Style="width:14px;height:14px;" /> Refinando con análisis de IA…
+                </MudText>
+            }
+        </div>
+
+        @if (_analisis != null)
+        {
+            <MudText Typo="Typo.body1" Class="mb-3">@_analisis.Lectura</MudText>
+
+            @if (_analisis.Hallazgos.Any())
+            {
+                <MudText Typo="Typo.subtitle2" Class="mb-2 fw-bold">Hallazgos</MudText>
+                <MudGrid Class="mb-3">
+                    @foreach (var h in _analisis.Hallazgos)
+                    {
+                        <MudItem xs="12" md="6" lg="3">
+                            <MudCard Elevation="0" Style="@($"border-left: 4px solid {ColorDeSeveridad(h.Severidad)}; background: #f8f9fa; height: 100%;")">
+                                <MudCardContent Class="pb-2">
+                                    <MudText Typo="Typo.body2" Class="fw-bold">@h.Titulo</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@h.Detalle</MudText>
                                 </MudCardContent>
                             </MudCard>
-                        }
-                    </MudItem>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+
+            @if (_analisis.Acciones.Any())
+            {
+                <MudText Typo="Typo.subtitle2" Class="mb-2 fw-bold">Prioridades de acción</MudText>
+                @foreach (var a in _analisis.Acciones)
+                {
+                    <MudCard Elevation="0" Class="mb-2" Style="background: #f8f9fa;">
+                        <MudCardContent Class="py-2">
+                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                <MudText Typo="Typo.body2">@a.Texto</MudText>
+                                <div class="d-flex gap-2">
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info">@a.Plazo</MudChip>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">@a.Impacto</MudChip>
+                                </div>
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
                 }
-            </MudGrid>
-        }
-        else if (!_loading && _cargado)
-        {
-            <MudAlert Severity="Severity.Info">No se encontraron indicadores.</MudAlert>
+            }
         }
     </MudCardContent>
 </MudCard>
@@ -51,6 +119,11 @@
     private List<IndicadorGerenciaDto> _data = new();
     private bool _loading = false;
     private bool _cargado = false;
+
+    private ModuloInsightDto? _analisis;
+    private bool _analizando;
+    private bool _refinadoConIA;
+    private int _correlativoIA = 0; // invalida respuestas viejas si el usuario actualiza en el medio
 
     protected override async Task OnInitializedAsync()
     {
@@ -64,6 +137,33 @@
         try
         {
             _data = await Mediator.Send(new GetIndicadoresGerenciaQuery());
+
+            // Proyección y cifras de Contaduría para enriquecer la lectura local y el
+            // contexto que recibe la IA (mismos números que ve el usuario en pantalla).
+            decimal volumenProyectado = 0, capacidadInstalada = 0, variacion = 0;
+            try
+            {
+                var zafras = await Mediator.Send(new GetProyeccionZafraQuery());
+                var proyectada = zafras?.FirstOrDefault(z => z.Estado == "Proyectado") ?? zafras?.FirstOrDefault();
+                if (proyectada != null)
+                {
+                    volumenProyectado = proyectada.TotalKgs;
+                    variacion = proyectada.VariacionPorcentual;
+                }
+                var datosFinancieros = await Mediator.Send(new GetFinancialDataQuery());
+                capacidadInstalada = datosFinancieros?.CapacidadInstalada ?? 0;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "No se pudo cargar la proyección/capacidad para la lectura estratégica");
+            }
+
+            // Lectura local determinista: siempre hay contenido, con o sin IA.
+            _analisis = AnalisisGerenciaBuilder.Construir(_data, volumenProyectado, capacidadInstalada, variacion);
+            _refinadoConIA = false;
+
+            var token = ++_correlativoIA;
+            _ = AnalizarConIAAsync(token, _data, volumenProyectado, capacidadInstalada, variacion);
         }
         catch (Exception ex)
         {
@@ -76,4 +176,82 @@
             StateHasChanged();
         }
     }
+
+    /// <summary>
+    /// Refina la lectura con IA EN SEGUNDO PLANO: el panel ya muestra la versión local
+    /// construida con los mismos indicadores; si el análisis de IA responde y se parsea
+    /// correctamente, se reemplaza el texto y aparece el chip. Si falla, no cambia nada.
+    /// </summary>
+    private async Task AnalizarConIAAsync(
+        int token,
+        List<IndicadorGerenciaDto> indicadores,
+        decimal volumenProyectado,
+        decimal capacidadInstalada,
+        decimal variacion)
+    {
+        try
+        {
+            _analizando = true;
+            await InvokeAsync(StateHasChanged);
+
+            var contexto = AnalisisGerenciaBuilder.ConstruirContextoJson(
+                indicadores, volumenProyectado, capacidadInstalada, variacion);
+            var resultado = await AIService.GetAnalisisDeModuloAsync("GerenciaAnalisis", contexto);
+
+            if (resultado is { EsIA: true } &&
+                (!string.IsNullOrWhiteSpace(resultado.Lectura) || resultado.Hallazgos.Any() || resultado.Acciones.Any()) &&
+                token == _correlativoIA)
+            {
+                // Tarjeta híbrida: lo que la IA no trajo se conserva de la versión
+                // local, para que la tarjeta siempre muestre lectura + hallazgos + acciones.
+                if (string.IsNullOrWhiteSpace(resultado.Lectura))
+                    resultado.Lectura = _analisis?.Lectura ?? string.Empty;
+                if (!resultado.Hallazgos.Any())
+                    resultado.Hallazgos = _analisis?.Hallazgos ?? new();
+                if (!resultado.Acciones.Any())
+                    resultado.Acciones = _analisis?.Acciones ?? new();
+
+                if (string.IsNullOrWhiteSpace(resultado.Lectura) && !resultado.Hallazgos.Any() && !resultado.Acciones.Any())
+                    return;
+
+                _analisis = resultado;
+                _refinadoConIA = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "No se pudo refinar la lectura estratégica de Gerencia con IA; se conserva la versión local.");
+        }
+        finally
+        {
+            _analizando = false;
+            if (token == _correlativoIA)
+            {
+                try
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // El usuario navegó fuera de la página mientras la IA respondía.
+                }
+            }
+        }
+    }
+
+    private static string ColorDeSeveridad(string? severidad) => severidad?.ToLowerInvariant() switch
+    {
+        "alta" => "#d32f2f",
+        "media" => "#fbc02d",
+        _ => "#388e3c"
+    };
+
+    private static Color ColorDeIndicador(IndicadorGerenciaDto item) => item.Categoria switch
+    {
+        "Producción" => Color.Success,
+        "Stock" => Color.Info,
+        "Logística" => Color.Warning,
+        "Operación" => Color.Secondary,
+        _ => Color.Primary
+    };
 }

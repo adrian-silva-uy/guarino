@@ -227,6 +227,27 @@ public class FallbackAIService : IAIService
         return BuildFallbackZafraStrategy(projectedZafra, capacidadMaxHistorica, stockActualBins, datosFinancieros);
         }
 
+    public async Task<ModuloInsightDto> GetAnalisisDeModuloAsync(string clavePrompt, string contextoJson)
+        {
+        if (_ollamaService.IsAvailable)
+            {
+            try
+                {
+                var aiResult = await _ollamaService.GetAnalisisDeModuloAsync(clavePrompt, contextoJson);
+                if (aiResult is { EsIA: true })
+                    return aiResult;
+                }
+            catch (Exception ex)
+                {
+                _logger.LogWarning(ex, "Ollama falló en GetAnalisisDeModuloAsync ({Clave}); la página conserva su análisis local.", clavePrompt);
+                }
+            }
+
+        // Sin IA: vacío con EsIA=false. El análisis local determinista lo construye la
+        // propia página con los mismos datos que muestra en pantalla (no se inventa texto).
+        return new ModuloInsightDto();
+        }
+
     /// <summary>
     /// Fallback sin IA. Los KPIs financieros, la comparativa de benchmark, los
     /// escenarios, el plan de acciones (PlanAccionZafraBuilder) y el resumen

@@ -345,7 +345,18 @@
             _stockVarietyChartKey++;
 
             var proyeccionZafra = await Mediator.Send(new GetProyeccionZafraQuery());
-            await RefreshSuggestionsAsync(totalStock, palletsSinCliente, crecimiento, mesTexto, stockPorVariedad, volcadosMensuales, proyeccionZafra);
+
+            // Las sugerencias de IA corren en SEGUNDO PLANO: el motor puede tardar
+            // minutos en CPU y el tablero no tiene por qué esperarlo — los KPIs,
+            // gráficos y la tabla ya quedaron pintados en este punto.
+            _ = RefreshSuggestionsAsync(totalStock, palletsSinCliente, crecimiento, mesTexto, stockPorVariedad, volcadosMensuales, proyeccionZafra);
+        }
+        catch (Exception ex)
+        {
+            // Un fallo transitorio de la base no debe tumbar el circuito: se avisa
+            // al usuario y el tablero queda usable (podrá reintentar con ACTUALIZAR).
+            Console.WriteLine($"Error cargando el Dashboard: {ex.Message}");
+            Snackbar.Add("No se pudieron cargar los indicadores. Intente nuevamente.", Severity.Error);
         }
         finally
         {
@@ -402,6 +413,7 @@
                 Icon = s.Icon ?? Icons.Material.Filled.Lightbulb
             }).ToList();
 
+            await NotificarSugerenciasAsync();
             return;
         }
 
@@ -433,6 +445,25 @@
                 Icon = Icons.Material.Filled.TrendingUp
             }
         };
+
+        await NotificarSugerenciasAsync();
+    }
+
+    /// <summary>
+    /// Como las sugerencias se piden en segundo plano (fuera del ciclo de vida de
+    /// LoadData), hay que pedirle al circuito que repinte; si el usuario ya navegó
+    /// fuera, no hay nada que pintar.
+    /// </summary>
+    private async Task NotificarSugerenciasAsync()
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Página descartada mientras la IA respondía.
+        }
     }
 
     // --- Exportaciones ---

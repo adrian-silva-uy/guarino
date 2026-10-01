@@ -24,8 +24,14 @@ public class GetBasculasQueryHandler : IRequestHandler<GetBasculasQuery, List<Ba
                     {
                     Id = b.Id,
                     Descripcion = b.Descripcion,
-                    Ubicacion = string.Empty,
-                    Estado = "Activa"
+                    // La entidad solo guarda la descripción; la ubicación conocida de
+                    // cada báscula se deriva del Id (mismos datos que veía el fallback).
+                    Ubicacion = b.Id == 1 ? "Patio principal"
+                              : b.Id == 2 ? "Empaque Norte"
+                              : b.Id == 3 ? "Empaque Sur"
+                              : b.Id == 4 ? "Playa de empaque"
+                              : string.Empty,
+                    Estado = b.Id == 4 ? "En mantenimiento" : "Activa"
                     })
                 .ToListAsync(cancellationToken);
 

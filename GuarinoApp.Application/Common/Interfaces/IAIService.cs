@@ -28,6 +28,15 @@ public interface IAIService
         int stockActualBins,
         List<BusinessSuggestionDto>? history = null,
         FinancialDataDto? datosFinancieros = null);
+
+    /// <summary>
+    /// Análisis con IA de un módulo funcional (Contaduría, Gerencia, …). La clave
+    /// identifica la plantilla de prompt (Resources/Prompts/{clave}.txt) y el contexto
+    /// es el JSON de datos que la página ya muestra en pantalla. Devuelve
+    /// <c>EsIA=false</c> si el motor no está disponible o el parseo falla: las páginas
+    /// conservan entonces su análisis local determinista.
+    /// </summary>
+    Task<ModuloInsightDto> GetAnalisisDeModuloAsync(string clavePrompt, string contextoJson);
     }
 
 public class ChatMessage

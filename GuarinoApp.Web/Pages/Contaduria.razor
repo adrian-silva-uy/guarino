@@ -2,12 +2,18 @@
 @attribute [Authorize(Roles = "Admin, Gerencia, Contador")]
 @using MediatR
 @using MudBlazor
+@using GuarinoApp.Application.Common.Dtos
+@using GuarinoApp.Application.Common.Helpers
 @using GuarinoApp.Application.Common.Interfaces
 @using GuarinoApp.Application.Modules.Contaduria.Queries.GetFinancialData
 @using GuarinoApp.Application.Modules.Contaduria.Commands.UpdateFinancialData
 @using GuarinoApp.Application.Modules.Contaduria.Dtos
+@using GuarinoApp.Application.Modules.Contaduria.Services
+@using GuarinoApp.Application.Modules.Proyeccion.Dtos
+@using GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccionZafra
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
+@inject IAIService AIService
 @inject Microsoft.Extensions.Logging.ILogger<Contaduria> Logger
 
 <PageTitle>Contaduría - Datos Financieros</PageTitle>
@@ -37,6 +43,46 @@
     }
     else
     {
+        @* ====== KPIs de decisión (mismos números que usa el tablero de zafra) ====== *@
+        <MudGrid Class="mb-4">
+            <MudItem xs="6" md="3">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardContent Class="pb-3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Capital de trabajo</MudText>
+                        <MudText Typo="Typo.h5">@(_kpi != null ? $"${_kpi.CapitalNecesario:N0}" : "N/D")</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">@(_volumenProyectado > 0 ? $"{_volumenProyectado:N0} kg proyectados × costo/kg" : "Sin proyección cargada")</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardContent Class="pb-3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Brecha de caja</MudText>
+                        <MudText Typo="Typo.h5" Style="@_estiloBrecha">@(_kpi != null ? $"${_kpi.BrechaLiquidez:N0}" : "N/D")</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">@(_kpi != null && _kpi.BrechaLiquidez <= 0 ? "Caja suficiente" : "Faltante vs. capital requerido")</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardContent Class="pb-3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Riesgo de liquidez</MudText>
+                        <MudText Typo="Typo.h5" Style="@(_kpi != null ? _estiloRiesgo : "")">@(_kpi?.RiesgoLiquidez ?? "N/D")</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">Caja $@(_data?.FlujoCaja.ToString("N0") ?? "—")</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardContent Class="pb-3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Ocupación de capacidad</MudText>
+                        <MudText Typo="Typo.h5">@_ocupacionTexto</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">@(_data is { CapacidadInstalada: > 0 } ? $"{_data.CapacidadInstalada:N0} kg instalados" : "Capacidad sin cargar")</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
         <MudCard Elevation="1">
             <MudCardContent>
                 <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-3">Datos Financieros</MudText>
@@ -163,6 +209,69 @@
                 </MudCardContent>
             </MudCard>
         }
+
+        @* ====== Análisis para Contaduría: local de inmediato, la IA refina en segundo plano ====== *@
+        <MudCard Elevation="2" Class="mt-4">
+            <MudCardContent>
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <MudText Typo="Typo.h6"> Análisis Financiero para Contaduría</MudText>
+                    @if (_refinadoConIA)
+                    {
+                        <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Icon="@Icons.Material.Filled.AutoAwesome">
+                            Plan refinado con análisis de IA
+                        </MudChip>
+                    }
+                    else if (_analizando)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-1" Style="width:14px;height:14px;" /> Refinando con análisis de IA…
+                        </MudText>
+                    }
+                </div>
+
+                @if (_analisis != null)
+                {
+                    <MudText Typo="Typo.body1" Class="mb-3">@_analisis.Lectura</MudText>
+
+                    @if (_analisis.Hallazgos.Any())
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mb-2 fw-bold">Hallazgos</MudText>
+                        <MudGrid Class="mb-3">
+                            @foreach (var h in _analisis.Hallazgos)
+                            {
+                                <MudItem xs="12" md="6" lg="4">
+                                    <MudCard Elevation="0" Style="@($"border-left: 4px solid {ColorDeSeveridad(h.Severidad)}; background: #f8f9fa; height: 100%;")">
+                                        <MudCardContent Class="pb-2">
+                                            <MudText Typo="Typo.body2" Class="fw-bold">@h.Titulo</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@h.Detalle</MudText>
+                                        </MudCardContent>
+                                    </MudCard>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    }
+
+                    @if (_analisis.Acciones.Any())
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mb-2 fw-bold">Acciones sugeridas</MudText>
+                        @foreach (var a in _analisis.Acciones)
+                        {
+                            <MudCard Elevation="0" Class="mb-2" Style="background: #f8f9fa;">
+                                <MudCardContent Class="py-2">
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                        <MudText Typo="Typo.body2">@a.Texto</MudText>
+                                        <div class="d-flex gap-2">
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Info">@a.Plazo</MudChip>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">@a.Impacto</MudChip>
+                                        </div>
+                                    </div>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    }
+                }
+            </MudCardContent>
+        </MudCard>
     }
 </div>
 
@@ -176,6 +285,33 @@
     private decimal? _costoFlete = null;
     private decimal _capacidadInstalada = 0;
     private string? _observaciones = null;
+
+    // KPIs de decisión + análisis (local de inmediato; la IA refina en segundo plano)
+    private FinancialKpiDto? _kpi;
+    private decimal _volumenProyectado;
+    private ModuloInsightDto? _analisis;
+    private bool _analizando;
+    private bool _refinadoConIA;
+    private int _correlativoIA = 0; // invalida respuestas viejas si se guarda en el medio
+
+    private string _ocupacionTexto =>
+        _data is { CapacidadInstalada: > 0 } && _volumenProyectado > 0
+            ? $"{_volumenProyectado / _data.CapacidadInstalada * 100:N1}%"
+            : "N/D";
+
+    private string _estiloBrecha =>
+        _kpi == null ? "" :
+        _kpi.BrechaLiquidez <= 0 ? "color: #388e3c;" :
+        _kpi.RiesgoLiquidez == "ALTO" ? "color: #d32f2f;" :
+        _kpi.RiesgoLiquidez == "MEDIO" ? "color: #fbc02d;" : "";
+
+    private string _estiloRiesgo => (_kpi?.RiesgoLiquidez) switch
+    {
+        "ALTO" => "color: #d32f2f;",
+        "MEDIO" => "color: #fbc02d;",
+        "N/D" => "color: #9e9e9e;",
+        _ => "color: #388e3c;"
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -200,6 +336,8 @@
                 _capacidadInstalada = _data.CapacidadInstalada;
                 _observaciones = _data.Observaciones;
             }
+
+            await CalcularKPIsYAnalisisAsync();
         }
         catch (Exception ex)
         {
@@ -231,6 +369,9 @@
 
             _data = await Mediator.Send(command);
             Snackbar.Add("Datos financieros guardados correctamente", Severity.Success);
+
+            // Las cifras cambiaron: se recalculan KPIs y análisis con los valores nuevos.
+            await CalcularKPIsYAnalisisAsync();
         }
         catch (Exception ex)
         {
@@ -243,6 +384,105 @@
             StateHasChanged();
         }
     }
+
+    /// <summary>
+    /// KPIs con FinancialKpiCalculator — la misma fuente que el tablero de Proyección
+    /// de Zafra— para que capital, brecha y riesgo sean idénticos en ambas pantallas.
+    /// Luego construye el análisis local y dispara el refinamiento con IA en background.
+    /// </summary>
+    private async Task CalcularKPIsYAnalisisAsync()
+    {
+        try
+        {
+            var zafras = await Mediator.Send(new GetProyeccionZafraQuery());
+            var proyectada = zafras?.FirstOrDefault(z => z.Estado == "Proyectado") ?? zafras?.FirstOrDefault();
+            if (proyectada != null)
+            {
+                _volumenProyectado = proyectada.TotalKgs;
+                _kpi = FinancialKpiCalculator.Calcular(
+                    proyectada.TotalKgs, proyectada.CapacidadMaximaHistoricaKgs ?? 0m, _data);
+            }
+            else
+            {
+                _volumenProyectado = 0;
+                _kpi = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "No se pudo cargar la proyección de zafra para los KPIs de Contaduría");
+        }
+
+        _analisis = AnalisisContaduriaBuilder.Construir(_data, _kpi, _volumenProyectado);
+        _refinadoConIA = false;
+
+        var token = ++_correlativoIA;
+        _ = AnalizarConIAAsync(token);
+    }
+
+    /// <summary>
+    /// Refina el análisis con IA EN SEGUNDO PLANO: la tarjeta ya muestra la versión
+    /// local con las mismas cifras del formulario; si el análisis de IA responde y se
+    /// parsea correctamente (EsIA), se reemplaza el texto y aparece el chip. Si falla,
+    /// no cambia nada en pantalla.
+    /// </summary>
+    private async Task AnalizarConIAAsync(int token)
+    {
+        try
+        {
+            _analizando = true;
+            await InvokeAsync(StateHasChanged);
+
+            var contexto = AnalisisContaduriaBuilder.ConstruirContextoJson(_data, _kpi, _volumenProyectado);
+            var resultado = await AIService.GetAnalisisDeModuloAsync("ContaduriaAnalisis", contexto);
+
+            if (resultado is { EsIA: true } &&
+                (!string.IsNullOrWhiteSpace(resultado.Lectura) || resultado.Hallazgos.Any() || resultado.Acciones.Any()) &&
+                token == _correlativoIA)
+            {
+                // Tarjeta híbrida: lo que la IA no trajo se conserva de la versión
+                // local, para que la tarjeta siempre muestre lectura + hallazgos + acciones.
+                if (string.IsNullOrWhiteSpace(resultado.Lectura))
+                    resultado.Lectura = _analisis?.Lectura ?? string.Empty;
+                if (!resultado.Hallazgos.Any())
+                    resultado.Hallazgos = _analisis?.Hallazgos ?? new();
+                if (!resultado.Acciones.Any())
+                    resultado.Acciones = _analisis?.Acciones ?? new();
+
+                if (string.IsNullOrWhiteSpace(resultado.Lectura) && !resultado.Hallazgos.Any() && !resultado.Acciones.Any())
+                    return;
+
+                _analisis = resultado;
+                _refinadoConIA = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "No se pudo refinar el análisis de Contaduría con IA; se conserva la versión local.");
+        }
+        finally
+        {
+            _analizando = false;
+            if (token == _correlativoIA)
+            {
+                try
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // El usuario navegó fuera de la página mientras la IA respondía.
+                }
+            }
+        }
+    }
+
+    private static string ColorDeSeveridad(string? severidad) => severidad?.ToLowerInvariant() switch
+    {
+        "alta" => "#d32f2f",
+        "media" => "#fbc02d",
+        _ => "#388e3c"
+    };
 
     private void LimpiarFormulario()
     {

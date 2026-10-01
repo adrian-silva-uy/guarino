@@ -262,10 +262,33 @@ public class OllamaAIService : IAIService
 
             messages.Add(new { role = "user", content = "Genera EXACTAMENTE 3 sugerencias estratégicas en JSON según las instrucciones." });
 
-            var requestObj = new { model = options.Model, messages, stream = false };
+            var requestObj = new
+                {
+                model = options.Model,
+                messages,
+                stream = false,
+                // Gramática JSON: el modelo solo puede emitir JSON válido (el contrato
+                // es un array de 3 sugerencias). num_predict=400: con salidas largas
+                // en CPU tardaba minutos; num_ctx=4096 cubre la plantilla corta.
+                format = "json",
+                options = new { num_predict = 400, temperature = 0.3, num_ctx = 4096 }
+                };
 
             var client = CreateClient();
-            var response = await client.PostAsJsonAsync("/api/chat", requestObj);
+            // Timeout duro: si Ollama está saturado por otra generación, mejor volver
+            // rápido a las sugerencias locales que dejar al usuario esperando.
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            HttpResponseMessage response;
+            try
+                {
+                response = await client.PostAsJsonAsync("/api/chat", requestObj, cts.Token);
+                }
+            catch (OperationCanceledException)
+                {
+                _logger.LogWarning("Ollama GetBusinessSuggestionsAsync superó 120s; se usan las sugerencias locales.");
+                return empty;
+                }
+
             if (!response.IsSuccessStatusCode)
                 {
                 _logger.LogWarning("Ollama GetBusinessSuggestionsAsync error: {Status}", response.StatusCode);
@@ -287,7 +310,10 @@ public class OllamaAIService : IAIService
                 return empty;
                 }
 
-            _logger.LogInformation("Sugerencias Ollama: rawContent={Len} chars, IsAvailable={Avail}.", rawContent?.Length ?? 0, IsAvailable);
+            // Diagnóstico: ver el inicio del contenido permite detectar prosa frente a JSON.
+            var inicio = rawContent.Length > 200 ? rawContent[..200] : rawContent;
+            _logger.LogInformation("Sugerencias Ollama: rawContent={Len} chars, IsAvailable={Avail}. Inicio: {Inicio}",
+                rawContent?.Length ?? 0, IsAvailable, inicio.Replace('\n', ' ').Replace('\r', ' '));
             if (string.IsNullOrWhiteSpace(rawContent))
                 return empty;
 
@@ -505,6 +531,408 @@ public class OllamaAIService : IAIService
         }
 
     /// <summary>
+    /// Análisis de módulo (Contaduría, Gerencia, …) con la misma receta ya validada
+    /// en ZafraStrategy: formato JSON con gramática de Ollama (sin prosa posible),
+    /// 2 intentos con timeout de 330 s (el primero suele agotarse cargando el modelo
+    /// en CPU), saneado de JSON consciente de cadenas y convertidores tolerantes.
+    /// Si el parseo falla devuelve EsIA=false y la página conserva su análisis local.
+    /// </summary>
+    public async Task<ModuloInsightDto> GetAnalisisDeModuloAsync(string clavePrompt, string contextoJson)
+        {
+        var empty = new ModuloInsightDto();
+        if (!IsAvailable || string.IsNullOrWhiteSpace(clavePrompt)) return empty;
+
+        try
+            {
+            var options = _optionsMonitor.CurrentValue;
+            var template = await LoadPromptTemplateAsync(clavePrompt, string.Empty);
+
+            if (string.IsNullOrWhiteSpace(template))
+                {
+                _logger.LogWarning("No se encontró la plantilla {Clave}.txt para el análisis de módulo.", clavePrompt);
+                return empty;
+                }
+
+            var system = template.Replace("{Contexto}", contextoJson ?? string.Empty);
+            var messages = new List<object>
+                {
+                new { role = "system", content = system },
+                new { role = "user", content = "Genera el análisis en JSON según las instrucciones." }
+                };
+
+            var requestObj = new
+                {
+                model = options.Model,
+                messages,
+                stream = false,
+                // Gramática JSON: el modelo solo puede emitir JSON válido; el contrato
+                // es corto (lectura + ≤4 hallazgos + ≤4 acciones) por eso 800 tokens.
+                format = "json",
+                options = new { num_predict = 1280, temperature = 0.2, num_ctx = 6144 }
+                };
+
+            var client = CreateClient();
+            string rawContent = string.Empty;
+
+            for (var intento = 1; intento <= 2 && string.IsNullOrWhiteSpace(rawContent); intento++)
+                {
+                using var cts = new CancellationTokenSource(ZafraStrategyTimeout);
+                HttpResponseMessage response;
+                try
+                    {
+                    response = await client.PostAsJsonAsync("/api/chat", requestObj, cts.Token);
+                    }
+                catch (OperationCanceledException)
+                    {
+                    _logger.LogWarning("Ollama GetAnalisisDeModuloAsync ({Clave}) superó {Segundos}s (intento {Intento}/2); se mantiene el análisis local.", clavePrompt, ZafraStrategyTimeout.TotalSeconds, intento);
+                    if (intento < 2)
+                        {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        continue;
+                        }
+
+                    return empty;
+                    }
+
+                if (!response.IsSuccessStatusCode)
+                    {
+                    _logger.LogWarning("Ollama GetAnalisisDeModuloAsync ({Clave}) error: {Status} (intento {Intento}/2).", clavePrompt, response.StatusCode, intento);
+                    if (intento < 2)
+                        {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        continue;
+                        }
+
+                    MarcarFalloDeGeneracion($"HTTP {(int)response.StatusCode}");
+                    return empty;
+                    }
+
+                var envelopeJson = await response.Content.ReadAsStringAsync();
+                try
+                    {
+                    var envelope = JsonSerializer.Deserialize<OllamaChatResponse>(envelopeJson);
+                    rawContent = envelope?.Message?.Content ?? string.Empty;
+                    }
+                catch (Exception ex)
+                    {
+                    _logger.LogWarning(ex, "No se pudo parsear el sobre de respuesta de Ollama para {Clave}.", clavePrompt);
+                    return empty;
+                    }
+
+                if (string.IsNullOrWhiteSpace(rawContent) && intento < 2)
+                    {
+                    _logger.LogWarning("Ollama GetAnalisisDeModuloAsync ({Clave}) respondió sin contenido (intento {Intento}/2); se reintenta.", clavePrompt, intento);
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                }
+
+            if (string.IsNullOrWhiteSpace(rawContent))
+                return empty;
+
+            var inicio = rawContent.Length > 200 ? rawContent[..200] : rawContent;
+            _logger.LogInformation("AnalisisModulo {Clave}: {Len} chars recibidos. Inicio: {Inicio}",
+                clavePrompt, rawContent.Length, inicio.Replace('\n', ' ').Replace('\r', ' '));
+
+            var parsed = ExtractModuloInsight(rawContent);
+            if (parsed == null)
+                return empty;
+
+            parsed.EsIA = true;
+            return parsed;
+            }
+        catch (Exception ex)
+            {
+            _logger.LogError(ex, "Error en GetAnalisisDeModuloAsync ({Clave})", clavePrompt);
+            MarcarFalloDeGeneracion(ex.GetType().Name);
+            return empty;
+            }
+        }
+
+    /// <summary>
+    /// Parsea la salida del modelo al contrato de análisis de módulo de forma MANUAL
+    /// (JsonDocument) porque el modelo pequeño incumple el contrato con relativa
+    /// frecuencia: `lectura` a veces viene como objeto de campos etiquetados y las
+    /// listas a veces traen strings sueltos. Reglas:
+    /// - lectura: solo prosa. Un objeto se acepta únicamente si trae una clave de
+    ///   párrafo conocida; si no, se descarta (la página conserva su lectura local)
+    ///   para no pintar "etiqueta: valor" concatenado en la tarjeta.
+    /// - hallazgos/acciones: aceptan strings sueltos y objetos con claves
+    ///   alternativas en inglés/español; severidad normalizada a alta/media/baja.
+    /// Devuelve null si no hay contenido aprovechable.
+    /// </summary>
+    private ModuloInsightDto? ExtractModuloInsight(string raw)
+        {
+        var cleaned = Regex.Replace(raw, "```(json)?", string.Empty, RegexOptions.IgnoreCase).Trim();
+        cleaned = LimpiarJson(cleaned);
+
+        var doc = AbrirJson(cleaned);
+        if (doc == null)
+            {
+            // Respuesta truncada por el límite de tokens: se corta en la última coma
+            // completa y se cierran los contenedores pendientes.
+            var reparado = RepararJsonTruncado(cleaned);
+            doc = reparado != null ? AbrirJson(reparado) : null;
+            }
+        if (doc == null)
+            {
+            var intento = Regex.Match(cleaned, @"\{[\s\S]*\}");
+            if (intento.Success)
+                {
+                doc = AbrirJson(intento.Value);
+                if (doc == null)
+                    {
+                    var reparado = RepararJsonTruncado(intento.Value);
+                    doc = reparado != null ? AbrirJson(reparado) : null;
+                    }
+                }
+            }
+        if (doc == null)
+            {
+            _logger.LogWarning("No se pudo parsear el JSON del análisis de módulo.");
+            return null;
+            }
+
+        var dto = new ModuloInsightDto();
+
+        using (doc)
+            {
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                return null;
+
+            // --- lectura (solo prosa) ---
+            if (BuscarPropiedad(root, "lectura", "resumen", "summary") is { } lecturaProp)
+                {
+                if (lecturaProp.ValueKind == JsonValueKind.String)
+                    {
+                    dto.Lectura = lecturaProp.GetString() ?? string.Empty;
+                    }
+                else if (lecturaProp.ValueKind == JsonValueKind.Object)
+                    {
+                    // El modelo estructuró la lectura en campos: solo se acepta si
+                    // trae una clave de párrafo; si no, se descarta (la tarjeta
+                    // conserva la lectura local, que ya tiene las mismas cifras).
+                    foreach (var nombre in new[] { "texto", "text", "parrafo", "párrafo", "resumen", "contenido", "content", "mensaje", "message" })
+                        {
+                        var posible = BuscarPropiedad(lecturaProp, nombre);
+                        if (posible is { ValueKind: JsonValueKind.String } s && !string.IsNullOrWhiteSpace(s.GetString()))
+                            {
+                            dto.Lectura = s.GetString() ?? string.Empty;
+                            break;
+                            }
+                        }
+                    }
+                }
+
+            // --- hallazgos ---
+            if (BuscarPropiedad(root, "hallazgos", "findings", "insights") is { ValueKind: JsonValueKind.Array } hallazgos)
+                {
+                foreach (var item in hallazgos.EnumerateArray())
+                    {
+                    if (dto.Hallazgos.Count >= 4)
+                        break;
+
+                    if (item.ValueKind == JsonValueKind.String)
+                        {
+                        var texto = item.GetString();
+                        if (!string.IsNullOrWhiteSpace(texto))
+                            dto.Hallazgos.Add(new InsightHallazgoDto { Titulo = texto.Trim(), Severidad = "media" });
+                        }
+                    else if (item.ValueKind == JsonValueKind.Object)
+                        {
+                        var titulo = TextoDe(item, "titulo", "title", "hallazgo", "finding");
+                        var detalle = TextoDe(item, "detalle", "detail", "description", "texto", "descripcion");
+                        if (string.IsNullOrWhiteSpace(titulo) && string.IsNullOrWhiteSpace(detalle))
+                            continue;
+
+                        dto.Hallazgos.Add(new InsightHallazgoDto
+                            {
+                            Titulo = (titulo ?? string.Empty).Trim(),
+                            Detalle = (detalle ?? string.Empty).Trim(),
+                            Severidad = SeveridadNormalizada(TextoDe(item, "severidad", "severity", "nivel"))
+                            });
+                        }
+                    }
+                }
+
+            // --- acciones ---
+            if (BuscarPropiedad(root, "acciones", "actions") is { ValueKind: JsonValueKind.Array } acciones)
+                {
+                foreach (var item in acciones.EnumerateArray())
+                    {
+                    if (dto.Acciones.Count >= 4)
+                        break;
+
+                    if (item.ValueKind == JsonValueKind.String)
+                        {
+                        var texto = item.GetString();
+                        if (!string.IsNullOrWhiteSpace(texto))
+                            dto.Acciones.Add(new InsightAccionDto { Texto = texto.Trim() });
+                        }
+                    else if (item.ValueKind == JsonValueKind.Object)
+                        {
+                        var texto = TextoDe(item, "texto", "accion", "action", "descripcion", "detail");
+                        if (string.IsNullOrWhiteSpace(texto))
+                            continue;
+
+                        dto.Acciones.Add(new InsightAccionDto
+                            {
+                            Texto = texto.Trim(),
+                            Plazo = (TextoDe(item, "plazo", "deadline", "tiempo") ?? string.Empty).Trim(),
+                            Impacto = (TextoDe(item, "impacto", "impact", "efecto", "effect", "beneficio") ?? string.Empty).Trim()
+                            });
+                        }
+                    }
+                }
+            }
+
+        dto.Lectura = (dto.Lectura ?? string.Empty).Trim();
+
+        // El modelo pequeño suele copiar la plantilla del FORMATO ("...cifras del
+        // INPUT") o repetir la lista de temas sin redactar. Una lectura con marcas
+        // del prompt (INPUT, <...>) o sin ninguna cifra no aporta: se descarta para
+        // que la página conserve su lectura local, que sí tiene las cifras.
+        if (dto.Lectura.Contains("INPUT", StringComparison.OrdinalIgnoreCase) ||
+            dto.Lectura.Contains('<') ||
+            !dto.Lectura.Any(char.IsDigit))
+            dto.Lectura = string.Empty;
+
+        // Mismo criterio para hallazgos/acciones contaminados con la plantilla, y
+        // dedupe: el modelo pequeño a veces repite la misma acción u hallazgo.
+        dto.Hallazgos = dto.Hallazgos
+            .Where(h => !MarcaDePrompt($"{h.Titulo} {h.Detalle}"))
+            .DistinctBy(h => (h.Titulo ?? string.Empty).Trim().ToLowerInvariant())
+            .ToList();
+        dto.Acciones = dto.Acciones
+            .Where(a => !MarcaDePrompt($"{a.Texto} {a.Plazo} {a.Impacto}"))
+            .DistinctBy(a => (a.Texto ?? string.Empty).Trim().ToLowerInvariant())
+            .ToList();
+
+        // El modelo a veces antepone la letra del índice ("B Brecha de caja"): se
+        // limpia para que el título se lea como frase normal.
+        foreach (var hallazgo in dto.Hallazgos)
+            hallazgo.Titulo = Regex.Replace(hallazgo.Titulo, @"^\p{Lu}\s+(?=\p{L})", string.Empty);
+
+        if (string.IsNullOrWhiteSpace(dto.Lectura) && dto.Hallazgos.Count == 0 && dto.Acciones.Count == 0)
+            return null;
+
+        return dto;
+        }
+
+    private static bool MarcaDePrompt(string? texto) =>
+        !string.IsNullOrWhiteSpace(texto) &&
+        (texto.Contains("INPUT", StringComparison.OrdinalIgnoreCase) || texto.Contains('<'));
+
+    private static JsonDocument? AbrirJson(string texto)
+        {
+        try
+            {
+            return JsonDocument.Parse(texto);
+            }
+        catch
+            {
+            return null;
+            }
+        }
+
+    /// <summary>
+    /// Reconstruye un JSON que el modelo dejó abierto al agotar el límite de tokens:
+    /// corta después de la última coma fuera de cadena (todo lo anterior está completo)
+    /// y cierra los objetos/arrays que quedaron pendientes. Devuelve null si no hay
+    /// corte utilizable — en ese caso se conserva el análisis local.
+    /// </summary>
+    private static string? RepararJsonTruncado(string json)
+        {
+        var texto = json.Trim();
+        var pila = new Stack<char>();
+        var enCadena = false;
+        var escapar = false;
+        var ultimaComa = -1;
+        var cerradoresEnLaComa = string.Empty;
+
+        for (var i = 0; i < texto.Length; i++)
+            {
+            var c = texto[i];
+            if (escapar)
+                {
+                escapar = false;
+                continue;
+                }
+            if (enCadena)
+                {
+                if (c == '\\') { escapar = true; continue; }
+                if (c == '"') enCadena = false;
+                continue;
+                }
+            if (c == '"') { enCadena = true; continue; }
+            if (c == '{') pila.Push('}');
+            else if (c == '[') pila.Push(']');
+            else if (c == '}' || c == ']')
+                {
+                if (pila.Count == 0 || pila.Peek() != c) return null;
+                pila.Pop();
+                }
+            else if (c == ',')
+                {
+                // La enumeración de Stack<T> es LIFO (de adentro hacia afuera),
+                // que es exactamente el orden en que hay que cerrar.
+                ultimaComa = i;
+                cerradoresEnLaComa = string.Concat(pila);
+                }
+            }
+
+        if (ultimaComa < 0)
+            return null;
+
+        var candidato = texto[..ultimaComa].TrimEnd();
+        if (candidato.Length == 0)
+            return null;
+
+        return candidato + cerradoresEnLaComa;
+        }
+
+    private static JsonElement? BuscarPropiedad(JsonElement objeto, params string[] nombres)
+        {
+        if (objeto.ValueKind != JsonValueKind.Object)
+            return null;
+
+        foreach (var propiedad in objeto.EnumerateObject())
+            {
+            foreach (var nombre in nombres)
+                {
+                if (string.Equals(propiedad.Name, nombre, StringComparison.OrdinalIgnoreCase))
+                    return propiedad.Value;
+                }
+            }
+
+        return null;
+        }
+
+    private static string? TextoDe(JsonElement objeto, params string[] nombres)
+        {
+        if (BuscarPropiedad(objeto, nombres) is not { } prop)
+            return null;
+
+        return prop.ValueKind switch
+            {
+            JsonValueKind.String => prop.GetString(),
+            JsonValueKind.Number => prop.GetRawText(),
+            JsonValueKind.True => "sí",
+            JsonValueKind.False => "no",
+            _ => null
+            };
+        }
+
+    private static string SeveridadNormalizada(string? severidad)
+        {
+        var s = (severidad ?? string.Empty).Trim().ToLowerInvariant();
+        if (s.StartsWith("alt") || s.Contains("critic")) return "alta";
+        if (s.StartsWith("med") || s.Contains("moder")) return "media";
+        if (s.StartsWith("baj") || s.Contains("leve")) return "baja";
+        return "media";
+        }
+
+    /// <summary>
     /// El modelo pequeño a veces devuelve menos objetos de los pedidos. Completa
     /// hasta 3 sugerencias con alternativas deterministas derivadas de los datos
     /// reales del request (mismo contrato Text/Color/Icon de la paleta).
@@ -596,6 +1024,35 @@ public class OllamaAIService : IAIService
             catch (Exception ex)
                 {
                 _logger.LogWarning(ex, "No se pudo parsear fragmento JSON de Ollama.");
+                }
+            }
+
+        // El modelo a veces devuelve un objeto único en vez de array: se acepta como
+        // primera sugerencia (CompletarHastaTres completa las otras dos). Sin este
+        // intento, la respuesta entera se perdía ("0 parseadas") y se caía a prosa.
+        if (result.Count == 0)
+            {
+            var objeto = Regex.Match(cleaned, @"\{[\s\S]*\}");
+            if (objeto.Success)
+                {
+                try
+                    {
+                    var opciones = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    opciones.Converters.Add(new LenientStringConverter());
+                    var unica = JsonSerializer.Deserialize<BusinessSuggestionDto>(objeto.Value, opciones);
+                    if (unica != null && !string.IsNullOrWhiteSpace(unica.Text))
+                        {
+                        // Un icono ilegible (p. ej. "??") no aporta: la UI ya sabe
+                        // renderizar el estado sin icono.
+                        if (unica.Icon != null && !unica.Icon.Any(char.IsLetter))
+                            unica.Icon = string.Empty;
+                        result.Add(unica);
+                        }
+                    }
+                catch (Exception ex)
+                    {
+                    _logger.LogWarning(ex, "No se pudo parsear objeto único de Ollama como sugerencia.");
+                    }
                 }
             }
 
