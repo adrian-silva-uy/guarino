@@ -10,6 +10,12 @@ namespace GuarinoApp.Web.Shared;
 public class ChartSeriesItem
     {
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Datos de la serie. En gráficos de línea, use <see cref="double.NaN"/> para
+    /// puntos sin dato: InteractiveChart lo traduce a un hueco en vez de dibujar un
+    /// cero falso en el eje.
+    /// </summary>
     public double[] Data { get; set; } = Array.Empty<double>();
 
     public string[] Labels { get; set; } = Array.Empty<string>();

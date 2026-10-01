@@ -281,6 +281,24 @@ namespace GuarinoApp.Infrastructure.Data
                     }
                 }
 
+            // 10. Seed FinancialData (datos de Contaduría para los KPIs de la proyección de zafra)
+            // Solo si la tabla está vacía: si Contaduría ya cargó sus cifras, jamás se pisan.
+            if (!context.FinancialData.Any())
+                {
+                context.FinancialData.Add(new FinancialData
+                    {
+                    CostoPorKg = 0.58m,          // USD por kg procesado (promedio 3 años)
+                    FlujoCaja = 45000m,          // USD disponibles en caja
+                    MargenBruto = 34m,           // %
+                    CostoFlete = 4800m,          // USD por contenedor
+                    CapacidadInstalada = 130000m, // kg por zafra sin tercerizar
+                    FechaActualizacion = DateTime.Now,
+                    ActualizadoPor = "sistema",
+                    Observaciones = "Valores iniciales de referencia. Actualizar con las cifras " +
+                                    "reales de Contaduría desde el módulo homónimo."
+                    });
+                }
+
             // Save final solo para datos dependientes
             context.SaveChanges();
             }

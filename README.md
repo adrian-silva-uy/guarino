@@ -5,6 +5,16 @@ Aplicación **Blazor Server** de gestión citrícola con Clean Architecture (`Do
 ## Resumen de cambios aplicados
 
 ### Recientes (2026)
+- **Proyección de Zafra — tablero ejecutivo** (página `/proyeccion-zafra`):
+  - **Seed de `FinancialData`** en `DbInitializer` (solo Development y solo si la tabla está vacía): costo/kg, flujo de caja, margen, flete y capacidad instalada; el Contador ve KPIs reales desde el primer arranque y puede editarlos en el módulo de Contaduría.
+  - **Fuente única de KPIs**: nuevo `FinancialKpiCalculator` (Application) usado por la página y por el servicio de respaldo → números idénticos con o sin motor de IA. Se corrigió la unidad del capital (antes restaba *bins* a *dólares*): ahora `capital = kg proyectados × costo/kg` y `brecha = capital − caja`.
+  - **Fix de overwrite**: la respuesta de la IA ya no pisa los KPIs calculados con datos de Contaduría; solo se adopta su texto de benchmark si aporta contenido nuevo.
+  - **Prompts ejecutivos**: `ZafraStrategy.txt` reescrito para audiencia de comité de dirección (veredicto primero, cifras obligatorias, fórmulas alineadas con el cálculo real) y —hallazgo— **no tenía placeholders**: se añadieron `{OperationalData}` / `{ProyeccionZafraData}` para que el modelo reciba por fin los datos reales (antes el `Replace` no hacía nada). La advertencia de datos faltantes ya no viene embebida: ahora se arma según existan o no cifras de Contaduría.
+  - **Textos sin detalles internos**: eliminadas las menciones a la herramienta de IA y el muro de "datos no disponibles" del benchmark; ahora el benchmark explica con cifras de la propia empresa (variación interanual, mejor zafra, % de capacidad instalada) y sugiere con tono opcional completar Contaduría.
+  - **Badge "ZAFRA XXXX" prominente y dinámico**: píldora grande con el año de la zafra proyectada (antes "Zafra 2026" hardcodeado y desfasado), `PageTitle` dinámico y línea de contexto con la zafra en curso.
+  - **Gráfico de Evolución de Volumen con 2 series**: real (azul, años históricos) vs. proyección (naranja, arranca del último punto real). `InteractiveChart` ahora soporta huecos (`double.NaN` → sin punto) en vez de dibujar ceros falsos.
+  - **Escenarios con impacto de caja real**: Base/Pesimista/Optimista muestran la brecha en USD ("Faltan $…") calculada con los datos de Contaduría; riesgo de la Base derivado de la brecha real.
+  - Se excluyó la zafra proyectada de la "mejor zafra registrada" (antes el promedio incluía la propia proyección).
 - **Roles como tabla (`Roles`)** — `AppUser.RoleId` (FK) apunta a la tabla `Roles`; antes cada fila guardaba el rol como texto duplicado (violación de forma normal). Validación de rol por lookup, selects dinámicos desde BD en el panel de Usuarios y migración con seed + backfill (`f4770d2`).
 - **Auditoría de normalización (FN)** — eliminadas 11 columnas redundantes o muertas con su migración `EliminarColumnasDesnormalizadas` (backfill en Up y Down) (`ba1bae9`):
   - 7 maestras (Especie, Empaque, Báscula, TipoLote, DestinoInterno, Emboquille, Responsable): columna `IdXxx` siempre en 0 junto a la PK identity; queries corregidos (`GetBasculas` devolvía `Id=0`; el join de báscula de Registro Pesadas nunca matcheaba).

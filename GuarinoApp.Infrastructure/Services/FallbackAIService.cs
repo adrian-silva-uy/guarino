@@ -2,7 +2,9 @@ namespace GuarinoApp.Infrastructure.Services;
 
 using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Dtos;
+using GuarinoApp.Application.Common.Helpers;
 using GuarinoApp.Application.Common.Interfaces;
+using GuarinoApp.Application.Modules.Contaduria.Dtos;
 using GuarinoApp.Application.Modules.Proyeccion.Dtos;
 using Microsoft.Extensions.Logging;
 using System;
@@ -21,10 +23,6 @@ public class FallbackAIService : IAIService
     private const string FALLBACK_CHAT_KEY = "FallbackChat";
     private const string FALLBACK_SUGGESTIONS_KEY = "FallbackSuggestions";
     private const string FALLBACK_ZAFRA_KEY = "FallbackZafra";
-
-    // Umbral usado por OportunidadCAPEX ("ALTA" si Proyección > CapacidadInstalada en > 15%),
-    // igual que en ZafraStrategy.txt.
-    private const decimal MargenCapexAltoPorcentual = 15m;
 
     public FallbackAIService(
         OllamaAIService ollamaService,
@@ -209,13 +207,14 @@ public class FallbackAIService : IAIService
         ZafraDto projectedZafra,
         decimal capacidadMaxHistorica,
         int stockActualBins,
-        List<BusinessSuggestionDto>? history = null)
+        List<BusinessSuggestionDto>? history = null,
+        FinancialDataDto? datosFinancieros = null)
         {
         if (_ollamaService.IsAvailable)
             {
             try
                 {
-                var aiResult = await _ollamaService.GetZafraInteligentStrategyAsync(projectedZafra, capacidadMaxHistorica, stockActualBins, history);
+                var aiResult = await _ollamaService.GetZafraInteligentStrategyAsync(projectedZafra, capacidadMaxHistorica, stockActualBins, history, datosFinancieros);
                 if (aiResult != null && (aiResult.AccionesEstrategicas.Any() || aiResult.KPIs != null))
                     return aiResult;
                 }
@@ -225,49 +224,34 @@ public class FallbackAIService : IAIService
                 }
             }
 
-        return BuildFallbackZafraStrategy(projectedZafra, capacidadMaxHistorica, stockActualBins);
+        return BuildFallbackZafraStrategy(projectedZafra, capacidadMaxHistorica, stockActualBins, datosFinancieros);
         }
 
     /// <summary>
-    /// Fallback sin IA. Los ejes Financiero/Logistica (capacidad) usan datos reales que sí
-    /// recibe (Origen="Calculado"); Calidad/ManoDeObra/Fitosanitario/CostoComparado no tienen
-    /// fuente de datos conectada todavía, así que se agregan como recordatorios operativos
-    /// estándar de industria (Origen="Checklist"), nunca como cifras inventadas -- mismos ejes
-    /// que pide ZafraStrategy.txt, para que el plan se vea igual con o sin IA disponible.
+    /// Fallback sin IA. Los KPIs financieros, la comparativa de benchmark y los
+    /// escenarios salen de FinancialKpiCalculator —la misma fuente que usa la
+    /// página— de modo que los números sean idénticos con o sin motor de IA.
+    /// Los ejes sin fuente de datos conectada (calidad, logística, mano de obra,
+    /// fitosanitario, costo comparado) se agregan como recordatorios operativos
+    /// estándar de industria (Origen="Checklist"), nunca como cifras inventadas
+    /// -- mismos ejes que pide ZafraStrategy.txt, para que el plan se vea igual
+    /// con o sin IA disponible.
     /// </summary>
     private static ZafraStrategyResultDto BuildFallbackZafraStrategy(
         ZafraDto projectedZafra,
         decimal capacidadMaxHistorica,
-        int stockActualBins)
+        int stockActualBins,
+        FinancialDataDto? datosFinancieros)
         {
         var esSimulado = projectedZafra.EsDummy;
         var variacion = projectedZafra.VariacionPorcentual;
         var volumenProyectado = projectedZafra.TotalKgs;
 
-        var brechaCapacidad = capacidadMaxHistorica > 0
-            ? (volumenProyectado - capacidadMaxHistorica) / capacidadMaxHistorica * 100
-            : 0m;
-        var oportunidadCapex = brechaCapacidad > MargenCapexAltoPorcentual ? "ALTA" : "BAJA";
+        var kpis = FinancialKpiCalculator.Calcular(volumenProyectado, capacidadMaxHistorica, datosFinancieros);
+        kpis.ComparativaBenchmark = FinancialKpiCalculator.ConstruirComparativaBenchmark(
+            projectedZafra, capacidadMaxHistorica, datosFinancieros);
 
-        var kpis = new FinancialKpiDto
-            {
-            CapitalNecesario = 0m,
-            BrechaLiquidez = 0m,
-            RiesgoLiquidez = "N/D",
-            OportunidadCAPEX = oportunidadCapex,
-            ComparativaBenchmark = "Capital necesario y riesgo de liquidez requieren costo real por kg " +
-                "y flujo de caja actual, que todavía no llegan a este servicio. Configure esa fuente de " +
-                "datos (módulo de Contaduría) para habilitar el cálculo completo. La referencia general " +
-                "de benchmark de industria solo está disponible con el motor de IA (Ollama) activo, ya " +
-                "que este fallback no tiene conocimiento propio para generarla."
-            };
-
-        var escenarios = new List<ScenarioDto>
-            {
-            new() { Nombre = "Base", Volumen = volumenProyectado, ImpactoCaja = "N/D — requiere costo real por kg", Riesgo = "Bajo" },
-            new() { Nombre = "Pesimista (-20%)", Volumen = Math.Round(volumenProyectado * 0.8m, 0), ImpactoCaja = "N/D — requiere costo real por kg", Riesgo = "Alto" },
-            new() { Nombre = "Optimista (+20%)", Volumen = Math.Round(volumenProyectado * 1.2m, 0), ImpactoCaja = "N/D — requiere costo real por kg", Riesgo = "Medio" }
-            };
+        var escenarios = FinancialKpiCalculator.ConstruirEscenarios(volumenProyectado, datosFinancieros);
 
         var acciones = new List<BusinessSuggestionDto>();
 
@@ -282,6 +266,22 @@ public class FallbackAIService : IAIService
                 Categoria = "Financiero",
                 Origen = "Checklist",
                 Riesgo = "Decisiones tomadas sobre datos simulados pueden no reflejar la realidad de campo."
+                });
+            }
+
+        if (kpis.BrechaLiquidez > 0 && datosFinancieros != null)
+            {
+            acciones.Add(new BusinessSuggestionDto
+                {
+                Text = $"La caja disponible no cubre el capital requerido para la zafra: faltan ${kpis.BrechaLiquidez:N0} " +
+                       $"(capital ${kpis.CapitalNecesario:N0} vs. caja ${datosFinancieros.FlujoCaja:N0} — riesgo {kpis.RiesgoLiquidez}). " +
+                       "Gestionar crédito de temporada, adelanto de clientes o reprogramación de pagos ANTES del pico.",
+                Color = "#F44336",
+                Icon = "account_balance_wallet",
+                Categoria = "Financiero",
+                Origen = "Calculado",
+                Impacto = $"Brecha de ${kpis.BrechaLiquidez:N0} a cubrir antes del inicio de zafra.",
+                Riesgo = "Sin financiamiento oportuno, la zafra se frena en el pico cuando el volumen ya está comprometido con clientes."
                 });
             }
 

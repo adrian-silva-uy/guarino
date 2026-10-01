@@ -3,6 +3,7 @@ namespace GuarinoApp.Infrastructure.Services;
 using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Dtos;
 using GuarinoApp.Application.Common.Interfaces;
+using GuarinoApp.Application.Modules.Contaduria.Dtos;
 using GuarinoApp.Application.Modules.Proyeccion.Dtos;
 using GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccionZafra;
 using GuarinoApp.Application.Settings;
@@ -308,7 +309,8 @@ public class OllamaAIService : IAIService
         ZafraDto projectedZafra,
         decimal capacidadMaxHistorica,
         int stockActualBins,
-        List<BusinessSuggestionDto>? history = null)
+        List<BusinessSuggestionDto>? history = null,
+        FinancialDataDto? datosFinancieros = null)
         {
         var empty = new ZafraStrategyResultDto();
         if (!IsAvailable) return empty;
@@ -343,18 +345,27 @@ public class OllamaAIService : IAIService
                 StockActualBins = stockActualBins,
                 CapacidadMaximaHistoricaKgs = capacidadMaxHistorica,
                 FechaConsulta = DateTime.Now.ToString("yyyy-MM-dd"),
-                CostoPorKgHistorico = (decimal?)null,
-                MargenBrutoHistorico = (decimal?)null,
-                FlujoCajaActual = (decimal?)null,
+                CostoPorKgHistorico = (decimal?)datosFinancieros?.CostoPorKg,
+                MargenBrutoHistorico = (decimal?)datosFinancieros?.MargenBruto,
+                FlujoCajaActual = (decimal?)datosFinancieros?.FlujoCaja,
+                CapacidadInstaladaKgs = (decimal?)datosFinancieros?.CapacidadInstalada,
+                CostoFleteHistorico = (decimal?)datosFinancieros?.CostoFlete,
                 BenchmarkExterno = (string?)null,
-                Advertencia = "CostoPorKgHistorico, MargenBrutoHistorico y FlujoCajaActual NO están " +
-                              "disponibles todavía (datos específicos de Guarino, no los inventes ni " +
-                              "asumas un valor típico de industria): devolvé capitalNecesario=0, " +
-                              "brechaLiquidez=0, riesgoLiquidez=\"N/D\". BenchmarkExterno tampoco está " +
-                              "configurado, pero para comparativaBenchmark SÍ podés usar tu conocimiento " +
-                              "general de la industria citrícola de exportación como referencia orientativa " +
-                              "-- seguí la EXCEPCIÓN CONTROLADA de las instrucciones (etiquetarla como no " +
-                              "verificada, sin cifras puntuales exactas)."
+                Advertencia = datosFinancieros != null
+                    ? "CostoPorKgHistorico, MargenBrutoHistorico, FlujoCajaActual y CapacidadInstaladaKgs " +
+                      "son cifras VIGENTES de Contaduría: usalas exactamente como vienen en las fórmulas de " +
+                      "capitalNecesario, brechaLiquidez, riesgoLiquidez y oportunidadCAPEX (no las alteres ni " +
+                      "las reemplaces por valores típicos de industria). BenchmarkExterno no está configurado: " +
+                      "para comparativaBenchmark usá tu conocimiento general de la industria citrícola de " +
+                      "exportación con la EXCEPCIÓN CONTROLADA de las instrucciones (etiquetado como no " +
+                      "verificado, con rangos y sin cifras puntuales exactas)."
+                    : "CostoPorKgHistorico, MargenBrutoHistorico y FlujoCajaActual NO están disponibles " +
+                      "(datos específicos de Guarino, no los inventes ni asumas un valor típico de industria): " +
+                      "devolvé capitalNecesario=0, brechaLiquidez=0, riesgoLiquidez=\"N/D\" y explicá en " +
+                      "comparativaBenchmark que falta el costo por kg y el flujo de caja de Contaduría. " +
+                      "BenchmarkExterno tampoco está configurado, pero para comparativaBenchmark SÍ podés usar " +
+                      "tu conocimiento general de la industria citrícola de exportación como referencia " +
+                      "orientativa -- seguí la EXCEPCIÓN CONTROLADA de las instrucciones."
                 }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
             var system = template
@@ -376,7 +387,7 @@ public class OllamaAIService : IAIService
                 model = options.Model,
                 messages,
                 stream = false,
-                options = new { num_predict = 700, temperature = 0.2 }
+                options = new { num_predict = 1000, temperature = 0.2 }
                 };
 
             using var cts = new CancellationTokenSource(ZafraStrategyTimeout);

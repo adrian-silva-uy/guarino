@@ -53,9 +53,16 @@
             .Select(index => new InteractiveChartPoint
             {
                 Label = index < effectiveLabels.Count ? effectiveLabels[index] : string.Empty,
+                // NaN en el Data de la serie = "sin punto" (hueco en la línea). Sin eso,
+                // un año sin dato de esa serie dibujaría un cero falso en el eje.
                 Values = sourceSeries.ToDictionary(
                     series => series.Name,
-                    series => index < (series.Data?.Length ?? 0) ? series.Data![index] : 0d)
+                    series =>
+                    {
+                        if (index >= (series.Data?.Length ?? 0) || double.IsNaN(series.Data![index]))
+                            return (double?)null;
+                        return series.Data![index];
+                    })
             })
             .ToList();
     }
@@ -71,8 +78,10 @@
     public sealed class InteractiveChartPoint
     {
         public string Label { get; init; } = string.Empty;
-        public Dictionary<string, double> Values { get; init; } = new();
-        public double GetValue(string seriesName) => Values.TryGetValue(seriesName, out var value) ? value : 0d;
+        public Dictionary<string, double?> Values { get; init; } = new();
+
+        /// <summary>Valor de la serie en este punto; null = sin dato (hueco en la línea).</summary>
+        public double? GetValue(string seriesName) => Values.TryGetValue(seriesName, out var value) ? value : null;
     }
 
     public enum InteractiveChartType { Bar, Line, Pie, Donut }

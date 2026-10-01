@@ -10,7 +10,7 @@
 @using GuarinoApp.Application.Modules.Contaduria.Dtos
 @using GuarinoApp.Application.Common.Interfaces
 @using GuarinoApp.Application.Common.Dtos
-@using System.Globalization
+@using GuarinoApp.Application.Common.Helpers
 @using Microsoft.Extensions.Logging
 @inject IMediator Mediator
 @inject IAIService AIService
@@ -19,21 +19,40 @@
 @inject IDialogService DialogService
 @inject NavigationManager NavManager
 
-<PageTitle>Tablero de Decisión Financiera - Zafra 2026</PageTitle>
+<PageTitle>Tablero de Decisión Financiera - Zafra @(_anioProyectado?.ToString() ?? "")</PageTitle>
 
 <div class="container-fluid p-4">
     <!-- Encabezado Estratégico -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="fw-bold text-dark">Tablero de Decisión Financiera</h2>
-            <p class="text-muted mb-0">Basado en Datos Históricos y Benchmarking de Mercado</p>
+            <p class="text-muted mb-0">Proyección de la próxima zafra — lectura ejecutiva para Gerencia y Contaduría</p>
         </div>
         <div class="text-end">
+            @if (_anioProyectado.HasValue)
+            {
+                <div class="d-inline-block rounded-pill px-4 py-2 fw-bold shadow"
+                     style="background: linear-gradient(135deg, #1976D2 0%, #009688 100%); color: #fff; font-size: 1.3rem; letter-spacing: 1px;">
+                    ZAFRA @_anioProyectado
+                </div>
+                <div class="text-muted mt-2" style="font-size: 0.85rem;">
+                    Próxima zafra proyectada
+                    @if (_anioActual.HasValue)
+                    {
+                        <span> · zafra @_anioActual en curso: @(_totalActualKgs?.ToString("N0")) kg registrados</span>
+                    }
+                </div>
+            }
+            else
+            {
+                <span class="badge bg-info text-white">Próxima zafra</span>
+            }
             @if (_zafras != null && _zafras.Any(z => z.EsDummy))
             {
-                <span class="badge bg-warning text-dark me-2">⚠️ Datos Simulados</span>
+                <div class="mt-1">
+                    <span class="badge bg-warning text-dark">⚠️ Datos Simulados</span>
+                </div>
             }
-            <span class="badge bg-info text-white">Zafra 2026</span>
         </div>
     </div>
 
@@ -88,7 +107,10 @@
             else
             {
                 <!-- Fila 1: KPIs Financieros -->
-                <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-3">Impacto Financiero Inmediato (Generado por IA)</MudText>
+                <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-3">Impacto Financiero Inmediato</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="d-block" Style="margin-top: -0.75rem; margin-bottom: 1rem;">
+                    Cálculo automático con la proyección de volumen y los datos vigentes de Contaduría.
+                </MudText>
 
                 <MudGrid>
                     <!-- Tarjeta 1: Capital Necesario -->
@@ -107,12 +129,12 @@
                                         else if (_kpiFinanciero != null)
                                         {
                                             <MudText Typo="Typo.h4" Class="mt-1 fw-bold text-primary">
-                                                $@_kpiFinanciero.CapitalNecesario.ToString("N0", CultureInfo.InvariantCulture)
+                                                $@_kpiFinanciero.CapitalNecesario.ToString("N0")
                                             </MudText>
                                             @if (_kpiFinanciero.BrechaLiquidez > 0)
                                             {
                                                 <MudText Typo="Typo.caption" Color="Color.Error">
-                                                    +$@_kpiFinanciero.BrechaLiquidez.ToString("N0", CultureInfo.InvariantCulture) vs. Caja Actual
+                                                    +$@_kpiFinanciero.BrechaLiquidez.ToString("N0") vs. Caja Actual
                                                 </MudText>
                                             }
                                             else
@@ -131,9 +153,17 @@
                                 </div>
                                 <MudDivider Class="my-2" />
                                 <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="font-size: 0.8rem;">
-                                    @if (_kpiFinanciero != null && _kpiFinanciero.CapitalNecesario == 0)
+                                    @if (_datosFinancieros != null)
                                     {
-                                        <span>⚠️ Requiere datos de Contaduría (costo/kg, flujo de caja) para calcular.</span>
+                                        <span>
+                                            Con costo $@(_datosFinancieros.CostoPorKg.ToString("0.00"))/kg y caja de
+                                            $@(_datosFinancieros.FlujoCaja.ToString("N0")) — datos de Contaduría,
+                                            actualizables en ese módulo cuando lo desee.
+                                        </span>
+                                    }
+                                    else if (_kpiFinanciero != null && _kpiFinanciero.CapitalNecesario == 0)
+                                    {
+                                        <span>Complete el costo por kg y el flujo de caja en Contaduría para habilitar este cálculo.</span>
                                     }
                                     else
                                     {
@@ -225,13 +255,26 @@
                     <MudDivider Class="my-4" />
                     <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
                         <MudIcon Icon="@Icons.Material.Filled.DataUsage" Class="me-2" Color="Color.Info" />
-                        <strong>Análisis de Benchmarking Externo:</strong>
+                        <strong>Análisis de Benchmarking:</strong>
                         <MudText Typo="Typo.body2" Class="ms-2">
                             @_kpiFinanciero.ComparativaBenchmark
                         </MudText>
                         <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="ms-2 d-block mt-1">
-                            ⚠️ <strong>Datos no disponibles:</strong> El benchmark de industria requiere datos de mercado verificados en tiempo real.
-                            Configure la fuente de datos de Contaduría (costo/kg, flujo de caja) para habilitar el cálculo completo.
+                            @if (_datosFinancieros != null)
+                            {
+                                <span>
+                                    Capital y brecha calculados con sus cifras vigentes de Contaduría;
+                                    puede actualizarlas en ese módulo cuando lo desee.
+                                </span>
+                            }
+                            else
+                            {
+                                <span>
+                                    Referencia calculada con el histórico y la capacidad propios de la empresa.
+                                    Si desea afinar capital y brecha con sus cifras, complete el costo por kg y el
+                                    flujo de caja en el módulo de Contaduría (opcional).
+                                </span>
+                            }
                         </MudText>
                     </MudAlert>
                 }
@@ -291,8 +334,10 @@
                                     Evolución de Volumen
                                 </MudText>
                                 <InteractiveChart Series="_series" Labels="_xLabels" Type="InteractiveChart.InteractiveChartType.Line" Height="250px" />
-                                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="text-center mt-2">
-                                    Línea base histórica vs. Proyección actual
+                                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="text-center mt-2 d-block">
+                                    Kilogramos por zafra — <strong style="color:#1976D2;">línea azul</strong>:
+                                    volúmenes reales registrados; <strong style="color:#FF9800;">línea naranja</strong>:
+                                    proyección de la próxima zafra.
                                 </MudText>
                             </MudCardContent>
                         </MudCard>
@@ -302,7 +347,7 @@
                 <!-- Fila 4: Recomendaciones Estratégicas -->
                 <MudDivider Class="my-4" />
                 <MudText Typo="Typo.h5" GutterBottom="true" Color="Color.Primary">
-                    🚀 Plan de Acción Estratégico (Generado por IA)
+                    🚀 Plan de Acción Estratégico
                 </MudText>
                 <MudText Typo="Typo.body2" Class="mb-3 text-muted">
                     Decisiones de inversión y gestión de riesgo basadas en datos reales y benchmarking.
@@ -311,7 +356,7 @@
                 @if (_cargandoEstrategia)
                 {
                     <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2" />
-                    <MudText Typo="Typo.caption" Color="Color.Tertiary">Generando plan estratégico con IA (puede tardar unos segundos)...</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">Preparando el plan estratégico (puede tardar unos segundos)...</MudText>
                 }
                 else if (_estrategiaZafra != null && _estrategiaZafra.Any())
                 {
@@ -349,7 +394,7 @@
                 else
                 {
                     <MudAlert Severity="Severity.Info" Class="mt-2">
-                        No se pudieron generar sugerencias estratégicas en este momento. Verifique la conexión con el motor de IA.
+                        No se pudieron generar sugerencias estratégicas en este momento. Intente nuevamente en unos minutos.
                     </MudAlert>
                 }
 
@@ -389,6 +434,13 @@
     private List<ChartSeriesItem> _series = new();
     private string[] _xLabels = Array.Empty<string>();
     private ImpactoClimaticoProyeccionDto? _impactoClimatico;
+
+    // Años derivados de los datos (el encabezado y el título de la pestaña muestran la
+    // zafra PROYECTADA, que es la que esta página ayuda a decidir — antes estaba
+    // hardcodeada y quedaba desfasada respecto de la tabla cada vez que se sumaba un año).
+    private int? _anioProyectado;
+    private int? _anioActual;
+    private decimal? _totalActualKgs;
 
     // _loading cubre solo la carga de datos reales (rápida: consulta a la base).
     // _cargandoEstrategia cubre solo la llamada a la IA (puede tardar) -- antes existía
@@ -434,6 +486,9 @@
         _kpiFinanciero = null;
         _estrategiaZafra = null;
         _impactoClimatico = null;
+        _anioProyectado = null;
+        _anioActual = null;
+        _totalActualKgs = null;
         StateHasChanged();
 
         List<ZafraDto>? zafras;
@@ -460,9 +515,32 @@
 
         var ordenadas = _zafras.OrderBy(x => x.Año).ToList();
         _xLabels = ordenadas.Select(x => x.Año.ToString()).ToArray();
+
+        var proyectadaZafra = ordenadas.FirstOrDefault(z => z.Estado == "Proyectado");
+        var actualZafra = ordenadas.FirstOrDefault(z => z.Estado == "Actual");
+        _anioProyectado = proyectadaZafra?.Año;
+        _anioActual = actualZafra?.Año;
+        _totalActualKgs = actualZafra?.TotalKgs;
+
+        // Dos series: volúmenes reales por zafra y la proyección de la próxima. En el
+        // array se usa NaN como "sin punto" (InteractiveChart lo traduce a un hueco);
+        // sin eso, los años sin dato de una serie dibujarían un cero falso en el eje.
+        // La serie de proyección arrastra el último punto real para que la línea naranja
+        // nazca de la zafra en curso y se vea el salto hacia el próximo año.
+        var idxProyectada = proyectadaZafra != null ? ordenadas.IndexOf(proyectadaZafra) : -1;
+        var reales = ordenadas.Select(z => z.Estado == "Proyectado" ? double.NaN : (double)z.TotalKgs).ToArray();
+        var proyeccion = Enumerable.Repeat(double.NaN, ordenadas.Count).ToArray();
+        if (idxProyectada >= 0)
+        {
+            proyeccion[idxProyectada] = (double)ordenadas[idxProyectada].TotalKgs;
+            if (idxProyectada > 0)
+                proyeccion[idxProyectada - 1] = (double)ordenadas[idxProyectada - 1].TotalKgs;
+        }
+
         _series = new List<ChartSeriesItem>
         {
-            new() { Name = "Total Kgs", Data = ordenadas.Select(x => (double)x.TotalKgs).ToArray() }
+            new() { Name = "Real", Data = reales, Color = "#1976D2" },
+            new() { Name = "Proyección", Data = proyeccion, Color = "#FF9800" }
         };
 
         // A partir de acá ya se ve la tabla/gráfico con datos reales -- lo que sigue (IA) tiene
@@ -489,34 +567,58 @@
 
         try
         {
-            var capacidadMax = ordenadas.Max(z => z.TotalKgs);
+            // Capacidad de referencia = MEJOR ZAFRA REAL (excluyo la proyectada; si no,
+            // la comparación se haría contra la propia proyección y nunca activaría el riesgo).
+            var capacidadMax = ordenadas
+                .Where(z => z.Estado != "Proyectado")
+                .Select(z => z.TotalKgs)
+                .DefaultIfEmpty(0m)
+                .Max();
             var stockActual = await DashboardService.GetTotalStockAsync(DateTime.Now);
 
             // Si hay datos financieros de Contaduría, calcular KPIs directamente
             if (_datosFinancieros != null)
             {
-                CalcularKPIsLocales(proyectada, capacidadMax, stockActual);
+                CalcularKPIsLocales(proyectada, capacidadMax);
             }
 
             var resultadoIA = await AIService.GetZafraInteligentStrategyAsync(
                 proyectada,
                 capacidadMax,
-                (int)stockActual
+                (int)stockActual,
+                history: null,
+                datosFinancieros: _datosFinancieros
             );
 
             if (resultadoIA != null)
             {
-                _kpiFinanciero = resultadoIA.KPIs;
+                var kpisIA = resultadoIA.KPIs;
+
+                if (_kpiFinanciero != null)
+                {
+                    // Los KPIs calculados con las cifras de Contaduría son la fuente de
+                    // los números (no se destruyen por una respuesta del modelo); de la IA
+                    // solo se adopta el texto de benchmark si aporta contenido nuevo.
+                    var benchmarkIA = kpisIA?.ComparativaBenchmark?.Trim();
+                    if (!string.IsNullOrWhiteSpace(benchmarkIA) &&
+                        !string.Equals(benchmarkIA, _kpiFinanciero.ComparativaBenchmark, StringComparison.Ordinal))
+                    {
+                        _kpiFinanciero.ComparativaBenchmark =
+                            string.IsNullOrWhiteSpace(_kpiFinanciero.ComparativaBenchmark)
+                                ? benchmarkIA
+                                : $"{_kpiFinanciero.ComparativaBenchmark} {benchmarkIA}";
+                    }
+                }
+                else if (kpisIA != null)
+                {
+                    _kpiFinanciero = kpisIA;
+                }
+
                 _estrategiaZafra = resultadoIA.AccionesEstrategicas;
 
                 _escenarios = resultadoIA.Escenarios != null && resultadoIA.Escenarios.Any()
                     ? resultadoIA.Escenarios
-                    : new List<ScenarioDto>
-                        {
-                            new ScenarioDto { Nombre = "Base", Volumen = proyectada.TotalKgs, ImpactoCaja = "Neutro", Riesgo = "Bajo" },
-                            new ScenarioDto { Nombre = "Pesimista (-20%)", Volumen = proyectada.TotalKgs * 0.8m, ImpactoCaja = "Calculado por IA", Riesgo = "Alto" },
-                            new ScenarioDto { Nombre = "Optimista (+20%)", Volumen = proyectada.TotalKgs * 1.2m, ImpactoCaja = "Calculado por IA", Riesgo = "Medio" }
-                        };
+                    : FinancialKpiCalculator.ConstruirEscenarios(proyectada.TotalKgs, _datosFinancieros);
 
                 CalcularEstilos();
             }
@@ -559,48 +661,18 @@
     }
 
     /// <summary>
-    /// Calcula KPIs financieros localmente usando los datos de Contaduría.
-    /// Esto permite mostrar valores reales sin depender de la IA.
+    /// Calcula KPIs y benchmark localmente con los datos de Contaduría usando
+    /// FinancialKpiCalculator —la misma fuente que el servicio de respaldo— para
+    /// que los números sean idénticos venga la IA o no, y no dependan de la
+    /// respuesta de un modelo.
     /// </summary>
-    private void CalcularKPIsLocales(ZafraDto proyectada, decimal capacidadMax, int stockActual)
+    private void CalcularKPIsLocales(ZafraDto proyectada, decimal capacidadMax)
     {
         if (_datosFinancieros == null) return;
 
-        var costoPorKg = _datosFinancieros.CostoPorKg;
-        var flujoCaja = _datosFinancieros.FlujoCaja;
-        var capacidadInstalada = _datosFinancieros.CapacidadInstalada;
-
-        // Capital necesario = (Proyección * CostoPorKg) - StockActual
-        var capitalNecesario = (proyectada.TotalKgs * costoPorKg) - stockActual;
-
-        // Brecha de liquidez = Capital necesario - Flujo de caja
-        var brechaLiquidez = capitalNecesario - flujoCaja;
-
-        // Riesgo de liquidez
-        string riesgoLiquidez;
-        if (flujoCaja > 0)
-        {
-            var porcentajeBrecha = (brechaLiquidez / flujoCaja) * 100;
-            riesgoLiquidez = porcentajeBrecha > 30 ? "ALTO" : porcentajeBrecha > 10 ? "MEDIO" : "BAJO";
-        }
-        else
-        {
-            riesgoLiquidez = "N/D";
-        }
-
-        // Oportunidad CAPEX
-        var oportunidadCapex = capacidadInstalada > 0 && proyectada.TotalKgs > capacidadInstalada * 1.15m
-            ? "ALTA"
-            : "BAJA";
-
-        _kpiFinanciero = new FinancialKpiDto
-        {
-            CapitalNecesario = Math.Max(0, capitalNecesario),
-            BrechaLiquidez = brechaLiquidez,
-            RiesgoLiquidez = riesgoLiquidez,
-            OportunidadCAPEX = oportunidadCapex,
-            ComparativaBenchmark = "Datos calculados con información de Contaduría actualizada."
-        };
+        _kpiFinanciero = FinancialKpiCalculator.Calcular(proyectada.TotalKgs, capacidadMax, _datosFinancieros);
+        _kpiFinanciero.ComparativaBenchmark = FinancialKpiCalculator.ConstruirComparativaBenchmark(
+            proyectada, capacidadMax, _datosFinancieros);
 
         CalcularEstilos();
     }
