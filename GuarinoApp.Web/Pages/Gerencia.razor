@@ -11,6 +11,7 @@
 @using GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccionZafra
 @inject IMediator Mediator
 @inject IAIService AIService
+@inject IDialogService DialogService
 @inject Microsoft.Extensions.Logging.ILogger<Gerencia> Logger
 
 <PageTitle>Panel de Gerencia - Guarino</PageTitle>
@@ -95,20 +96,28 @@ else if (!_loading && _cargado)
 
             @if (_analisis.Acciones.Any())
             {
-                <MudText Typo="Typo.subtitle2" Class="mb-2 fw-bold">Prioridades de acción</MudText>
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <MudText Typo="Typo.subtitle2" Class="fw-bold">Prioridades de acción</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="me-1" />
+                        Cada prioridad dice qué hacer, cuándo ejecutarla (azul) y qué se espera lograr (verde). Hacé clic para ver el detalle.
+                    </MudText>
+                </div>
                 @foreach (var a in _analisis.Acciones)
                 {
-                    <MudCard Elevation="0" Class="mb-2" Style="background: #f8f9fa;">
-                        <MudCardContent Class="py-2">
-                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-                                <MudText Typo="Typo.body2">@a.Texto</MudText>
-                                <div class="d-flex gap-2">
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Info">@a.Plazo</MudChip>
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">@a.Impacto</MudChip>
+                    <div @onclick="() => VerPrioridad(a)" style="cursor: pointer;">
+                        <MudCard Elevation="0" Class="mb-2" Style="background: #f8f9fa;">
+                            <MudCardContent Class="py-2">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                    <MudText Typo="Typo.body2">@a.Texto</MudText>
+                                    <div class="d-flex gap-2">
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Title="Cuándo ejecutarla">@a.Plazo</MudChip>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined" Title="Qué se espera lograr">@a.Impacto</MudChip>
+                                    </div>
                                 </div>
-                            </div>
-                        </MudCardContent>
-                    </MudCard>
+                            </MudCardContent>
+                        </MudCard>
+                    </div>
                 }
             }
         }
@@ -244,6 +253,34 @@ else if (!_loading && _cargado)
         "alta" => "#d32f2f",
         "media" => "#fbc02d",
         _ => "#388e3c"
+    };
+
+    /// <summary>
+    /// Abre la ficha de detalle de una prioridad: explica la acción, qué significa
+    /// el plazo sugerido y qué impacto se espera, para que los chips de la tarjeta
+    /// queden siempre autoexplicativos.
+    /// </summary>
+    private async Task VerPrioridad(InsightAccionDto a)
+    {
+        var contenido =
+            $"QUÉ HACER\n{a.Texto}\n\n" +
+            $"CUÁNDO EJECUTARLA: {a.Plazo}\n{ExplicacionDePlazo(a.Plazo)}\n\n" +
+            $"QUÉ SE ESPERA LOGRAR\n{a.Impacto}";
+
+        await DialogService.ShowAsync<SimpleDialog>("Prioridad de acción", new DialogParameters<SimpleDialog>
+        {
+            { x => x.Titulo, "Prioridad de acción" },
+            { x => x.Contenido, contenido }
+        });
+    }
+
+    private static string ExplicacionDePlazo(string plazo) => plazo.Trim().ToLowerInvariant() switch
+    {
+        "inmediato" => "Ejecutar ya: es la prioridad que no admite espera.",
+        "esta semana" => "Ejecutar dentro de los próximos 7 días.",
+        "antes de la zafra" => "Antes del arranque de la próxima temporada de cosecha (zafra), cuando la planta vuelva a procesar volumen nuevo.",
+        "mensual" => "Revisar todos los meses, junto al cierre contable.",
+        _ => "Plazo sugerido para poner en marcha la acción."
     };
 
     private static Color ColorDeIndicador(IndicadorGerenciaDto item) => item.Categoria switch
