@@ -57,7 +57,13 @@ para dar una referencia orientativa. Reglas estrictas para hacerlo bien:
 
 ## TAREA OBLIGATORIA:
 
-1. **CALCULAR KPIs FINANCIEROS** — usá EXACTAMENTE estas fórmulas (solo con datos reales;
+1. **RESUMEN EJECUTIVO (resumenEjecutivo)** — 3 a 4 oraciones que abren el tablero del comité,
+   en este orden: (a) volumen proyectado y variación vs. la última zafra; (b) capital necesario
+   y brecha de caja con sus cifras en USD; (c) veredicto de CAPEX/capacidad; (d) recomendación
+   principal en un verbo concreto ("Gestionar...", "Anticipar..."). Todo cuantificado, sin
+   repetir textualmente frases de los otros campos.
+
+2. **CALCULAR KPIs FINANCIEROS** — usá EXACTAMENTE estas fórmulas (solo con datos reales;
    si falta alguno, ver REGLA CRÍTICA):
    - `capitalNecesario` = TotalKgs proyectados × CostoPorKgHistorico (USD, redondeado a entero).
    - `brechaLiquidez` = capitalNecesario − FlujoCajaActual (USD; negativo = sobra caja).
@@ -67,7 +73,7 @@ para dar una referencia orientativa. Reglas estrictas para hacerlo bien:
      (si falta CapacidadInstaladaKgs, usá CapacidadMaximaHistoricaKgs); si no, "BAJA".
      (Este sí se puede calcular siempre que exista una capacidad de referencia.)
 
-2. **ANÁLISIS DE BENCHMARKING (comparativaBenchmark, 4 a 6 oraciones, todo cuantificado)**:
+3. **ANÁLISIS DE BENCHMARKING (comparativaBenchmark, 3 a 4 oraciones, todo cuantificado)**:
    obligatoriamente en este orden:
    a) variación del volumen proyectado vs. la última zafra real (±%, con el kg de ambos años);
    b) qué % representa la proyección sobre CapacidadMaximaHistoricaKgs (mejor zafra registrada);
@@ -77,7 +83,8 @@ para dar una referencia orientativa. Reglas estrictas para hacerlo bien:
    - Si CapacidadInstaladaKgs, CostoPorKgHistorico o FlujoCajaActual vienen en null, agregá una
      última oración breve: qué dato falta y que se carga en Contaduría para habilitar el cálculo.
 
-3. **GENERAR PLAN DE ACCIÓN (5 a 8 puntos)** cubriendo los siguientes ejes. No todos los ejes
+4. **GENERAR PLAN DE ACCIÓN (5 a 6 puntos, sin relleno: cada campo al grano)** cubriendo
+   los siguientes ejes. No todos los ejes
    necesitan una acción "Calculado" — priorizá que cada eje relevante tenga AL MENOS una acción,
    aunque sea tipo "Checklist":
 
@@ -107,6 +114,7 @@ para dar una referencia orientativa. Reglas estrictas para hacerlo bien:
 
 ## FORMATO DE SALIDA (JSON Estricto — sin texto antes ni después del objeto):
 {
+  "resumenEjecutivo": "Veredicto de 3-4 oraciones para el comité: volumen, capital y brecha en USD, CAPEX y recomendación principal.",
   "kpis": {
     "capitalNecesario": 0,
     "brechaLiquidez": 0,

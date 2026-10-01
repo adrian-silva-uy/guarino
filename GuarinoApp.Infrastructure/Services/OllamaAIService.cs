@@ -12,9 +12,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -39,7 +41,14 @@ public class OllamaAIService : IAIService
     // acciones con un modelo 1B puede tardar mucho o directamente no converger; preferimos
     // fallar rápido a la variante honesta sin IA (FallbackAIService) antes que dejar a la UI
     // "colgada" hasta el timeout completo.
-    private static readonly TimeSpan ZafraStrategyTimeout = TimeSpan.FromSeconds(25);
+    // 150 s por intento: en esta máquina (5,7 GB de RAM, CPU) cargar el modelo y generar
+    // ~700 tokens puede pasar de los 90 s. Corre en segundo plano, no bloquea la pantalla.
+    // 330s: esta CPU genera ~4-5 tokens/s, la respuesta completa son ~1000-1300
+    // tokens (resumen + benchmark + plan) y la carga en frío del modelo suma
+    // ~45-60s. Con timeouts más cortos los intentos se cortaban a mitad de
+    // camino, dejaban generaciones huérfanas encoladas y el siguiente intento
+    // volvía a expirar — una bola de nieve que impedía completar el ciclo.
+    private static readonly TimeSpan ZafraStrategyTimeout = TimeSpan.FromSeconds(330);
 
     private const string DefaultChatTemplate =
         "Sos un consultor experto en la industria citrícola, plantas empacadoras y exportadoras de fruta a nivel internacional.\n" +
@@ -387,45 +396,87 @@ public class OllamaAIService : IAIService
                 model = options.Model,
                 messages,
                 stream = false,
-                options = new { num_predict = 1000, temperature = 0.2 }
+                // "format": "json" usa la gramática de Ollama: el modelo no puede
+                // emitir prosa, markdown ni comentarios — solo JSON válido. Los
+                // desajustes de esquema (texto donde pide objeto, números como
+                // texto) los absorben los convertidores tolerantes del parser.
+                format = "json",
+                // num_predict=1400: con 700 el JSON venía truncado a mitad de
+                // accionesEstrategicas. num_ctx=6144 (192 MB de caché KV): el default
+                // (2048) no alcanza para la plantilla y 8192 (256 MB) exigía memoria
+                // que esta máquina no tenía libres; 6144 cubre plantilla (~2,5k
+                // tokens) + datos + 1400 de salida con margen.
+                options = new { num_predict = 1400, temperature = 0.2, num_ctx = 6144 }
                 };
 
-            using var cts = new CancellationTokenSource(ZafraStrategyTimeout);
-
             var client = CreateClient();
-            HttpResponseMessage response;
-            try
-                {
-                response = await client.PostAsJsonAsync("/api/chat", requestObj, cts.Token);
-                }
-            catch (OperationCanceledException)
-                {
-                _logger.LogWarning("Ollama GetZafraInteligentStrategyAsync superó el tiempo límite de {Segundos}s; se usa el fallback sin IA.", ZafraStrategyTimeout.TotalSeconds);
-                return empty;
-                }
+            string rawContent = string.Empty;
 
-            if (!response.IsSuccessStatusCode)
+            // Hasta 2 intentos: en máquinas con poca RAM libre Ollama puede fallar con
+            // 500 (bad_alloc al crear la caché KV) o contestar 200 sin contenido; el
+            // segundo intento suele salir cuando el modelo ya quedó cargado en memoria.
+            for (var intento = 1; intento <= 2 && string.IsNullOrWhiteSpace(rawContent); intento++)
                 {
-                _logger.LogWarning("Ollama GetZafraInteligentStrategyAsync error: {Status}", response.StatusCode);
-                MarcarFalloDeGeneracion($"HTTP {(int)response.StatusCode}");
-                return empty;
-                }
+                using var cts = new CancellationTokenSource(ZafraStrategyTimeout);
+                HttpResponseMessage response;
+                try
+                    {
+                    response = await client.PostAsJsonAsync("/api/chat", requestObj, cts.Token);
+                    }
+                catch (OperationCanceledException)
+                    {
+                    _logger.LogWarning("Ollama GetZafraInteligentStrategyAsync superó el tiempo límite de {Segundos}s (intento {Intento}/2); se usa el fallback sin IA.", ZafraStrategyTimeout.TotalSeconds, intento);
+                    if (intento < 2)
+                        {
+                        // El primer intento suele agotarse cargando el modelo; el segundo
+                        // arranca con el modelo ya en memoria y es mucho más rápido.
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        continue;
+                        }
 
-            var envelopeJson = await response.Content.ReadAsStringAsync();
-            string rawContent;
-            try
-                {
-                var envelope = JsonSerializer.Deserialize<OllamaChatResponse>(envelopeJson);
-                rawContent = envelope?.Message?.Content ?? string.Empty;
-                }
-            catch (Exception ex)
-                {
-                _logger.LogWarning(ex, "No se pudo parsear el sobre de respuesta de Ollama para ZafraStrategy.");
-                return empty;
+                    return empty;
+                    }
+
+                if (!response.IsSuccessStatusCode)
+                    {
+                    _logger.LogWarning("Ollama GetZafraInteligentStrategyAsync error: {Status} (intento {Intento}/2).", response.StatusCode, intento);
+                    if (intento < 2)
+                        {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        continue;
+                        }
+
+                    MarcarFalloDeGeneracion($"HTTP {(int)response.StatusCode}");
+                    return empty;
+                    }
+
+                var envelopeJson = await response.Content.ReadAsStringAsync();
+                try
+                    {
+                    var envelope = JsonSerializer.Deserialize<OllamaChatResponse>(envelopeJson);
+                    rawContent = envelope?.Message?.Content ?? string.Empty;
+                    }
+                catch (Exception ex)
+                    {
+                    _logger.LogWarning(ex, "No se pudo parsear el sobre de respuesta de Ollama para ZafraStrategy.");
+                    return empty;
+                    }
+
+                if (string.IsNullOrWhiteSpace(rawContent) && intento < 2)
+                    {
+                    _logger.LogWarning("Ollama GetZafraInteligentStrategyAsync respondió sin contenido (intento {Intento}/2); se reintenta.", intento);
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
                 }
 
             if (string.IsNullOrWhiteSpace(rawContent))
                 return empty;
+
+            // Diagnóstico: con modelos pequeños la respuesta a veces viene en prosa
+            // en lugar de JSON; ver el inicio del contenido permite distinguirlo.
+            var inicio = rawContent.Length > 200 ? rawContent[..200] : rawContent;
+            _logger.LogInformation("ZafraStrategy: {Len} chars recibidos. Inicio: {Inicio}",
+                rawContent.Length, inicio.Replace('\n', ' ').Replace('\r', ' '));
 
             var parsed = ExtractZafraStrategyResult(rawContent);
             if (parsed != null)
@@ -554,7 +605,10 @@ public class OllamaAIService : IAIService
     private ZafraStrategyResultDto? ExtractZafraStrategyResult(string raw)
         {
         var cleaned = Regex.Replace(raw, "```(json)?", string.Empty, RegexOptions.IgnoreCase).Trim();
+        cleaned = LimpiarJson(cleaned);
         var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        jsonOptions.Converters.Add(new LenientStringConverter());
+        jsonOptions.Converters.Add(new LenientNullableDecimalConverter());
 
         var directo = TryDeserializeZafraStrategy(cleaned, jsonOptions);
         if (directo != null)
@@ -571,6 +625,76 @@ public class OllamaAIService : IAIService
         return null;
         }
 
+    /// <summary>
+    /// Sanea la salida del modelo antes de parsearla: retira comentarios (// y /* */),
+    /// comas finales antes de } o ] y todo lo demás intacto. El recorrido es consciente
+    /// de las cadenas, así que una URL o una ruta dentro de un string no se toca.
+    /// </summary>
+    private static string LimpiarJson(string json)
+        {
+        var sb = new StringBuilder(json.Length);
+        var enCadena = false;
+        var escapar = false;
+
+        for (var i = 0; i < json.Length; i++)
+            {
+            var c = json[i];
+
+            if (enCadena)
+                {
+                sb.Append(c);
+                if (escapar)
+                    escapar = false;
+                else if (c == '\\')
+                    escapar = true;
+                else if (c == '"')
+                    enCadena = false;
+                continue;
+                }
+
+            if (c == '"')
+                {
+                enCadena = true;
+                sb.Append(c);
+                continue;
+                }
+
+            // Comentario de línea: se salta hasta el salto de línea (se conserva).
+            if (c == '/' && i + 1 < json.Length && json[i + 1] == '/')
+                {
+                while (i < json.Length && json[i] != '\n' && json[i] != '\r')
+                    i++;
+                if (i < json.Length)
+                    sb.Append(json[i]);
+                continue;
+                }
+
+            // Comentario de bloque: se salta hasta */.
+            if (c == '/' && i + 1 < json.Length && json[i + 1] == '*')
+                {
+                i += 2;
+                while (i + 1 < json.Length && !(json[i] == '*' && json[i + 1] == '/'))
+                    i++;
+                i++;
+                continue;
+                }
+
+            // Coma final antes de cerrar objeto o arreglo: se omite.
+            if (c == ',')
+                {
+                var j = i + 1;
+                while (j < json.Length && (json[j] == ' ' || json[j] == '\t' || json[j] == '\n' || json[j] == '\r'))
+                    j++;
+                if (j < json.Length && (json[j] == '}' || json[j] == ']'))
+                    continue;
+                }
+
+            sb.Append(c);
+            }
+
+        return sb.ToString();
+        }
+
     private ZafraStrategyAiResponseDto? TryDeserializeZafraStrategy(string json, JsonSerializerOptions options)
         {
         try
@@ -585,6 +709,112 @@ public class OllamaAIService : IAIService
             {
             _logger.LogWarning(ex, "No se pudo parsear el objeto JSON de ZafraStrategy.");
             return null;
+            }
+        }
+
+    /// <summary>
+    /// Los modelos pequeños a veces incumplen el esquema: ponen un objeto, número o
+    /// booleano donde se pide texto (p. ej. "comparativaBenchmark": {"texto": "..."}).
+    /// Sin esto, un solo token inesperado tumbaba todo el análisis. Convierte al mejor
+    /// texto disponible en lugar de fallar.
+    /// </summary>
+    private sealed class LenientStringConverter : JsonConverter<string>
+        {
+        public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+            switch (reader.TokenType)
+                {
+                case JsonTokenType.String:
+                    return reader.GetString();
+                case JsonTokenType.Number:
+                case JsonTokenType.True:
+                case JsonTokenType.False:
+                case JsonTokenType.StartObject:
+                case JsonTokenType.StartArray:
+                    // Se materializa el valor en un JsonElement y se extrae el texto:
+                    // JsonElement sí expone GetRawText() (Utf8JsonReader no).
+                    using (var doc = JsonDocument.ParseValue(ref reader))
+                        return ExtraerTexto(doc.RootElement);
+                default:
+                    return null;
+                }
+            }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+            => writer.WriteStringValue(value);
+
+        private static string? ExtraerTexto(JsonElement elemento)
+            {
+            if (elemento.ValueKind == JsonValueKind.Array)
+                {
+                var partes = elemento.EnumerateArray()
+                    .Select(ExtraerTexto)
+                    .Where(s => !string.IsNullOrWhiteSpace(s));
+                var unido = string.Join(" ", partes);
+                return string.IsNullOrWhiteSpace(unido) ? elemento.GetRawText() : unido;
+                }
+
+            if (elemento.ValueKind == JsonValueKind.Object)
+                {
+                // Primero claves habituales (inglés/español, mayúsculas indistintas)...
+                foreach (var preferida in new[] { "texto", "text", "contenido", "content", "valor", "value", "mensaje", "message", "descripcion", "comparativa", "benchmark" })
+                    {
+                    foreach (var propiedad in elemento.EnumerateObject())
+                        {
+                        if (string.Equals(propiedad.Name, preferida, StringComparison.OrdinalIgnoreCase)
+                            && propiedad.Value.ValueKind == JsonValueKind.String
+                            && !string.IsNullOrWhiteSpace(propiedad.Value.GetString()))
+                            return propiedad.Value.GetString();
+                        }
+                    }
+
+                // ...y si no, se concatenan los strings del objeto.
+                var textos = elemento.EnumerateObject()
+                    .Where(p => p.Value.ValueKind == JsonValueKind.String)
+                    .Select(p => p.Value.GetString())
+                    .Where(s => !string.IsNullOrWhiteSpace(s));
+                var concat = string.Join(" ", textos);
+                return string.IsNullOrWhiteSpace(concat) ? elemento.GetRawText() : concat;
+                }
+
+            return elemento.ValueKind == JsonValueKind.String
+                ? elemento.GetString()
+                : elemento.GetRawText();
+            }
+        }
+
+    /// <summary>
+    /// Igual que el anterior pero para los KPIs: si el modelo manda los números como
+    /// texto ("70.841"), se convierten en vez de romper la lectura.
+    /// </summary>
+    private sealed class LenientNullableDecimalConverter : JsonConverter<decimal?>
+        {
+        public override decimal? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+            switch (reader.TokenType)
+                {
+                case JsonTokenType.Number:
+                    return reader.GetDecimal();
+                case JsonTokenType.String:
+                    var texto = reader.GetString();
+                    if (decimal.TryParse(texto, NumberStyles.Any, CultureInfo.InvariantCulture, out var dec)
+                        || decimal.TryParse(texto, NumberStyles.Any, CultureInfo.CurrentCulture, out dec))
+                        return dec;
+                    return null;
+                case JsonTokenType.True:
+                case JsonTokenType.False:
+                    return reader.GetBoolean() ? 1m : 0m;
+                default:
+                    return null;
+                }
+            }
+
+        public override void Write(Utf8JsonWriter writer, decimal? value, JsonSerializerOptions options)
+            {
+            if (value.HasValue)
+                writer.WriteNumberValue(value.Value);
+            else
+                writer.WriteNullValue();
             }
         }
 
@@ -621,7 +851,9 @@ public class OllamaAIService : IAIService
             {
             KPIs = kpis,
             AccionesEstrategicas = acciones,
-            Escenarios = new List<ScenarioDto>()
+            Escenarios = new List<ScenarioDto>(),
+            ResumenEjecutivo = ai.ResumenEjecutivo ?? string.Empty,
+            EsIA = true
             };
         }
 
@@ -645,6 +877,7 @@ public class OllamaAIService : IAIService
         {
         public ZafraStrategyAiKpisDto? Kpis { get; set; }
         public List<ZafraStrategyAiAccionDto>? AccionesEstrategicas { get; set; }
+        public string? ResumenEjecutivo { get; set; }
         }
 
     private class ZafraStrategyAiKpisDto

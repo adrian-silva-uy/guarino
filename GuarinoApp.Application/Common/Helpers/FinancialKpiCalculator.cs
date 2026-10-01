@@ -147,6 +147,45 @@ public static class FinancialKpiCalculator
         return string.Join(" ", partes);
         }
 
+    /// <summary>
+    /// Veredicto para el comité de dirección: volumen y variación, capital y
+    /// brecha con sus cifras, CAPEX y recomendación principal. Es lo primero que
+    /// lee Gerencia en el tablero; la IA puede reemplazarlo con una versión más
+    /// rica cuando responde, pero este nunca falta.
+    /// </summary>
+    public static string ConstruirResumenEjecutivo(
+        ZafraDto proyectada,
+        FinancialKpiDto kpis,
+        FinancialDataDto? datos)
+        {
+        var partes = new List<string>();
+
+        var volumen = $"La zafra {proyectada.Año} se proyecta en {proyectada.TotalKgs:N0} kg";
+        volumen += proyectada.VariacionPorcentual != 0
+            ? $" ({(proyectada.VariacionPorcentual >= 0 ? "+" : "")}{proyectada.VariacionPorcentual:0.0}% sobre la zafra {proyectada.Año - 1})."
+            : ".";
+        partes.Add(volumen);
+
+        if (datos != null)
+            {
+            var financiero = $"El capital a financiar asciende a ${kpis.CapitalNecesario:N0} ";
+            financiero += kpis.BrechaLiquidez > 0
+                ? $"contra ${datos.FlujoCaja:N0} de caja disponible: falta ${kpis.BrechaLiquidez:N0} y el riesgo de liquidez es {kpis.RiesgoLiquidez}."
+                : $"y la caja de ${datos.FlujoCaja:N0} lo cubre con ${-kpis.BrechaLiquidez:N0} de margen (riesgo de liquidez {kpis.RiesgoLiquidez}).";
+            partes.Add(financiero);
+            }
+        else
+            {
+            partes.Add("Para dimensionar capital y brecha hace falta cargar el costo por kg y el flujo de caja en Contaduría.");
+            }
+
+        partes.Add(kpis.OportunidadCAPEX == "ALTA"
+            ? "La proyección excede la capacidad en curso: corresponde evaluar inversión de CAPEX o tercerización de empaque."
+            : "La proyección cabe dentro de la capacidad instalada: no se requiere inversión de CAPEX por volumen.");
+
+        return string.Join(" ", partes);
+        }
+
     private static string CalcularOportunidadCapex(
         decimal volumenProyectadoKgs,
         decimal capacidadMaxHistoricaKgs,

@@ -228,14 +228,12 @@ public class FallbackAIService : IAIService
         }
 
     /// <summary>
-    /// Fallback sin IA. Los KPIs financieros, la comparativa de benchmark y los
-    /// escenarios salen de FinancialKpiCalculator —la misma fuente que usa la
-    /// página— de modo que los números sean idénticos con o sin motor de IA.
-    /// Los ejes sin fuente de datos conectada (calidad, logística, mano de obra,
-    /// fitosanitario, costo comparado) se agregan como recordatorios operativos
-    /// estándar de industria (Origen="Checklist"), nunca como cifras inventadas
-    /// -- mismos ejes que pide ZafraStrategy.txt, para que el plan se vea igual
-    /// con o sin IA disponible.
+    /// Fallback sin IA. Los KPIs financieros, la comparativa de benchmark, los
+    /// escenarios, el plan de acciones (PlanAccionZafraBuilder) y el resumen
+    /// ejecutivo salen de las mismas fuentes que usa la página — de modo que lo
+    /// visible sea idéntico con o sin motor de IA. Los ejes sin fuente de datos
+    /// conectada se agregan como recordatorios operativos estándar de industria
+    /// (Origen="Checklist"), nunca como cifras inventadas.
     /// </summary>
     private static ZafraStrategyResultDto BuildFallbackZafraStrategy(
         ZafraDto projectedZafra,
@@ -243,8 +241,6 @@ public class FallbackAIService : IAIService
         int stockActualBins,
         FinancialDataDto? datosFinancieros)
         {
-        var esSimulado = projectedZafra.EsDummy;
-        var variacion = projectedZafra.VariacionPorcentual;
         var volumenProyectado = projectedZafra.TotalKgs;
 
         var kpis = FinancialKpiCalculator.Calcular(volumenProyectado, capacidadMaxHistorica, datosFinancieros);
@@ -253,142 +249,18 @@ public class FallbackAIService : IAIService
 
         var escenarios = FinancialKpiCalculator.ConstruirEscenarios(volumenProyectado, datosFinancieros);
 
-        var acciones = new List<BusinessSuggestionDto>();
-
-        // --- Financiero / Logística de capacidad (Calculado: datos reales disponibles acá) ---
-        if (esSimulado)
-            {
-            acciones.Add(new BusinessSuggestionDto
-                {
-                Text = "⚠️ Datos de proyección son simulados. Validar con datos reales de campo antes de comprometer recursos financieros mayores.",
-                Color = "#FF9800",
-                Icon = "warning",
-                Categoria = "Financiero",
-                Origen = "Checklist",
-                Riesgo = "Decisiones tomadas sobre datos simulados pueden no reflejar la realidad de campo."
-                });
-            }
-
-        if (kpis.BrechaLiquidez > 0 && datosFinancieros != null)
-            {
-            acciones.Add(new BusinessSuggestionDto
-                {
-                Text = $"La caja disponible no cubre el capital requerido para la zafra: faltan ${kpis.BrechaLiquidez:N0} " +
-                       $"(capital ${kpis.CapitalNecesario:N0} vs. caja ${datosFinancieros.FlujoCaja:N0} — riesgo {kpis.RiesgoLiquidez}). " +
-                       "Gestionar crédito de temporada, adelanto de clientes o reprogramación de pagos ANTES del pico.",
-                Color = "#F44336",
-                Icon = "account_balance_wallet",
-                Categoria = "Financiero",
-                Origen = "Calculado",
-                Impacto = $"Brecha de ${kpis.BrechaLiquidez:N0} a cubrir antes del inicio de zafra.",
-                Riesgo = "Sin financiamiento oportuno, la zafra se frena en el pico cuando el volumen ya está comprometido con clientes."
-                });
-            }
-
-        if (capacidadMaxHistorica > 0 && volumenProyectado > capacidadMaxHistorica * 1.1m)
-            {
-            var exceso = volumenProyectado - capacidadMaxHistorica;
-            acciones.Add(new BusinessSuggestionDto
-                {
-                Text = $"La proyección supera la capacidad histórica en {exceso:N0} kg. Evaluar contratación de turno extra o tercerización de empaque.",
-                Color = "#F44336",
-                Icon = "speed",
-                Categoria = "ManoDeObra",
-                Origen = "Calculado",
-                Impacto = $"Exceso de {exceso:N0} kg sobre capacidad histórica.",
-                Riesgo = "Sin turno extra, riesgo de cuello de botella en el pico de zafra."
-                });
-            }
-        else if (stockActualBins > 0 && volumenProyectado < capacidadMaxHistorica * 0.8m)
-            {
-            acciones.Add(new BusinessSuggestionDto
-                {
-                Text = "Volumen proyectado inferior al histórico. Optimizar turnos de empaque para reducir costos fijos y liberar capacidad de frío.",
-                Color = "#2196F3",
-                Icon = "trending_down",
-                Categoria = "ManoDeObra",
-                Origen = "Calculado"
-                });
-            }
-
-        if (variacion > 10)
-            {
-            var incremento = (int)(stockActualBins * 0.15);
-            acciones.Add(new BusinessSuggestionDto
-                {
-                Text = $"Crecimiento proyectado del {variacion:F1}%. Anticipar compra de insumos para {incremento} bins adicionales y asegurar precios.",
-                Color = "#4CAF50",
-                Icon = "shopping_cart",
-                Categoria = "Financiero",
-                Origen = "Calculado",
-                Impacto = $"{incremento} bins adicionales de insumos estimados."
-                });
-            }
-        else if (variacion < -5)
-            {
-            acciones.Add(new BusinessSuggestionDto
-                {
-                Text = $"Descenso proyectado del {Math.Abs(variacion):F1}%. Revisar contratos de insumos para reducir volúmenes y liberar flujo de caja.",
-                Color = "#9C27B0",
-                Icon = "account_balance",
-                Categoria = "Financiero",
-                Origen = "Calculado"
-                });
-            }
-
-        // --- Ejes sin fuente de datos real conectada todavía: recordatorio operativo estándar ---
-        acciones.Add(new BusinessSuggestionDto
-            {
-            Text = "Definir meta de packout rate para la próxima zafra y plan de calibración óptica antes del pico.",
-            Color = "#795548",
-            Icon = "grading",
-            Categoria = "Calidad",
-            Origen = "Checklist",
-            Riesgo = "Sin esta revisión, la merma real puede superar lo presupuestado sin que se detecte a tiempo."
-            });
-
-        acciones.Add(new BusinessSuggestionDto
-            {
-            Text = "Confirmar disponibilidad de contenedores refrigerados y turnos de puerto para el volumen proyectado del pico.",
-            Color = "#3F51B5",
-            Icon = "local_shipping",
-            Categoria = "Logistica",
-            Origen = "Checklist"
-            });
-
-        acciones.Add(new BusinessSuggestionDto
-            {
-            Text = "Relevar disponibilidad de personal temporal en la zona antes del inicio del pico de zafra.",
-            Color = "#009688",
-            Icon = "groups",
-            Categoria = "ManoDeObra",
-            Origen = "Checklist"
-            });
-
-        acciones.Add(new BusinessSuggestionDto
-            {
-            Text = "Verificar vigencia de certificaciones (GlobalGAP, PPECB u otras según mercado destino) antes del inicio de zafra.",
-            Color = "#8BC34A",
-            Icon = "verified",
-            Categoria = "Fitosanitario",
-            Origen = "Checklist",
-            Riesgo = "Un rechazo fitosanitario en destino invalida la proyección financiera de ese lote."
-            });
-
-        acciones.Add(new BusinessSuggestionDto
-            {
-            Text = "Relevar costo de flete actual por mercado de destino para poder comparar contra benchmark internacional en la próxima ronda.",
-            Color = "#607D8B",
-            Icon = "compare_arrows",
-            Categoria = "CostoComparado",
-            Origen = "Checklist"
-            });
+        // Plan de acciones y resumen: misma construcción determinista que usa la página,
+        // de modo que lo visible sea idéntico venga la IA o no.
+        var acciones = PlanAccionZafraBuilder.Construir(projectedZafra, capacidadMaxHistorica, stockActualBins, datosFinancieros, kpis);
+        var resumen = FinancialKpiCalculator.ConstruirResumenEjecutivo(projectedZafra, kpis, datosFinancieros);
 
         return new ZafraStrategyResultDto
             {
             KPIs = kpis,
             AccionesEstrategicas = acciones,
-            Escenarios = escenarios
+            Escenarios = escenarios,
+            ResumenEjecutivo = resumen,
+            EsIA = false
             };
         }
     }

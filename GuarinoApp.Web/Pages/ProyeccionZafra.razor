@@ -18,38 +18,83 @@
 @inject ILogger<ProyeccionZafra> Logger
 @inject IDialogService DialogService
 @inject NavigationManager NavManager
+@inject IJSRuntime JS
 
 <PageTitle>Tablero de Decisión Financiera - Zafra @(_anioProyectado?.ToString() ?? "")</PageTitle>
 
+<style>
+    /* Vista de impresión: Contaduría imprime este tablero en papel (usuarios que
+       necesitan leerlo físico). Se ocultan navegación, barra superior y controles;
+       las tarjetas no se parten entre páginas y se conservan los colores de los
+       badges (ALTO/MEDIO/BAJO) para que se lean igual de bien en gris. */
+    @@media print {
+        .no-print, .mud-appbar, .mud-drawer, .mud-overlay, .apexcharts-toolbar {
+            display: none !important;
+        }
+
+        .mud-main-content, .mud-container, .container-fluid {
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: none !important;
+        }
+
+        body, .mud-layout {
+            background: #fff !important;
+        }
+
+        .mud-card, .mud-table, .mud-alert {
+            break-inside: avoid;
+            page-break-inside: avoid;
+            box-shadow: none !important;
+        }
+
+        * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+    }
+</style>
+
 <div class="container-fluid p-4">
     <!-- Encabezado Estratégico -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="fw-bold text-dark">Tablero de Decisión Financiera</h2>
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+        <div class="me-4">
+            <h2 class="fw-bold text-dark mb-1">Tablero de Decisión Financiera</h2>
             <p class="text-muted mb-0">Proyección de la próxima zafra — lectura ejecutiva para Gerencia y Contaduría</p>
         </div>
         <div class="text-end">
+            <!-- Fila propia del distintivo de zafra: separada del título y del subtítulo
+                 para que respire (antes quedaba todo muy junto en la misma línea). -->
+            <div class="d-flex align-items-center justify-content-end flex-wrap gap-2 mb-2">
+                @if (_anioProyectado.HasValue)
+                {
+                    <div class="rounded-pill px-4 py-2 fw-bold shadow"
+                         style="background: linear-gradient(135deg, #1976D2 0%, #009688 100%); color: #fff; font-size: 1.3rem; letter-spacing: 1px; line-height: 1.5;">
+                        ZAFRA @_anioProyectado
+                    </div>
+                }
+                else
+                {
+                    <span class="badge bg-info text-white">Próxima zafra</span>
+                }
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Print" OnClick="Imprimir" Class="no-print">
+                    Imprimir / PDF
+                </MudButton>
+            </div>
             @if (_anioProyectado.HasValue)
             {
-                <div class="d-inline-block rounded-pill px-4 py-2 fw-bold shadow"
-                     style="background: linear-gradient(135deg, #1976D2 0%, #009688 100%); color: #fff; font-size: 1.3rem; letter-spacing: 1px;">
-                    ZAFRA @_anioProyectado
-                </div>
-                <div class="text-muted mt-2" style="font-size: 0.85rem;">
+                <div class="text-muted" style="font-size: 0.85rem; line-height: 1.6;">
                     Próxima zafra proyectada
                     @if (_anioActual.HasValue)
                     {
-                        <span> · zafra @_anioActual en curso: @(_totalActualKgs?.ToString("N0")) kg registrados</span>
+                        <div>zafra @_anioActual en curso: @(_totalActualKgs?.ToString("N0")) kg registrados</div>
                     }
                 </div>
             }
-            else
-            {
-                <span class="badge bg-info text-white">Próxima zafra</span>
-            }
             @if (_zafras != null && _zafras.Any(z => z.EsDummy))
             {
-                <div class="mt-1">
+                <div class="mt-2">
                     <span class="badge bg-warning text-dark">⚠️ Datos Simulados</span>
                 </div>
             }
@@ -91,6 +136,19 @@
         </MudAlert>
     }
 
+    <!-- Resumen ejecutivo: lo primero que lee Gerencia antes de bajar a los números -->
+    @if (!_loading && !string.IsNullOrEmpty(_resumenEjecutivo))
+    {
+        <MudCard Elevation="1" Class="mb-4 border-start border-4 border-primary">
+            <MudCardContent Class="py-3">
+                <MudText Typo="Typo.subtitle1" Class="fw-bold mb-1" Color="Color.Primary">
+                    📋 Resumen para la Dirección
+                </MudText>
+                <MudText Typo="Typo.body1" Style="line-height: 1.7;">@_resumenEjecutivo</MudText>
+            </MudCardContent>
+        </MudCard>
+    }
+
     <MudCard Elevation="1">
         <MudCardContent>
             @if (_loading)
@@ -122,11 +180,7 @@
                                         <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="text-transform: uppercase; font-weight: bold;">
                                             Capital de Trabajo Necesario
                                         </MudText>
-                                        @if (_cargandoEstrategia)
-                                        {
-                                            <MudText Typo="Typo.h4" Class="mt-1 fw-bold text-primary">Calculando...</MudText>
-                                        }
-                                        else if (_kpiFinanciero != null)
+                                        @if (_kpiFinanciero != null)
                                         {
                                             <MudText Typo="Typo.h4" Class="mt-1 fw-bold text-primary">
                                                 $@_kpiFinanciero.CapitalNecesario.ToString("N0")
@@ -183,11 +237,7 @@
                                         <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="text-transform: uppercase; font-weight: bold;">
                                             Índice de Riesgo de Liquidez
                                         </MudText>
-                                        @if (_cargandoEstrategia)
-                                        {
-                                            <MudText Typo="Typo.h4" Class="mt-1 fw-bold text-primary">Calculando...</MudText>
-                                        }
-                                        else if (_kpiFinanciero != null)
+                                        @if (_kpiFinanciero != null)
                                         {
                                             <MudText Typo="Typo.h4" Class="mt-1 fw-bold" Style="@_riesgoColor">
                                                 @_kpiFinanciero.RiesgoLiquidez
@@ -220,11 +270,7 @@
                                         <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="text-transform: uppercase; font-weight: bold;">
                                             Oportunidad de Inversión (CAPEX)
                                         </MudText>
-                                        @if (_cargandoEstrategia)
-                                        {
-                                            <MudText Typo="Typo.h4" Class="mt-1 fw-bold text-primary">Calculando...</MudText>
-                                        }
-                                        else if (_kpiFinanciero != null)
+                                        @if (_kpiFinanciero != null)
                                         {
                                             <MudText Typo="Typo.h4" Class="mt-1 fw-bold text-success">
                                                 @_kpiFinanciero.OportunidadCAPEX
@@ -249,37 +295,173 @@
                     </MudItem>
                 </MudGrid>
 
-                <!-- Fila 2: Análisis de Benchmarking -->
-                @if (!_cargandoEstrategia && _kpiFinanciero != null && !string.IsNullOrEmpty(_kpiFinanciero.ComparativaBenchmark))
+                <!-- Fila 2: Análisis de Benchmarking — métricas clave + lectura ejecutiva -->
+                @if (_proyectadaRef != null && _kpiFinanciero != null && !string.IsNullOrEmpty(_kpiFinanciero.ComparativaBenchmark))
                 {
                     <MudDivider Class="my-4" />
-                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
-                        <MudIcon Icon="@Icons.Material.Filled.DataUsage" Class="me-2" Color="Color.Info" />
-                        <strong>Análisis de Benchmarking:</strong>
-                        <MudText Typo="Typo.body2" Class="ms-2">
-                            @_kpiFinanciero.ComparativaBenchmark
-                        </MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="ms-2 d-block mt-1">
+                    <MudCard Elevation="1" Class="mb-4">
+                        <MudCardContent>
+                            <div class="d-flex align-items-center mb-3">
+                                <MudIcon Icon="@Icons.Material.Filled.DataUsage" Color="Color.Info" Class="me-2" />
+                                <MudText Typo="Typo.h6" Class="fw-bold mb-0">Análisis de Benchmarking</MudText>
+                            </div>
+
+                            <!-- Métricas de referencia, con cifras propias: escanear en 5 segundos -->
+                            <MudGrid Class="mb-3">
+                                <MudItem xs="12" sm="6" md="3">
+                                    <div class="rounded p-2 text-center h-100" style="background: #E3F2FD;">
+                                        <MudText Typo="Typo.caption" Class="d-block" Color="Color.Tertiary">
+                                            Variación vs. zafra @((_anioProyectado ?? 0) - 1)
+                                        </MudText>
+                                        <MudText Typo="Typo.h5" Class="fw-bold" Style="color: #1976D2;">@_variacionTexto</MudText>
+                                        @if (!string.IsNullOrEmpty(_kgsAnteriorTexto))
+                                        {
+                                            <MudText Typo="Typo.caption" Class="d-block" Color="Color.Tertiary">
+                                                @_kgsAnteriorTexto → @_proyectadaRef.TotalKgs.ToString("N0") kg
+                                            </MudText>
+                                        }
+                                    </div>
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <div class="rounded p-2 text-center h-100" style="background: #E8F5E9;">
+                                        <MudText Typo="Typo.caption" Class="d-block" Color="Color.Tertiary">% de la mejor zafra</MudText>
+                                        <MudText Typo="Typo.h5" Class="fw-bold" Style="color: #2E7D32;">@_pctMejorZafraTexto</MudText>
+                                        @if (_capacidadMaxRef > 0)
+                                        {
+                                            <MudText Typo="Typo.caption" Class="d-block" Color="Color.Tertiary">
+                                                récord: @_capacidadMaxRef.ToString("N0") kg (@_capacidadMaxAnio)
+                                            </MudText>
+                                        }
+                                    </div>
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <div class="rounded p-2 text-center h-100" style="background: #FFF3E0;">
+                                        <MudText Typo="Typo.caption" Class="d-block" Color="Color.Tertiary">% de capacidad instalada</MudText>
+                                        <MudText Typo="Typo.h5" Class="fw-bold" Style="color: #E65100;">@_pctCapacidadTexto</MudText>
+                                        @if (_datosFinancieros is { CapacidadInstalada: > 0 })
+                                        {
+                                            <MudText Typo="Typo.caption" Class="d-block" Color="Color.Tertiary">
+                                                techo: @_datosFinancieros.CapacidadInstalada.ToString("N0") kg
+                                            </MudText>
+                                        }
+                                    </div>
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <div class="rounded p-2 text-center h-100" style="background: #FFEBEE;">
+                                        <MudText Typo="Typo.caption" Class="d-block" Color="Color.Tertiary">Brecha de caja</MudText>
+                                        @if (_datosFinancieros != null)
+                                        {
+                                            <MudText Typo="Typo.h5" Class="fw-bold"
+                                                     Style="@(_kpiFinanciero.BrechaLiquidez > 0 ? "color: #C62828;" : "color: #2E7D32;")">
+                                                @(_kpiFinanciero.BrechaLiquidez > 0
+                                                    ? $"${_kpiFinanciero.BrechaLiquidez:N0}"
+                                                    : "Sin brecha")
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Class="d-block" Color="Color.Tertiary">
+                                                capital $@_kpiFinanciero.CapitalNecesario.ToString("N0") vs. caja $@_datosFinancieros.FlujoCaja.ToString("N0")
+                                            </MudText>
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.h5" Class="fw-bold text-secondary">N/D</MudText>
+                                            <MudText Typo="Typo.caption" Class="d-block" Color="Color.Tertiary">complete en Contaduría</MudText>
+                                        }
+                                    </div>
+                                </MudItem>
+                            </MudGrid>
+
+                            <!-- Lectura ejecutiva del benchmark -->
+                            <MudText Typo="Typo.body1" Style="line-height: 1.7;">@_kpiFinanciero.ComparativaBenchmark</MudText>
+
+                            <!-- Insumos usados: visibles y trazables, para que Contaduría sepa
+                                 exactamente con qué cifras se tomó cada decisión -->
                             @if (_datosFinancieros != null)
                             {
-                                <span>
-                                    Capital y brecha calculados con sus cifras vigentes de Contaduría;
-                                    puede actualizarlas en ese módulo cuando lo desee.
-                                </span>
+                                <div class="mt-3 pt-3" style="border-top: 1px dashed #dee2e6;">
+                                    <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                                        <MudText Typo="Typo.subtitle2" Class="me-1">Insumos de Contaduría:</MudText>
+                                        <MudChip Size="Size.Small">Costo $@_datosFinancieros.CostoPorKg.ToString("0.00")/kg</MudChip>
+                                        <MudChip Size="Size.Small">Caja $@_datosFinancieros.FlujoCaja.ToString("N0")</MudChip>
+                                        <MudChip Size="Size.Small">Margen bruto @_datosFinancieros.MargenBruto.ToString("0.#")%</MudChip>
+                                        @if (_datosFinancieros.CostoFlete.HasValue)
+                                        {
+                                            <MudChip Size="Size.Small">Flete $@_datosFinancieros.CostoFlete.Value.ToString("N0")/contenedor</MudChip>
+                                        }
+                                        <MudChip Size="Size.Small">Capacidad @_datosFinancieros.CapacidadInstalada.ToString("N0") kg</MudChip>
+                                    </div>
+                                    <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="d-block">
+                                        Actualizados el @_datosFinancieros.FechaActualizacion.ToString("dd/MM/yyyy")
+                                        @(!string.IsNullOrWhiteSpace(_datosFinancieros.ActualizadoPor) ? $" por {_datosFinancieros.ActualizadoPor}" : "").
+                                        Modifíquelos en el módulo de Contaduría: este tablero se recalcula solo.
+                                    </MudText>
+                                </div>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                }
+
+                <!-- Fila 3: Panorama completo de zafras (histórico + proyección + impacto operativo) -->
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-3">Panorama de Zafras: Histórico y Proyección</MudText>
+                <MudTable Items="@_zafras.OrderBy(z => z.Año)" Hover="true" Dense="true" Striped="true" Breakpoint="Breakpoint.Sm" Class="mb-2">
+                    <HeaderContent>
+                        <MudTh>Zafra</MudTh>
+                        <MudTh>Estado</MudTh>
+                        <MudTh Numeric="true">Volumen (kg)</MudTh>
+                        <MudTh Numeric="true">Variación</MudTh>
+                        <MudTh>Meses pico</MudTh>
+                        <MudTh Numeric="true">Bins</MudTh>
+                        <MudTh Numeric="true">Camiones</MudTh>
+                        <MudTh Numeric="true">Horas empáque</MudTh>
+                        <MudTh>Capacidad</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Zafra"><strong>@context.Año</strong></MudTd>
+                        <MudTd DataLabel="Estado">
+                            @if (context.Estado == "Proyectado")
+                            {
+                                <MudChip Size="Size.Small" Color="Color.Warning">Proyectado</MudChip>
+                            }
+                            else if (context.Estado == "Actual")
+                            {
+                                <MudChip Size="Size.Small" Color="Color.Info">En curso</MudChip>
                             }
                             else
                             {
-                                <span>
-                                    Referencia calculada con el histórico y la capacidad propios de la empresa.
-                                    Si desea afinar capital y brecha con sus cifras, complete el costo por kg y el
-                                    flujo de caja en el módulo de Contaduría (opcional).
-                                </span>
+                                <MudChip Size="Size.Small">Histórico</MudChip>
                             }
-                        </MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Volumen (kg)" Numeric="true">@context.TotalKgs.ToString("N0")</MudTd>
+                        <MudTd DataLabel="Variación" Numeric="true">@(context.VariacionPorcentual != 0 ? $"{(context.VariacionPorcentual >= 0 ? "+" : "")}{context.VariacionPorcentual:0.0}%" : "—")</MudTd>
+                        <MudTd DataLabel="Meses pico">@(string.IsNullOrWhiteSpace(context.MesesPico) ? "—" : context.MesesPico)</MudTd>
+                        <MudTd DataLabel="Bins" Numeric="true">@(context.BinsEstimados?.ToString("N0") ?? "—")</MudTd>
+                        <MudTd DataLabel="Camiones" Numeric="true">@(context.CamionesEstimados?.ToString("N0") ?? "—")</MudTd>
+                        <MudTd DataLabel="Horas empáque" Numeric="true">@(context.HorasEmpaqueEstimadas?.ToString("N0") ?? "—")</MudTd>
+                        <MudTd DataLabel="Capacidad">
+                            @if (context.RiesgoCapacidad)
+                            {
+                                <MudChip Size="Size.Small" Color="Color.Error">Excede</MudChip>
+                            }
+                            else if (context.BinsEstimados.HasValue)
+                            {
+                                <MudChip Size="Size.Small" Color="Color.Success">Sin riesgo</MudChip>
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+                @if (_proyectadaRef != null && !string.IsNullOrWhiteSpace(_proyectadaRef.SupuestosOperativos))
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                        <strong>Supuestos operativos de la proyección @(_proyectadaRef.Año):</strong>
+                        @_proyectadaRef.SupuestosOperativos
                     </MudAlert>
                 }
 
-                <!-- Fila 3: Comparativa de Escenarios -->
+                <!-- Fila 4: Comparativa de Escenarios -->
                 <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-3">Escenarios de Producción vs. Volumen</MudText>
 
                 <MudGrid>
@@ -289,11 +471,7 @@
                                 <MudText Typo="Typo.subtitle1" Class="mb-3" Color="Color.Primary">
                                     Escenarios de Crecimiento
                                 </MudText>
-                                @if (_cargandoEstrategia)
-                                {
-                                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
-                                }
-                                else
+                                @if (_escenarios.Any())
                                 {
                                     <MudTable Items="@_escenarios" Hover="true" Dense="true" Striped="true">
                                         <HeaderContent>
@@ -344,26 +522,69 @@
                     </MudItem>
                 </MudGrid>
 
-                <!-- Fila 4: Recomendaciones Estratégicas -->
+                <!-- Fila 5: Recomendaciones Estratégicas — UN cuadro por eje de decisión
+                     (antes cada acción tenía su tarjeta y las categorías se repetían) -->
                 <MudDivider Class="my-4" />
-                <MudText Typo="Typo.h5" GutterBottom="true" Color="Color.Primary">
-                    🚀 Plan de Acción Estratégico
-                </MudText>
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+                    <MudText Typo="Typo.h5" Color="Color.Primary">
+                        🚀 Plan de Acción Estratégico
+                    </MudText>
+                    <div class="d-flex align-items-center gap-2">
+                        @if (_cargandoEstrategia)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Refinando el análisis con IA...</MudText>
+                        }
+                        @if (_planRefinadoConIA)
+                        {
+                            <MudChip Size="Size.Small" Color="Color.Success">Plan refinado con análisis de IA</MudChip>
+                        }
+                    </div>
+                </div>
                 <MudText Typo="Typo.body2" Class="mb-3 text-muted">
-                    Decisiones de inversión y gestión de riesgo basadas en datos reales y benchmarking.
+                    Un cuadro por eje de decisión — haga clic para ver impacto, riesgo y origen de cada acción.
                 </MudText>
 
-                @if (_cargandoEstrategia)
-                {
-                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2" />
-                    <MudText Typo="Typo.caption" Color="Color.Tertiary">Preparando el plan estratégico (puede tardar unos segundos)...</MudText>
-                }
-                else if (_estrategiaZafra != null && _estrategiaZafra.Any())
+                @if (_estrategiaZafra != null && _estrategiaZafra.Any())
                 {
                     <MudGrid>
-                        @foreach (var sugerencia in _estrategiaZafra)
+                        @foreach (var grupo in _estrategiaZafra
+                            .Where(a => !string.IsNullOrWhiteSpace(a.Categoria))
+                            .GroupBy(a => a.Categoria)
+                            .OrderBy(g => g.Key))
                         {
-                            <MudItem xs="12" sm="6" md="4">
+                            var categoria = grupo.Key ?? "Acciones";
+                            var accionesGrupo = grupo.ToList();
+                            <MudItem xs="12" sm="6" lg="4">
+                                <MudCard Elevation="2" Class="h-100 cursor-pointer hover-shadow" @onclick="() => ExpandirGrupo(categoria, accionesGrupo)">
+                                    <MudCardContent>
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <MudChip Size="Size.Small" Color="@(accionesGrupo.Any(a => a.Origen == "Calculado") ? Color.Primary : Color.Default)">
+                                                @categoria
+                                            </MudChip>
+                                            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                                @accionesGrupo.Count @(accionesGrupo.Count == 1 ? "acción" : "acciones")
+                                            </MudText>
+                                        </div>
+                                        <ul class="ps-3 mb-0">
+                                            @foreach (var accion in accionesGrupo)
+                                            {
+                                                <li class="mb-1">
+                                                    <MudText Typo="Typo.body2">@accion.Text</MudText>
+                                                </li>
+                                            }
+                                        </ul>
+                                        <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-2 d-block">
+                                            Clic para ver detalle de impacto y riesgo
+                                        </MudText>
+                                    </MudCardContent>
+                                </MudCard>
+                            </MudItem>
+                        }
+                        @* Acciones sin categoría explícita: conservan su tarjeta individual *@
+                        @foreach (var sugerencia in _estrategiaZafra.Where(a => string.IsNullOrWhiteSpace(a.Categoria)))
+                        {
+                            <MudItem xs="12" sm="6" lg="4">
                                 <MudCard Elevation="2" Class="h-100 cursor-pointer hover-shadow" @onclick="() => ExpandirSugerencia(sugerencia)">
                                     <MudCardContent>
                                         <div class="d-flex align-items-start">
@@ -371,12 +592,6 @@
                                                 <MudIcon Style="@_iconStyle" Class="@NormalizarClaseIcono(sugerencia.Icon)" />
                                             </div>
                                             <div>
-                                                @if (!string.IsNullOrWhiteSpace(sugerencia.Categoria))
-                                                {
-                                                    <MudChip Size="Size.Small" Color="@(sugerencia.Origen == "Calculado" ? Color.Primary : Color.Default)" Class="mb-1">
-                                                        @sugerencia.Categoria
-                                                    </MudChip>
-                                                }
                                                 <MudText Typo="Typo.body1" Class="fw-bold" Style="@_sugerenciaColor">
                                                     @sugerencia.Text
                                                 </MudText>
@@ -398,9 +613,9 @@
                     </MudAlert>
                 }
 
-                <!-- Controles -->
+                <!-- Controles (solo pantalla) -->
                 <MudDivider Class="my-4" />
-                <div class="d-flex align-items-center flex-wrap gap-3 mb-1">
+                <div class="d-flex align-items-center flex-wrap gap-3 mb-1 no-print">
                     <MudText Typo="Typo.subtitle2" Class="mb-0">
                         Ingrese % de crecimiento manual (deje vacío para usar histórico):
                     </MudText>
@@ -419,7 +634,7 @@
                                      Color="Color.Primary" />
                 </div>
 
-                <div class="text-end mt-3">
+                <div class="text-end mt-3 no-print">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RecalcularProyeccion" Disabled="_loading">
                         Recalcular Proyección y Estrategia
                     </MudButton>
@@ -443,10 +658,9 @@
     private decimal? _totalActualKgs;
 
     // _loading cubre solo la carga de datos reales (rápida: consulta a la base).
-    // _cargandoEstrategia cubre solo la llamada a la IA (puede tardar) -- antes existía
-    // declarada pero nunca se usaba, y toda la página quedaba tapada por _loading hasta que
-    // terminaban AMBAS cosas. Separarlas es lo que hace que la tabla/gráfico se vean de
-    // inmediato aunque la IA todavía esté generando el plan estratégico.
+    // _cargandoEstrategia = la IA está refinando el plan EN SEGUNDO PLANO: el tablero
+    // ya se ve completo con el cálculo local; este flag solo gobierna el indicador
+    // "Refinando el análisis de IA..." junto al título del plan. Nadie espera en pantalla.
     private bool _loading = false;
     private bool _cargandoEstrategia = false;
 
@@ -458,6 +672,20 @@
     private FinancialKpiDto? _kpiFinanciero;
     private List<ScenarioDto> _escenarios = new();
     private FinancialDataDto? _datosFinancieros;
+
+    // Resumen ejecutivo y estado del refinamiento con IA (segundo plano).
+    private string _resumenEjecutivo = string.Empty;
+    private bool _planRefinadoConIA = false;
+    private int _correlativoIA = 0; // invalida respuestas si el usuario recalcula en el medio
+
+    // Datos de referencia para las métricas del benchmark y la tabla de panorama.
+    private ZafraDto? _proyectadaRef;
+    private decimal _capacidadMaxRef;
+    private int? _capacidadMaxAnio;
+    private string _variacionTexto = "—";
+    private string _kgsAnteriorTexto = "";
+    private string _pctMejorZafraTexto = "N/D";
+    private string _pctCapacidadTexto = "N/D";
 
     private decimal? _porcentajeManual = null;
 
@@ -485,10 +713,20 @@
         _loading = true;
         _kpiFinanciero = null;
         _estrategiaZafra = null;
+        _escenarios = new();
         _impactoClimatico = null;
         _anioProyectado = null;
         _anioActual = null;
         _totalActualKgs = null;
+        _proyectadaRef = null;
+        _capacidadMaxRef = 0m;
+        _capacidadMaxAnio = null;
+        _resumenEjecutivo = string.Empty;
+        _planRefinadoConIA = false;
+        _variacionTexto = "—";
+        _kgsAnteriorTexto = "";
+        _pctMejorZafraTexto = "N/D";
+        _pctCapacidadTexto = "N/D";
         StateHasChanged();
 
         List<ZafraDto>? zafras;
@@ -505,6 +743,13 @@
         }
 
         _zafras = zafras;
+
+        // Todas las consultas a la base van acá, en serie y mientras el spinner cubre la
+        // pantalla (el DbContext es único por circuito y no admite operaciones concurrentes):
+        // así la primera pantalla que ve el usuario ya sale completa, sin estados a medio cargar.
+        await CargarDatosFinancierosAsync();
+        await CargarImpactoClimaticoAsync();
+
         _loading = false;
 
         if (_zafras == null || !_zafras.Any())
@@ -543,95 +788,58 @@
             new() { Name = "Proyección", Data = proyeccion, Color = "#FF9800" }
         };
 
-        // A partir de acá ya se ve la tabla/gráfico con datos reales -- lo que sigue (IA) tiene
-        // su propio indicador y no bloquea el resto de la pantalla.
-        StateHasChanged();
-
-        // Cargar datos financieros de Contaduría para cálculos de KPIs
-        await CargarDatosFinancierosAsync();
-
-        // Impacto climático sobre la proyección: se espera (no fire-and-forget) porque comparte
-        // la misma instancia de DbContext (scoped al circuito Blazor) que DashboardService y el
-        // resto de esta página. Lanzarlo en paralelo con esas otras llamadas rompe con
-        // "A second operation was started on this context instance..." (EF Core no admite dos
-        // operaciones concurrentes sobre el mismo DbContext). Es rápida (solo DB, sin IA), así
-        // que el costo de esperarla acá es mínimo. Si falla, simplemente no se muestra la alerta.
-        await CargarImpactoClimaticoAsync();
-
+        // A partir de acá la pantalla ya está completa con el cálculo local; la IA se lanza
+        // en segundo plano con su propio indicador y no bloquea nada de lo visible.
         var proyectada = _zafras.FirstOrDefault(z => z.Estado == "Proyectado");
         if (proyectada == null)
+        {
+            StateHasChanged();
             return;
+        }
 
-        _cargandoEstrategia = true;
-        StateHasChanged();
-
+        decimal capacidadMax = 0m;
+        decimal stockActual = 0m;
         try
         {
             // Capacidad de referencia = MEJOR ZAFRA REAL (excluyo la proyectada; si no,
             // la comparación se haría contra la propia proyección y nunca activaría el riesgo).
-            var capacidadMax = ordenadas
+            capacidadMax = ordenadas
                 .Where(z => z.Estado != "Proyectado")
                 .Select(z => z.TotalKgs)
                 .DefaultIfEmpty(0m)
                 .Max();
-            var stockActual = await DashboardService.GetTotalStockAsync(DateTime.Now);
+            stockActual = await DashboardService.GetTotalStockAsync(DateTime.Now);
 
-            // Si hay datos financieros de Contaduría, calcular KPIs directamente
-            if (_datosFinancieros != null)
-            {
-                CalcularKPIsLocales(proyectada, capacidadMax);
-            }
+            // Cálculo local determinista: KPIs, benchmark, métricas, escenarios, plan de
+            // acción y resumen ejecutivo se pintan YA — sin esperar a la IA y con las
+            // mismas fuentes que usa el servicio de respaldo (números idénticos con o sin IA).
+            _proyectadaRef = proyectada;
+            _capacidadMaxRef = capacidadMax;
+            _capacidadMaxAnio = ordenadas
+                .Where(z => z.Estado != "Proyectado")
+                .OrderByDescending(z => z.TotalKgs)
+                .Select(z => (int?)z.Año)
+                .FirstOrDefault();
 
-            var resultadoIA = await AIService.GetZafraInteligentStrategyAsync(
-                proyectada,
-                capacidadMax,
-                (int)stockActual,
-                history: null,
-                datosFinancieros: _datosFinancieros
-            );
-
-            if (resultadoIA != null)
-            {
-                var kpisIA = resultadoIA.KPIs;
-
-                if (_kpiFinanciero != null)
-                {
-                    // Los KPIs calculados con las cifras de Contaduría son la fuente de
-                    // los números (no se destruyen por una respuesta del modelo); de la IA
-                    // solo se adopta el texto de benchmark si aporta contenido nuevo.
-                    var benchmarkIA = kpisIA?.ComparativaBenchmark?.Trim();
-                    if (!string.IsNullOrWhiteSpace(benchmarkIA) &&
-                        !string.Equals(benchmarkIA, _kpiFinanciero.ComparativaBenchmark, StringComparison.Ordinal))
-                    {
-                        _kpiFinanciero.ComparativaBenchmark =
-                            string.IsNullOrWhiteSpace(_kpiFinanciero.ComparativaBenchmark)
-                                ? benchmarkIA
-                                : $"{_kpiFinanciero.ComparativaBenchmark} {benchmarkIA}";
-                    }
-                }
-                else if (kpisIA != null)
-                {
-                    _kpiFinanciero = kpisIA;
-                }
-
-                _estrategiaZafra = resultadoIA.AccionesEstrategicas;
-
-                _escenarios = resultadoIA.Escenarios != null && resultadoIA.Escenarios.Any()
-                    ? resultadoIA.Escenarios
-                    : FinancialKpiCalculator.ConstruirEscenarios(proyectada.TotalKgs, _datosFinancieros);
-
-                CalcularEstilos();
-            }
+            CalcularKPIsLocales(proyectada, capacidadMax);
+            CalcularMetricasBenchmark(proyectada, ordenadas);
+            _escenarios = FinancialKpiCalculator.ConstruirEscenarios(proyectada.TotalKgs, _datosFinancieros);
+            _estrategiaZafra = PlanAccionZafraBuilder.Construir(
+                proyectada, capacidadMax, (int)stockActual, _datosFinancieros, _kpiFinanciero!);
+            _resumenEjecutivo = FinancialKpiCalculator.ConstruirResumenEjecutivo(
+                proyectada, _kpiFinanciero!, _datosFinancieros);
+            CalcularEstilos();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error al generar la estrategia IA de la próxima zafra");
+            Logger.LogError(ex, "Error al calcular el tablero local de la zafra");
         }
-        finally
-        {
-            _cargandoEstrategia = false;
-            StateHasChanged();
-        }
+
+        _cargandoEstrategia = true;
+        StateHasChanged();
+
+        var token = ++_correlativoIA;
+        _ = RefinarConIAAsync(token, proyectada, capacidadMax, (int)stockActual);
     }
 
     private async Task CargarImpactoClimaticoAsync()
@@ -661,15 +869,13 @@
     }
 
     /// <summary>
-    /// Calcula KPIs y benchmark localmente con los datos de Contaduría usando
-    /// FinancialKpiCalculator —la misma fuente que el servicio de respaldo— para
-    /// que los números sean idénticos venga la IA o no, y no dependan de la
-    /// respuesta de un modelo.
+    /// Calcula KPIs y benchmark localmente usando FinancialKpiCalculator —la misma
+    /// fuente que el servicio de respaldo— para que los números sean idénticos venga
+    /// la IA o no. Funciona también sin datos de Contaduría (muestra N/D en lugar
+    /// de bloquear la lectura del tablero).
     /// </summary>
     private void CalcularKPIsLocales(ZafraDto proyectada, decimal capacidadMax)
     {
-        if (_datosFinancieros == null) return;
-
         _kpiFinanciero = FinancialKpiCalculator.Calcular(proyectada.TotalKgs, capacidadMax, _datosFinancieros);
         _kpiFinanciero.ComparativaBenchmark = FinancialKpiCalculator.ConstruirComparativaBenchmark(
             proyectada, capacidadMax, _datosFinancieros);
@@ -699,6 +905,108 @@
     }
 
     /// <summary>
+    /// Métricas de las cajitas del benchmark: variación interanual, % de la mejor
+    /// zafra y % de capacidad instalada, todas derivadas de datos propios.
+    /// </summary>
+    private void CalcularMetricasBenchmark(ZafraDto proyectada, List<ZafraDto> ordenadas)
+    {
+        _variacionTexto = proyectada.VariacionPorcentual != 0
+            ? $"{(proyectada.VariacionPorcentual >= 0 ? "+" : "")}{proyectada.VariacionPorcentual:0.0}%"
+            : "—";
+
+        var idx = ordenadas.IndexOf(proyectada);
+        _kgsAnteriorTexto = idx > 0 ? ordenadas[idx - 1].TotalKgs.ToString("N0") : "";
+
+        _pctMejorZafraTexto = _capacidadMaxRef > 0
+            ? $"{proyectada.TotalKgs / _capacidadMaxRef * 100:0.0}%"
+            : "N/D";
+
+        _pctCapacidadTexto = _datosFinancieros is { CapacidadInstalada: > 0 }
+            ? $"{proyectada.TotalKgs / _datosFinancieros.CapacidadInstalada * 100:0.0}%"
+            : "N/D";
+    }
+
+    /// <summary>
+    /// Enriquece el tablero con la IA EN SEGUNDO PLANO. El usuario ya ve todo el
+    /// contenido (cálculo local determinista) mientras esto corre; si el motor de IA
+    /// responde, se adoptan su resumen ejecutivo, su texto de benchmark y su plan de
+    /// acciones. Si falla o responde con el mismo cálculo de respaldo, no cambia nada
+    /// en pantalla — nadie espera frente a la pantalla.
+    /// </summary>
+    private async Task RefinarConIAAsync(int token, ZafraDto proyectada, decimal capacidadMax, int stockActual)
+    {
+        try
+        {
+            var resultado = await AIService.GetZafraInteligentStrategyAsync(
+                proyectada,
+                capacidadMax,
+                stockActual,
+                history: null,
+                datosFinancieros: _datosFinancieros);
+
+            if (resultado == null || token != _correlativoIA)
+                return; // se disparó un recálculo en el medio: se descarta la respuesta vieja
+
+            if (_kpiFinanciero != null)
+            {
+                // Los KPIs calculados con las cifras de Contaduría son la fuente de los
+                // números (no se destruyen por una respuesta del modelo); de la IA solo
+                // se adopta el texto de benchmark si aporta contenido nuevo.
+                var benchmarkIA = resultado.KPIs?.ComparativaBenchmark?.Trim();
+                if (!string.IsNullOrWhiteSpace(benchmarkIA) &&
+                    !string.Equals(benchmarkIA, _kpiFinanciero.ComparativaBenchmark, StringComparison.Ordinal))
+                {
+                    _kpiFinanciero.ComparativaBenchmark =
+                        string.IsNullOrWhiteSpace(_kpiFinanciero.ComparativaBenchmark)
+                            ? benchmarkIA
+                            : $"{_kpiFinanciero.ComparativaBenchmark} {benchmarkIA}";
+                }
+            }
+            else if (resultado.KPIs != null)
+            {
+                _kpiFinanciero = resultado.KPIs;
+            }
+
+            if (!string.IsNullOrWhiteSpace(resultado.ResumenEjecutivo))
+                _resumenEjecutivo = resultado.ResumenEjecutivo;
+
+            if (resultado.EsIA && resultado.AccionesEstrategicas != null && resultado.AccionesEstrategicas.Any())
+            {
+                // Solo se adoptan acciones cuando vienen del análisis de IA real:
+                // si el parseo falló, el servicio devuelve líneas de texto de
+                // respaldo que no son un plan y arruinarían el tablero (el plan
+                // local ya es completo y determinista).
+                _estrategiaZafra = resultado.AccionesEstrategicas;
+                _planRefinadoConIA = resultado.EsIA;
+            }
+
+            if (!_escenarios.Any() && resultado.Escenarios != null && resultado.Escenarios.Any())
+                _escenarios = resultado.Escenarios;
+
+            CalcularEstilos();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "No se pudo enriquecer la estrategia de zafra con IA; se mantiene el cálculo local.");
+        }
+        finally
+        {
+            if (token == _correlativoIA)
+            {
+                _cargandoEstrategia = false;
+                try
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // El usuario navegó fuera de la página mientras la IA respondía: no hay nada que pintar.
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Abre el detalle completo de la sugerencia (categoría, origen, impacto, riesgo).
     /// Antes solo hacía Logger.LogInformation -- no había ninguna acción visible para el usuario.
     /// </summary>
@@ -722,6 +1030,47 @@
             string.IsNullOrWhiteSpace(sugerencia.Categoria) ? "Detalle de la Sugerencia" : sugerencia.Categoria,
             (MarkupString)mensaje.ToString(),
             yesText: "Cerrar");
+    }
+
+    /// <summary>
+    /// Detalle de un eje de decisión completo (todas las acciones agrupadas en la
+    /// tarjeta): impacto, riesgo y origen de cada una, sin duplicar tarjetas.
+    /// </summary>
+    private async Task ExpandirGrupo(string categoria, List<BusinessSuggestionDto> acciones)
+    {
+        var mensaje = new System.Text.StringBuilder();
+
+        for (var i = 0; i < acciones.Count; i++)
+        {
+            var accion = acciones[i];
+            var origenTexto = accion.Origen == "Calculado"
+                ? "Calculado a partir de datos reales del sistema."
+                : "Recomendación operativa estándar de industria (checklist).";
+
+            mensaje.Append($"<p><b>{(i + 1)}. {accion.Text}</b></p>");
+            mensaje.Append($"<p style=\"color:#666;\"><i>{origenTexto}</i>");
+
+            if (!string.IsNullOrWhiteSpace(accion.Impacto))
+                mensaje.Append($"<br/><b>Impacto estimado:</b> {accion.Impacto}");
+
+            if (!string.IsNullOrWhiteSpace(accion.Riesgo))
+                mensaje.Append($"<br/><b>Riesgo / trade-off:</b> {accion.Riesgo}");
+
+            mensaje.Append("</p>");
+            if (i < acciones.Count - 1)
+                mensaje.Append("<hr style=\"margin:0.5em 0;\"/>");
+        }
+
+        await DialogService.ShowMessageBox(categoria, (MarkupString)mensaje.ToString(), yesText: "Cerrar");
+    }
+
+    /// <summary>
+    /// Imprime o guarda en PDF con el formato de impresión de esta página
+    /// (se ocultan navegación y controles) — pensado para leer en papel.
+    /// </summary>
+    private async Task Imprimir()
+    {
+        await JS.InvokeVoidAsync("window.print");
     }
 
     private async Task RecalcularProyeccion()
