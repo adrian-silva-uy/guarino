@@ -270,7 +270,6 @@ namespace GuarinoApp.Infrastructure.Data
                         Marca = "Guarino Premium",
                         Categoria = "Primera",
                         Estado = Enum.GetNames(typeof(EstadoPallet)).Length > 0 ? Enum.GetValues(typeof(EstadoPallet)).Cast<EstadoPallet>().First() : default,
-                        EstadoTexto = "F",
                         Cantidad = 1,
                         CantidadEnvases = 56 + (i % 5),
                         PesoNeto = 1008 + (i * 18),

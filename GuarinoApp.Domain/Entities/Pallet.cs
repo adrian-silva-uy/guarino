@@ -19,7 +19,9 @@ public class Pallet : BaseEntity, IAggregateRoot
     public string? Cliente { get; set; }
     public string? Variedad { get; set; }
     public string? Categoria { get; set; }
-    public string? EstadoTexto { get; set; } // Representa 'D', 'F', 'P', 'R'
+    // (Eliminado: EstadoTexto duplicaba al enum Estado — dos fuentes de verdad
+    // del mismo dato, con filtros que perdían filas por comparar NULL en SQL.
+    // El estado vive únicamente en Estado.)
     public EstadoPallet Estado { get; set; }
 
     public string? Productor { get; set; }

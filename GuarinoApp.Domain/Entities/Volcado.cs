@@ -7,7 +7,7 @@ public class Volcado : BaseEntity
     public DateTime FechaVolcado { get; set; }
     public int CantidadBins { get; set; }
     public decimal PesoKilos { get; set; }
-    public int? IdBascula { get; set; } // Legacy, reemplazar por Canal.
+    // (Eliminado: IdBascula legacy sin FK ni uso — la bascula se referencia por Canal.)
     public CanalDistribucion Canal { get; set; }
     public virtual Lote Lote { get; set; } = null!;
     }

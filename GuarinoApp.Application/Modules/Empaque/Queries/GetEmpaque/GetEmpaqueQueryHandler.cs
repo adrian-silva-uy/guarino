@@ -1,5 +1,6 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Empaque.Dtos;
+using GuarinoApp.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -26,8 +27,9 @@ public class GetEmpaqueQueryHandler : IRequestHandler<GetEmpaqueQuery, List<Empa
             var queryResult = await _context.Pallets
                 .AsNoTracking()
 
-                // Filtramos por EstadoTexto (Asumiendo que 'B' es "Baja" o "Borrado")
-                .Where(p => p.EstadoTexto != "B")
+                // Excluimos bajas (EstadoPallet.Bajado): el estado vive solo en el enum,
+                // sin comparar contra la columna de texto que perdía filas NULL.
+                .Where(p => p.Estado != EstadoPallet.Bajado)
 
                 // Agrupamos por la propiedad que represente el Empaque (Asumo 'Envase'. Si es 'Embalaje', cámbialo aquí)
                 // Usamos "??" para evitar que los nulos rompan la agrupación

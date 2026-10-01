@@ -24,12 +24,13 @@ public class GetRegistroPesadasQueryHandler : IRequestHandler<GetRegistroPesadas
         try
             {
 
-            // Construimos la consulta usando Join explícito para asegurar que funcione
-            // sin depender de propiedades de navegación en LotesEmboquille si no existen.
+            // Joins explícitos sobre las FK normalizadas: LoteId (antes el LEFT
+            // JOIN de báscula apuntaba a b.IdBascula, columna muerta de la
+            // maestra que siempre vale 0, y nunca matcheaba).
             var query = from le in _context.LotesEmboquille.AsNoTracking()
-                        join l in _context.Lotes.AsNoTracking() on le.IdLote equals l.Id
+                        join l in _context.Lotes.AsNoTracking() on le.LoteId equals l.Id
                         join p in _context.Productores.AsNoTracking() on l.ProductorId equals p.Id
-                        join b in _context.Basculas.AsNoTracking() on le.IdBascula equals b.IdBascula into bg
+                        join b in _context.Basculas.AsNoTracking() on le.IdBascula equals b.Id into bg
                         from b in bg.DefaultIfEmpty() // LEFT JOIN para Bascula (puede ser null)
                         orderby le.FechaProduccion descending // LotesEmboquille tiene FechaVolcado corresponde a FechaProduccion
                         select new RegistroPesadaDto

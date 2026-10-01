@@ -139,6 +139,22 @@ namespace GuarinoApp.Infrastructure.Data
                 .HasForeignKey(le => le.IdEmpaque)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Lote/Emboquille: antes eran relaciones por convención con FK shadow
+            // (LoteId/EmboquilleId) mientras la entidad declaraba IdLote/IdEmboquille
+            // como columnas muertas — 4 columnas para 2 relaciones. Ahora la entidad
+            // declara las FKs reales y el mapeo es explícito.
+            modelBuilder.Entity<LoteEmboquille>()
+                .HasOne(le => le.Lote)
+                .WithMany()
+                .HasForeignKey(le => le.LoteId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<LoteEmboquille>()
+                .HasOne(le => le.Emboquille)
+                .WithMany()
+                .HasForeignKey(le => le.EmboquilleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             modelBuilder.Entity<Variedad>()
                 .HasOne(v => v.Especie)
                 .WithMany()

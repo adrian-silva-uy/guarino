@@ -2,6 +2,7 @@ using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Lugares.Queries.GetLugares;
 using GuarinoApp.Application.Modules.PalletsContramarca.Dtos;
 using GuarinoApp.Domain.Entities;
+using GuarinoApp.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -25,8 +26,8 @@ public class GetPalletsContramarcaQueryHandler : IRequestHandler<GetPalletsContr
             {
             var query = _context.Pallets
                 .AsNoTracking()
-                // Filtramos excluyendo el estado 'B' (Baja/Borrador) usando el campo string EstadoTexto
-                .Where(p => p.EstadoTexto != "B");
+                // Excluimos bajas (EstadoPallet.Bajado): el estado vive solo en el enum.
+                .Where(p => p.Estado != EstadoPallet.Bajado);
 
             var result = await query
                 .GroupBy(p => p.Contramarca)

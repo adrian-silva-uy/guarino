@@ -43,8 +43,10 @@ public class EventoClimatico : BaseEntity
     public decimal? PorcentajePerdidaEstimada { get; set; }
 
     /// <summary>
-    /// Kilos de producción estimados perdidos
-    /// Calculado: PorcentajePerdidaEstimada * ProyeccionLote
+    /// Kilos de producción estimados perdidos.
+    /// Calculado al persistir el evento: PorcentajePerdidaEstimada × KilosNetos
+    /// del lote (snapshot: el valor histórico no cambia si el lote se actualiza
+    /// después). Lo completa OpenMeteoClimateService.CalcularKilosPerdidosAsync.
     /// </summary>
     public decimal? KilosPerdidosEstimados { get; set; }
 

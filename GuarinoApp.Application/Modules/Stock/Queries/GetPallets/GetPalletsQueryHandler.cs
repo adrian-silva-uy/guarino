@@ -11,25 +11,6 @@ public class GetPalletsQueryHandler : IRequestHandler<GetPalletsQuery, PalletsRe
     private readonly IApplicationDbContext _context;
     private readonly ILogger<GetPalletsQueryHandler> _logger;
 
-    // Mapeo inverso de la etiqueta legible -> enum. Existe porque el filtro de la UI (ver
-    // stockgeneral.razor: _availableEstados sale de p.Estado ya traducido por
-    // EstadoPalletExtensions.MapEstado) le manda al handler la etiqueta legible, no el nombre
-    // del enum ni el código legado. Sin este mapeo, Enum.TryParse falla silenciosamente para
-    // "En Frío"/"Pre Frío" (no son nombres válidos de EstadoPallet) y el Where termina
-    // comparando la etiqueta contra EstadoTexto (que guarda "D"/"F"/"P"/"R"), que nunca matchea.
-    //
-    // NOTA: esto duplica, en sentido inverso, la misma tabla de equivalencias que ya vive en
-    // EstadoPalletExtensions.MapEstado. Si me pasás ese archivo, lo correcto es mover este
-    // mapeo ahí (p.ej. EstadoPalletExtensions.TryParseEtiqueta) para tener una sola fuente de
-    // verdad en vez de dos lugares con los mismos 4 pares clave-valor.
-    private static readonly Dictionary<string, EstadoPallet> EstadoPorEtiqueta = new(StringComparer.OrdinalIgnoreCase)
-        {
-        ["Despachado"] = EstadoPallet.Despachado,
-        ["En Frío"] = EstadoPallet.EnFrio,
-        ["Pre Frío"] = EstadoPallet.PreFrio,
-        ["Rearmado"] = EstadoPallet.Rearmado
-        };
-
     public GetPalletsQueryHandler(
         IApplicationDbContext context,
         ILogger<GetPalletsQueryHandler> logger)
@@ -42,7 +23,10 @@ public class GetPalletsQueryHandler : IRequestHandler<GetPalletsQuery, PalletsRe
         {
         try
             {
-            var query = _context.Pallets.AsNoTracking().Where(p => p.EstadoTexto != "B");
+            // El estado vive en una sola columna (enum Estado). El 'B' (Baja)
+            // que antes se excluía desde la columna duplicada EstadoTexto ahora
+            // es un miembro del enum: filtrar por él no pierde filas por NULL.
+            var query = _context.Pallets.AsNoTracking().Where(p => p.Estado != EstadoPallet.Bajado);
 
             // Filtro por Zafra (mapeado a la propiedad Produccion)
             if (!string.IsNullOrWhiteSpace(request.Zafra))
@@ -50,23 +34,28 @@ public class GetPalletsQueryHandler : IRequestHandler<GetPalletsQuery, PalletsRe
                 query = query.Where(p => p.Produccion == request.Zafra);
                 }
 
-            // Filtro por Estado: acepta el nombre del enum, la etiqueta legible que muestra la
-            // UI, o el código legado ('D'/'F'/'P'/'R') tal cual viene en EstadoTexto.
+            // Filtro por Estado: acepta el nombre del enum, la etiqueta legible
+            // que muestra la UI o el código legado ('D'/'F'/'P'/'R'/'B'). Las
+            // tres formas se resuelven contra la misma tabla de equivalencias
+            // (EstadoPalletExtensions), sin duplicar mapeos en este archivo.
             if (!string.IsNullOrWhiteSpace(request.Estado))
                 {
                 var estadoFiltro = request.Estado.Trim();
 
                 if (Enum.TryParse<EstadoPallet>(estadoFiltro, true, out var estadoEnum))
                     {
-                    query = query.Where(p => p.Estado == estadoEnum || p.EstadoTexto == estadoFiltro);
+                    query = query.Where(p => p.Estado == estadoEnum);
                     }
-                else if (EstadoPorEtiqueta.TryGetValue(estadoFiltro, out var estadoDesdeEtiqueta))
+                else if (EstadoPalletExtensions.TryParse(estadoFiltro, out var estadoTraducido))
                     {
-                    query = query.Where(p => p.Estado == estadoDesdeEtiqueta);
+                    query = query.Where(p => p.Estado == estadoTraducido);
                     }
                 else
                     {
-                    query = query.Where(p => p.EstadoTexto == estadoFiltro);
+                    // Valor desconocido: estado inexistente, ninguna fila
+                    // coincide (el caller cae en el fallback de datos dummy,
+                    // igual que antes con el filtro por texto).
+                    query = query.Where(p => p.Estado == (EstadoPallet)(-1));
                     }
                 }
 
@@ -85,7 +74,7 @@ public class GetPalletsQueryHandler : IRequestHandler<GetPalletsQuery, PalletsRe
                 Codigo = p.Codigo,
                 LoteCodigo = p.Lote ?? string.Empty,
                 Variedad = string.IsNullOrWhiteSpace(p.Variedad) ? "Sin variedad" : p.Variedad,
-                Estado = EstadoPalletExtensions.MapEstado(p.EstadoTexto, p.Estado),
+                Estado = p.Estado.ToDisplayName(),
                 Cliente = string.IsNullOrWhiteSpace(p.Cliente) ? "Sin cliente" : p.Cliente,
                 Zafra = p.Produccion
                 }).ToList();

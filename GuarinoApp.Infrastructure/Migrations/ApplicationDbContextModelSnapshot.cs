@@ -108,9 +108,6 @@ namespace GuarinoApp.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("IdBascula")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -142,9 +139,6 @@ namespace GuarinoApp.Infrastructure.Migrations
                     b.Property<string>("Descripcion")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("IdDestinoInterno")
-                        .HasColumnType("int");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -178,9 +172,6 @@ namespace GuarinoApp.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("IdEmboquille")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -213,9 +204,6 @@ namespace GuarinoApp.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("IdEmpaque")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -247,9 +235,6 @@ namespace GuarinoApp.Infrastructure.Migrations
                     b.Property<string>("Descripcion")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("IdEspecie")
-                        .HasColumnType("int");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -585,13 +570,7 @@ namespace GuarinoApp.Infrastructure.Migrations
                     b.Property<int?>("IdDestinoInterno")
                         .HasColumnType("int");
 
-                    b.Property<int>("IdEmboquille")
-                        .HasColumnType("int");
-
                     b.Property<int?>("IdEmpaque")
-                        .HasColumnType("int");
-
-                    b.Property<int>("IdLote")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsDeleted")
@@ -759,9 +738,6 @@ namespace GuarinoApp.Infrastructure.Migrations
 
                     b.Property<int>("Estado")
                         .HasColumnType("int");
-
-                    b.Property<string>("EstadoTexto")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FecCosecha")
                         .HasColumnType("nvarchar(max)");
@@ -971,9 +947,6 @@ namespace GuarinoApp.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("IdResponsable")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -1146,9 +1119,6 @@ namespace GuarinoApp.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("IdTipoLote")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -1222,9 +1192,6 @@ namespace GuarinoApp.Infrastructure.Migrations
 
                     b.Property<DateTime>("FechaVolcado")
                         .HasColumnType("datetime2");
-
-                    b.Property<int?>("IdBascula")
-                        .HasColumnType("int");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");

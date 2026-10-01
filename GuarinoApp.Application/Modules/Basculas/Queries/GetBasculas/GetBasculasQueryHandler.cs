@@ -22,7 +22,7 @@ public class GetBasculasQueryHandler : IRequestHandler<GetBasculasQuery, List<Ba
                 .Where(b => !b.IsDeleted)
                 .Select(b => new BasculaDto
                     {
-                    Id = b.IdBascula,
+                    Id = b.Id,
                     Descripcion = b.Descripcion,
                     Ubicacion = string.Empty,
                     Estado = "Activa"

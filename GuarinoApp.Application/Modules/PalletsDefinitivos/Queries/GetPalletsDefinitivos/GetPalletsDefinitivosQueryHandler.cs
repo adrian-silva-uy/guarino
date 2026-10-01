@@ -1,5 +1,6 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.PalletsDefinitivos.Dtos;
+using GuarinoApp.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -49,7 +50,7 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
                     Marca = p.Marca,
                     Cliente = p.Cliente,
                     Variedad = p.Variedad,
-                    Estado = p.EstadoTexto ?? p.Estado.ToString(),
+                    Estado = p.Estado.ToDisplayName(),
                     Productor = p.Productor,
                     TipoPallet = p.TipoPallet,
                     FormaEmbalado = p.FormaEmbalado,

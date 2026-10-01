@@ -2,8 +2,12 @@ using GuarinoApp.Domain.Shared;
 namespace GuarinoApp.Domain.Entities;
 public class LoteEmboquille : BaseEntity
     {
-    public int IdLote { get; set; }
-    public int IdEmboquille { get; set; }
+    // FKs explícitas a Lote y Emboquille: antes existían AMBOS pares
+    // (IdLote/IdEmboquille como columnas muertas + LoteId/EmboquilleId como
+    // shadow FK de EF), una violación de normalización con 4 columnas para
+    // 2 relaciones. Hoy LoteId/EmboquilleId son la única fuente de verdad.
+    public int LoteId { get; set; }
+    public int EmboquilleId { get; set; }
     public DateTime FechaProduccion { get; set; }
     public decimal KilosNetos { get; set; }
     public int CantidadBins { get; set; }

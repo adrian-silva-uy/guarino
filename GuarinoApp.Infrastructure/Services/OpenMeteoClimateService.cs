@@ -180,11 +180,37 @@ namespace GuarinoApp.Infrastructure.Services
 
             if (allEventos.Any())
                 {
+                await CalcularKilosPerdidosAsync(allEventos, cancellationToken);
                 await _context.EventosClimaticos.AddRangeAsync(allEventos, cancellationToken);
                 }
 
             await _context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Escaneo climático finalizado. Eventos nuevos insertados: {Total}.", allEventos.Count);
+            }
+
+        /// <summary>
+        /// Completa el indicador derivado "kilos perdidos" al momento de persistir:
+        /// porcentaje estimado × kilos del lote. Es un snapshot del evento (si el
+        /// lote cambia después, el histórico no se reescribe). Antes el campo
+        /// quedaba en NULL porque ningún escritor lo calculaba y el KPI del
+        /// dashboard sumaba cero.
+        /// </summary>
+        private async Task CalcularKilosPerdidosAsync(
+            List<EventoClimatico> eventos,
+            CancellationToken cancellationToken)
+            {
+            var loteIds = eventos.Select(e => e.LoteId).Distinct().ToList();
+            var kilosPorLote = await _context.Lotes
+                .AsNoTracking()
+                .Where(l => loteIds.Contains(l.Id))
+                .ToDictionaryAsync(l => l.Id, l => l.KilosNetos, cancellationToken);
+
+            foreach (var ev in eventos)
+                {
+                if (ev.PorcentajePerdidaEstimada is not decimal porcentaje) continue;
+                if (!kilosPorLote.TryGetValue(ev.LoteId, out var kilos)) continue;
+                ev.KilosPerdidosEstimados = Math.Round(kilos * porcentaje / 100m, 2);
+                }
             }
 
         private async Task<List<EventoClimatico>> ProcesarLoteAsync(

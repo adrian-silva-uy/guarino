@@ -1,5 +1,6 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.PalletsSinCliente.Dtos;
+using GuarinoApp.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -29,11 +30,10 @@ public class GetPalletsSinClienteQueryHandler : IRequestHandler<GetPalletsSinCli
     // CONFIRMADO contra PalletSinClienteDto.cs: Id (int), Codigo/Variedad/Estado/Contramarca/
     // Calibre/Cliente (string?), Fecha (DateTime?) -- ya no hace falta ningún "?? DateTime.MinValue".
     //
-    // ÚNICA ASUNCIÓN QUE QUEDA:
-    //   - El estado "Baja/Anulado" (el 'B' del SQL original, ausente en el enum EstadoPallet) se
-    //     filtra usando EstadoTexto, el campo legado en string. Confirmá que EstadoTexto puede
-    //     valer "B" para pallets dados de baja -- si ese estado se maneja distinto (otro flag,
-    //     un IsDeleted, soft-delete de EF, etc.) hay que ajustar el Where.
+    // ESTADO: una sola fuente de verdad. El estado es el enum EstadoPallet y el
+    // 'B' (Baja/Anulado) del SQL original es el miembro EstadoPallet.Bajado --
+    // antes se filtraba contra la columna duplicada EstadoTexto, que además
+    // perdía filas con NULL al comparar en SQL.
     // =========================================================================================
     public async Task<List<PalletSinClienteDto>> Handle(GetPalletsSinClienteQuery request, CancellationToken cancellationToken)
         {
@@ -43,9 +43,9 @@ public class GetPalletsSinClienteQueryHandler : IRequestHandler<GetPalletsSinCli
 
             var query = _context.Pallets
                 .AsNoTracking()
-                // Filtra: Sin cliente (null o vacío) Y Estado no es 'B'
+                // Filtra: Sin cliente (null o vacío) Y estado distinto de Bajado
                 .Where(p => (string.IsNullOrEmpty(p.Cliente) || p.Cliente.Trim().Length == 0)
-                           && p.EstadoTexto != "B");
+                           && p.Estado != EstadoPallet.Bajado);
 
             var result = await query
                 .Select(p => new PalletSinClienteDto
