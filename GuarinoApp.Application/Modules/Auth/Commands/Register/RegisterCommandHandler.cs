@@ -58,14 +58,20 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthSessi
 
         // El primer usuario de la organización siempre queda como Admin.
         var hasUsers = await _context.Users.AnyAsync(u => !u.IsDeleted, ct);
-        var role = hasUsers ? _authSettings.DefaultRole : AdminRole;
+        var roleName = hasUsers ? _authSettings.DefaultRole : AdminRole;
+
+        // El rol se resuelve contra la tabla Roles (fuente única de verdad).
+        var role = await _context.Roles
+            .FirstOrDefaultAsync(r => r.Name == roleName && r.IsActive && !r.IsDeleted, ct);
+        if (role == null)
+            return AuthSessionDto.Fail("La configuración de roles está incompleta. Contactá al soporte.");
 
         var user = new AppUser
         {
             UserName = userName,
             FullName = fullName,
             PasswordHash = _passwordHasher.Hash(password),
-            Role = role,
+            RoleId = role.Id,
             IsActive = true,
             ActivatedAt = DateTime.UtcNow
         };
@@ -77,21 +83,21 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthSessi
         {
             UserName = user.UserName,
             FullName = user.FullName,
-            Role = user.Role,
+            Role = role.Name,
             ExpiresAtUtc = DateTime.UtcNow.AddHours(Math.Max(1, _authSettings.TokenValidityHours))
         });
 
         await _audit.LogAsync(
             "Register",
             "Acceso",
-            $"Alta de usuario {user.UserName} con rol {user.Role}.");
+            $"Alta de usuario {user.UserName} con rol {role.Name}.");
 
         return new AuthSessionDto
         {
             Success = true,
             UserName = user.UserName,
             FullName = user.FullName,
-            Role = user.Role,
+            Role = role.Name,
             Token = token
         };
     }

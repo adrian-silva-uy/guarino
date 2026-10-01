@@ -30,6 +30,7 @@ namespace GuarinoApp.Application.Common.Interfaces
         DbSet<FinancialData> FinancialData { get; }
         DbSet<LogEntry> LogEntries { get; }
         DbSet<AppUser> Users { get; }
+        DbSet<Role> Roles { get; }
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
         }
     }

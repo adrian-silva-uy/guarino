@@ -13,11 +13,11 @@ namespace GuarinoApp.Application.Modules.Auth.Commands.UpdateUser;
 /// - Nunca se puede quitar o desactivar al último Admin activo.
 /// - Cada cambio de estado registra desde cuándo está activo/inactivo.
 /// - Concurrencia optimista: si otra sesión editó la fila, no se pisa el cambio.
+/// - Los roles se resuelven contra la tabla Roles (fuente única de verdad).
 /// </summary>
 public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, AuthResultDto>
 {
     private const string AdminRole = "Admin";
-    private static readonly string[] ValidRoles = { "Admin", "Gerencia", "Contador", "Operador" };
 
     private readonly IApplicationDbContext _context;
     private readonly ICurrentUserService _currentUser;
@@ -35,10 +35,20 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, AuthR
 
     public async Task<AuthResultDto> Handle(UpdateUserCommand request, CancellationToken ct)
     {
-        if (!ValidRoles.Contains(request.Role))
+        // El rol pedido y el rol Admin se resuelven contra la tabla Roles:
+        // no hay listas hardcodeadas que puedan divergir de la BD.
+        var role = await _context.Roles
+            .FirstOrDefaultAsync(r => r.Name == request.Role && r.IsActive && !r.IsDeleted, ct);
+        if (role == null)
             return AuthResultDto.Fail("El rol seleccionado no es válido.");
 
+        var adminRole = await _context.Roles
+            .FirstOrDefaultAsync(r => r.Name == AdminRole && !r.IsDeleted, ct);
+        if (adminRole == null)
+            return AuthResultDto.Fail("La configuración de roles está incompleta. Contactá al soporte.");
+
         var user = await _context.Users
+            .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Id == request.UserId && !u.IsDeleted, ct);
         if (user == null)
             return AuthResultDto.Fail("El usuario no existe.");
@@ -49,7 +59,7 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, AuthR
         if (isSelf && !request.IsActive)
             return AuthResultDto.Fail("No podés deshabilitar tu propia cuenta.");
 
-        if (isSelf && user.Role != request.Role)
+        if (isSelf && user.RoleId != role.Id)
             return AuthResultDto.Fail("No podés cambiar tu propio rol. Pedile a otro usuario con permisos.");
 
         var isAdmin = _currentUser.IsInRole(AdminRole);
@@ -60,25 +70,25 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, AuthR
         if (statusChanged && !isAdmin)
             return AuthResultDto.Fail("Solo un Administrador puede activar o desactivar usuarios.");
 
-        var roleChanged = !string.Equals(user.Role, request.Role, StringComparison.Ordinal);
+        var roleChanged = user.RoleId != role.Id;
 
         // Cambiar roles: Admin y Gerencia.
         if (roleChanged && !isAdmin && !isGerencia)
             return AuthResultDto.Fail("No tenés permiso para cambiar roles de usuario.");
 
         // Asignar o quitar el rol Admin: exclusivo del Admin.
-        if ((roleChanged && (user.Role == AdminRole || request.Role == AdminRole)) && !isAdmin)
+        if (roleChanged && (user.RoleId == adminRole.Id || role.Id == adminRole.Id) && !isAdmin)
             return AuthResultDto.Fail("Solo un Administrador puede asignar o quitar el rol Admin.");
 
         // Jamás dejar la aplicación sin un Admin activo.
         var losesAdminOrIsDeactivated =
-            (user.Role == AdminRole && request.Role != AdminRole) || !request.IsActive;
-        if (user.Role == AdminRole && losesAdminOrIsDeactivated)
+            (user.RoleId == adminRole.Id && role.Id != adminRole.Id) || !request.IsActive;
+        if (user.RoleId == adminRole.Id && losesAdminOrIsDeactivated)
         {
             var otherActiveAdmin = await _context.Users.AnyAsync(u =>
                 u.Id != user.Id
                 && !u.IsDeleted
-                && u.Role == AdminRole
+                && u.RoleId == adminRole.Id
                 && u.IsActive, ct);
 
             if (!otherActiveAdmin)
@@ -87,7 +97,7 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, AuthR
 
         var cambios = new List<string>();
         if (roleChanged)
-            cambios.Add($"rol {user.Role} → {request.Role}");
+            cambios.Add($"rol {user.Role.Name} → {role.Name}");
 
         // Transiciones de estado con fecha "desde cuándo".
         if (statusChanged)
@@ -107,7 +117,7 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, AuthR
             }
         }
 
-        user.Role = request.Role;
+        user.RoleId = role.Id;
         user.IsActive = request.IsActive;
         user.UpdatedAt = DateTime.UtcNow;
         user.UpdatedBy = _currentUser.UserName;

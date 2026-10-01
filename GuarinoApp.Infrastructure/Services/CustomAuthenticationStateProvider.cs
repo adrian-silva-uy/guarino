@@ -191,6 +191,7 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider, IA
             //   desactivación surten efecto en el próximo inicio de sesión
             //   de la página, sin esperar a que venza el token).
             var user = await _dbContext.Users
+                .Include(u => u.Role)
                 .FirstOrDefaultAsync(u => u.UserName == payload.UserName && !u.IsDeleted);
 
             if (user == null || !user.IsActive)
@@ -200,7 +201,7 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider, IA
             {
                 new(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new(ClaimTypes.Name, user.UserName),
-                new(ClaimTypes.Role, user.Role)
+                new(ClaimTypes.Role, user.Role.Name)
             };
 
             if (!string.IsNullOrWhiteSpace(user.FullName))

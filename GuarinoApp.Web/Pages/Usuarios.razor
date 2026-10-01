@@ -2,10 +2,12 @@
 @attribute [Authorize(Roles = "Admin, Gerencia")]
 @using GuarinoApp.Application.Modules.Auth.Dtos
 @using GuarinoApp.Application.Modules.Auth.Queries.GetUsers
+@using GuarinoApp.Application.Modules.Auth.Queries.GetRoles
 @using GuarinoApp.Application.Modules.Auth.Commands.UpdateUser
 @using GuarinoApp.Application.Modules.Auth.Commands.CreateUser
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
+@inject ILogger<Usuarios> Logger
 
 <PageTitle>Usuarios - Guarino App</PageTitle>
 
@@ -54,16 +56,17 @@
                                       HelperText="Mínimo 6 caracteres" />
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
+                        @* Los roles vienen de la tabla Roles (fuente única de verdad). *@
                         <MudSelect T="string"
                                    @bind-Value="_newUser.Role"
                                    Label="Rol"
                                    Variant="Variant.Outlined"
                                    Margin="Margin.Dense"
                                    Dense="true">
-                            <MudSelectItem Value="@("Operador")">Operador</MudSelectItem>
-                            <MudSelectItem Value="@("Gerencia")">Gerencia</MudSelectItem>
-                            <MudSelectItem Value="@("Contador")">Contador</MudSelectItem>
-                            <MudSelectItem Value="@("Admin")">Admin</MudSelectItem>
+                            @foreach (var roleName in _roles)
+                            {
+                                <MudSelectItem Value="@roleName">@roleName</MudSelectItem>
+                            }
                         </MudSelect>
                     </MudItem>
                 </MudGrid>
@@ -121,10 +124,10 @@ else
                            Margin="Margin.Dense"
                            Dense="true"
                            Disabled="_saving">
-                    <MudSelectItem Value="@("Admin")">Admin</MudSelectItem>
-                    <MudSelectItem Value="@("Gerencia")">Gerencia</MudSelectItem>
-                    <MudSelectItem Value="@("Contador")">Contador</MudSelectItem>
-                    <MudSelectItem Value="@("Operador")">Operador</MudSelectItem>
+                    @foreach (var roleName in _roles)
+                    {
+                        <MudSelectItem Value="@roleName">@roleName</MudSelectItem>
+                    }
                 </MudSelect>
             </MudTd>
             <MudTd DataLabel="Activo">
@@ -155,6 +158,7 @@ else
 
 @code {
     private List<AppUserDto> _users = new();
+    private List<string> _roles = new();
     private bool _loading = true;
     private bool _saving;
     private bool _showForm;
@@ -212,7 +216,25 @@ else
     }
 
     protected override async Task OnInitializedAsync()
-        => await LoadAsync();
+    {
+        await CargarRolesAsync();
+        await LoadAsync();
+    }
+
+    /// <summary>Carga los roles desde la tabla Roles (fuente única de verdad
+    /// de la lista). Si falla, los selects quedan vacíos pero el resto de la
+    /// página sigue funcionando y el server-side rechazará altas inválidas.</summary>
+    private async Task CargarRolesAsync()
+    {
+        try
+        {
+            _roles = await Mediator.Send(new GetRolesQuery());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al cargar los roles");
+        }
+    }
 
     /// <summary>Estado con su fecha: "desde cuándo" está activo o inactivo.</summary>
     private static string StateLabel(AppUserDto user) =>

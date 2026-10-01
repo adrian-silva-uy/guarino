@@ -10,13 +10,12 @@ namespace GuarinoApp.Application.Modules.Auth.Commands.CreateUser;
 /// Alta de usuarios con las mismas reglas de madurez que la edición:
 /// - Solo Admin crea usuarios (validado server-side, no solo en la UI).
 /// - Contraseña hasheada con PBKDF2: jamás se persiste en texto plano.
-/// - Usuario único, nombre completo obligatorio y rol de la lista válida.
+/// - Usuario único, nombre completo obligatorio y rol activo de la tabla Roles.
 /// - Alta auditada (quién creó a quién y con qué rol).
 /// </summary>
 public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, AuthResultDto>
 {
     private const string AdminRole = "Admin";
-    private static readonly string[] ValidRoles = { "Admin", "Gerencia", "Contador", "Operador" };
 
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
@@ -40,7 +39,10 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, AuthR
         if (!_currentUser.IsInRole(AdminRole))
             return AuthResultDto.Fail("Solo un Administrador puede crear usuarios.");
 
-        if (!ValidRoles.Contains(request.Role))
+        // El rol se valida contra la tabla Roles: la BD es la única fuente de verdad.
+        var role = await _context.Roles
+            .FirstOrDefaultAsync(r => r.Name == request.Role && r.IsActive && !r.IsDeleted, ct);
+        if (role == null)
             return AuthResultDto.Fail("El rol seleccionado no es válido.");
 
         var userName = (request.UserName ?? string.Empty).Trim();
@@ -66,7 +68,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, AuthR
             UserName = userName,
             FullName = fullName,
             PasswordHash = _passwordHasher.Hash(password),
-            Role = request.Role,
+            RoleId = role.Id,
             IsActive = true,
             ActivatedAt = DateTime.UtcNow,
             CreatedBy = _currentUser.UserName
@@ -78,7 +80,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, AuthR
         await _audit.LogAsync(
             "CreateUser",
             "Usuarios",
-            $"Alta de usuario {user.UserName} con rol {user.Role} por {_currentUser.UserName}.");
+            $"Alta de usuario {user.UserName} con rol {role.Name} por {_currentUser.UserName}.");
 
         return AuthResultDto.Ok();
     }

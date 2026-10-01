@@ -18,8 +18,11 @@ public class AppUser : BaseEntity
     /// <summary>Contraseña en formato PBKDF2 (nunca en texto plano).</summary>
     public string PasswordHash { get; set; } = string.Empty;
 
-    /// <summary>Rol de la aplicación: Gerencia, Contador u Operador.</summary>
-    public string Role { get; set; } = "Operador";
+    /// <summary>Identificador del rol (FK → tabla Roles).</summary>
+    public int RoleId { get; set; }
+
+    /// <summary>Rol del usuario (navegación a la tabla Roles).</summary>
+    public Role Role { get; set; } = null!;
 
     /// <summary>Indica si el usuario puede ingresar.</summary>
     public bool IsActive { get; set; } = true;

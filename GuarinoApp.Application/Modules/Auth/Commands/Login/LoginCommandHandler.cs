@@ -33,6 +33,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthSessionDto>
     {
         var userName = request.UserName.Trim();
         var user = await _context.Users
+            .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.UserName == userName && !u.IsDeleted, ct);
 
         if (user == null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
@@ -69,21 +70,21 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthSessionDto>
         {
             UserName = user.UserName,
             FullName = user.FullName,
-            Role = user.Role,
+            Role = user.Role.Name,
             ExpiresAtUtc = DateTime.UtcNow.AddHours(Math.Max(1, _authSettings.TokenValidityHours))
         });
 
         await _audit.LogAsync(
             "Login",
             "Acceso",
-            $"Inicio de sesión de {user.UserName} (rol {user.Role}).");
+            $"Inicio de sesión de {user.UserName} (rol {user.Role.Name}).");
 
         return new AuthSessionDto
         {
             Success = true,
             UserName = user.UserName,
             FullName = user.FullName,
-            Role = user.Role,
+            Role = user.Role.Name,
             Token = token
         };
     }

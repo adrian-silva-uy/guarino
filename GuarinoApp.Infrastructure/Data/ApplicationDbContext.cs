@@ -43,6 +43,7 @@ namespace GuarinoApp.Infrastructure.Data
         public DbSet<FinancialData> FinancialData => Set<FinancialData>();
         public DbSet<LogEntry> LogEntries => Set<LogEntry>();
         public DbSet<AppUser> Users => Set<AppUser>();
+        public DbSet<Role> Roles => Set<Role>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
             {
@@ -189,13 +190,28 @@ namespace GuarinoApp.Infrastructure.Data
                 entity.Property(u => u.UserName).IsRequired().HasMaxLength(100);
                 entity.Property(u => u.FullName).IsRequired().HasMaxLength(200);
                 entity.Property(u => u.PasswordHash).IsRequired().HasMaxLength(200);
-                entity.Property(u => u.Role).IsRequired().HasMaxLength(50);
+                // Rol normalizado: FK a la tabla Roles (nunca cadenas sueltas).
+                entity.Property(u => u.RoleId).IsRequired();
+                entity.HasOne(u => u.Role)
+                    .WithMany()
+                    .HasForeignKey(u => u.RoleId)
+                    .OnDelete(DeleteBehavior.Restrict);
                 // Concurrencia optimista: dos sesiones que editen al mismo
                 // usuario no se pisan; la segunda recibe un error controlado.
                 entity.Property(u => u.RowVersion).IsRowVersion();
                 // La collation por defecto de SQL Server es case-insensitive,
                 // por lo que el índice único impedirá "ADRIA" y "adria" a la vez.
                 entity.HasIndex(u => u.UserName).IsUnique();
+            });
+
+            // --- Roles de acceso (tabla maestra) ---
+            modelBuilder.Entity<Role>(entity =>
+            {
+                entity.ToTable("Roles");
+                entity.HasKey(r => r.Id);
+                entity.Property(r => r.Name).IsRequired().HasMaxLength(50);
+                entity.Property(r => r.IsActive).IsRequired();
+                entity.HasIndex(r => r.Name).IsUnique();
             });
 
             // --- Entidad keyless ---
