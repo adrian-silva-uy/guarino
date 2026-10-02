@@ -24,9 +24,15 @@
 
 <style>
     /* Vista de impresión: Contaduría imprime este tablero en papel (usuarios que
-       necesitan leerlo físico). Se ocultan navegación, barra superior y controles;
-       las tarjetas no se parten entre páginas y se conservan los colores de los
-       badges (ALTO/MEDIO/BAJO) para que se lean igual de bien en gris. */
+       necesitan leerlo físico). Se ocultan navegación, barra superior y controles
+       y se conservan los colores de los badges (ALTO/MEDIO/BAJO).
+
+       IMPORTANTE: NO usar page-break-inside:avoid en tarjetas o tablas grandes.
+       La tarjeta de Impacto Financiero → Panorama → Plan de Acción mide +4.000 px
+       (unas 4 hojas): si Chrome no puede cumplir "no cortar" un bloque más alto
+       que la hoja, termina dejando páginas y espacios en blanco en el PDF. Se
+       permite el corte y se protegen solo unidades chicas que sí caben en una
+       hoja (filas, alertas, chips, títulos). */
     @@media print {
         .no-print, .mud-appbar, .mud-drawer, .mud-overlay, .apexcharts-toolbar {
             display: none !important;
@@ -42,10 +48,32 @@
             background: #fff !important;
         }
 
-        .mud-card, .mud-table, .mud-alert {
-            break-inside: avoid;
-            page-break-inside: avoid;
+        .mud-card, .mud-table, .mud-alert, .mud-grid {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
             box-shadow: none !important;
+        }
+
+        /* Unidades que sí caben en una hoja: que no se partan */
+        tr, .mud-alert, .mud-chip, .mud-divider, h2, h3, h4, h5 {
+            break-inside: avoid;
+        }
+
+        /* Si una tabla ocupa varias hojas, repetir el encabezado en cada una */
+        thead {
+            display: table-header-group;
+        }
+
+        /* El contenedor con scroll cortaba la tabla al ancho de la hoja */
+        .mud-table-container {
+            overflow: visible !important;
+            height: auto !important;
+        }
+
+        /* El gráfico (806 px) es más ancho que el texto de la hoja: escalarlo
+           para que no se corte en el borde derecho */
+        .apexcharts-canvas {
+            zoom: 0.85;
         }
 
         * {
