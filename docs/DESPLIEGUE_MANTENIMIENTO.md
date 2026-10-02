@@ -88,26 +88,29 @@ dotnet ef migrations list
   "ConnectionStrings": {
     "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=GuarinoApp_Dev;Trusted_Connection=true"
   },
-  "ClimateRiskSettings": {
+  "Ollama": {
     "Enabled": true,
-    "CheckIntervalMinutes": 60,
-    "TemperatureThresholdCelsius": 35,
-    "HumidityThresholdPercent": 30
-  },
-  "OllamaOptions": {
     "Url": "http://localhost:11434",
-    "TimeoutSeconds": 300,
-    "Model": "llama2"
+    "Model": "llama3.2:1b",
+    "TimeoutSeconds": 120
   },
-  "EmailOptions": {
+  "IaWeb": {
+    "Habilitada": true,
+    "UrlBase": "https://api.groq.com/openai/v1",
+    "Modelo": "meta-llama/llama-4-scout-17b-16e-instruct",
+    "ApiKey": ""
+  },
+  "Email": {
     "SmtpServer": "smtp.gmail.com",
     "SmtpPort": 587,
     "FromEmail": "test@gmail.com",
-    "Username": "test@gmail.com",
     "Password": "app_password_here"
   }
 }
 ```
+
+> Las claves sensibles de desarrollo (`Email:Password`, `IaWeb:ApiKey`) van en
+> **user-secrets**, no en el archivo: `dotnet user-secrets set "IaWeb:ApiKey" "gsk_..."`
 
 ### 5. Ejecutar Aplicación
 
@@ -118,14 +121,15 @@ dotnet run
 
 # Salida esperada:
 # info: GuarinoApp.Web.Program[0]
+#     GuarinoApp iniciada. Entorno: Development | Ollama: True en http://localhost:11434 | ...
+#     IA web en paralelo (plan gratuito): sin clave (solo ruta local) — meta-llama/llama-4-scout-17b-16e-instruct
+# info: GuarinoApp.Web.Program[0]
+#     CORS: Development — cualquier origen habilitado.
+# info: Microsoft.Hosting.Lifetime[0]
 #     Application started. Press Ctrl+C to exit.
-# info: GuarinoApp.Web.Program[0]
-#     Hosting environment: Development
-# info: GuarinoApp.Web.Program[0]
-#     Content root path: C:\...\GuarinoApp.Web
 ```
 
-**Acceder**: http://localhost:5000
+**Acceder**: http://localhost:5062
 
 ---
 
@@ -279,44 +283,57 @@ icacls "C:\inetpub\guarino" /grant:r "IIS AppPool\GuarinoApp:(OI)(CI)F"
 
 ### Paso 5: Configurar appsettings.Production.json
 
+El archivo real desplegado es `GuarinoApp.Web/appsettings.Production.json` (este
+repo). Sus claves deben coincidir con las secciones que la app realmente lee —
+`Ollama`, `Email`, `ClimateRisk`, `IaWeb`, `Cors`:
+
 ```json
 {
-  "Logging": {
-    "LogLevel": {
-      "Default": "Warning",
-      "Microsoft": "Error"
-    },
-    "ApplicationInsights": {
-      "Enabled": true,
-      "InstrumentationKey": "YOUR_KEY_HERE"
-    }
-  },
   "ConnectionStrings": {
-    "DefaultConnection": "Server=sqlserver.internal;Database=GuarinoApp_Prod;User=GuarinoApp;Password=StrongPassword123!;Encrypt=true;TrustServerCertificate=false"
+    "DefaultConnection": "Server=sqlserver.internal;Database=GuarinoApp_Prod;User=GuarinoApp;Password=StrongPassword123!;TrustServerCertificate=True"
   },
-  "ClimateRiskSettings": {
-    "Enabled": true,
-    "CheckIntervalMinutes": 60
-  },
-  "OllamaOptions": {
+  "Ollama": {
     "Url": "http://192.168.1.100:11434",
-    "TimeoutSeconds": 300,
-    "Model": "llama2"
+    "Model": "phi3:3.8b",
+    "TimeoutSeconds": 300
   },
-  "EmailOptions": {
+  "IaWeb": {
+    "Habilitada": true,
+    "UrlBase": "https://api.groq.com/openai/v1",
+    "Modelo": "meta-llama/llama-4-scout-17b-16e-instruct",
+    "ApiKey": "",
+    "TimeoutSegundos": 45,
+    "ConsultasWebSimultaneas": 8,
+    "EsperaLocalSegundos": 90
+  },
+  "Cors": {
+    "AllowedOrigins": [ "https://guarino.company.com" ]
+  },
+  "Email": {
     "SmtpServer": "smtp.office365.com",
     "SmtpPort": 587,
     "FromEmail": "noreply@guarino.com.uy",
-    "Username": "noreply@guarino.com.uy",
-    "Password": "SecurePasswordHere"
+    "Password": "app_password"
   },
-  "RateLimiting": {
-    "Enabled": true,
-    "PermitLimit": 100,
-    "WindowMinutes": 1
-  }
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
 }
 ```
+
+Notas de producción:
+
+- **`IaWeb:ApiKey` NUNCA va en el archivo**: se inyecta con la variable de
+  entorno `IaWeb__ApiKey` (ver «Variables de Entorno» más abajo). Sin clave, la
+  ruta web queda apagada y la app sigue 100% por la ruta local + plan
+  determinista — sin errores.
+- **`Cors:AllowedOrigins`** gobierna solo peticiones cross-origin; con la lista
+  vacía la app responde exclusivamente en mismo origen (estado seguro por
+  defecto). Reemplazá `guarino.company.com` por el dominio real del binding IIS.
 
 ### Paso 6: Migraciones de BD
 
@@ -347,6 +364,12 @@ Get-Content "C:\inetpub\logs\LogFiles\W3SVC1\*.log" -Tail 20
 # 4. Probar servicios externos
 # Abrir navegador > Consola de desarrollador > Network
 # Verificar que OpenMeteo responde
+
+# 5. Verificar el arranque de IA y CORS en los logs de la app:
+#    "GuarinoApp iniciada ... | IA web en paralelo (plan gratuito): habilitada"
+#    "CORS: Production — solo orígenes permitidos: https://guarino.company.com"
+#    (si la línea de IA dice "sin clave (solo ruta local)", falta la variable
+#     IaWeb__ApiKey — la app funciona igual por la ruta local)
 ```
 
 ---
@@ -375,8 +398,10 @@ Get-Content "C:\inetpub\logs\LogFiles\W3SVC1\*.log" -Tail 20
 # En servidor (Windows CMD):
 setx ASPNETCORE_ENVIRONMENT Production
 setx ConnectionStrings__DefaultConnection "Server=...;Password=..."
-setx OllamaOptions__Url "http://localhost:11434"
-setx EmailOptions__Password "app_password"
+setx Ollama__Url "http://localhost:11434"
+setx Email__Password "app_password"
+setx IaWeb__ApiKey "gsk_..."     # clave gratuita de console.groq.com (NUNCA en el repo)
+setx Cors__AllowedOrigins__0 "https://guarino.company.com"
 
 # En servidor (PowerShell):
 [Environment]::SetEnvironmentVariable(
@@ -386,6 +411,10 @@ setx EmailOptions__Password "app_password"
 )
 ```
 
+> Los nombres usan `__` como separador de niveles (`Sección:Clave` →
+> `Seccion__Clave`). `setx` solo afecta a procesos iniciados **después** del
+> `setx`: reiniciá el app pool de IIS o el servidor.
+
 ### Secret Manager (Desarrollo)
 
 ```bash
@@ -394,7 +423,8 @@ dotnet user-secrets init
 
 # Establecer secrets
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=...;Password=..."
-dotnet user-secrets set "EmailOptions:Password" "app_password"
+dotnet user-secrets set "Email:Password" "app_password"
+dotnet user-secrets set "IaWeb:ApiKey" "gsk_..."   # IA web gratuita (opcional)
 
 # Verificar
 dotnet user-secrets list
@@ -719,7 +749,7 @@ echo "📧 Notificando al equipo..."
 - [ ] Tests unitarios pasados
 - [ ] Build en Release mode exitoso
 - [ ] Migraciones de BD revisadas
-- [ ] Secrets configurados en servidor
+- [ ] Secrets configurados en servidor (`IaWeb__ApiKey`, `Email__Password`, conexión BD)
 - [ ] Backup de BD creado
 - [ ] Plan de rollback documentado
 

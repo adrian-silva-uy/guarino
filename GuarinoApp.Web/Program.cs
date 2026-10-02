@@ -138,9 +138,21 @@ builder.Services.AddResponseCompression(options =>
 });
 
 // ============================================================================
-// CORS - Configuración explícita para Blazor Server
-// En producción, restringir a orígenes específicos.
+// CORS
+// Blazor Server atiende todo en mismo origen: las peticiones de la propia app
+// (HTML, SignalR, estáticos) nunca pasan por CORS. La política por defecto
+// gobierna SOLO peticiones cross-origin:
+//   - Development: cualquier origen (debug en red local).
+//   - Production: únicamente los orígenes listados en "Cors:AllowedOrigins"
+//     (appsettings.Production.json o variable Cors__AllowedOrigins__0).
+//     Lista vacía = no se emite ninguna cabecera CORS => solo mismo origen.
 // ============================================================================
+var corsOrigenes = (builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>())
+    .Where(o => !string.IsNullOrWhiteSpace(o))
+    .Select(o => o.Trim().TrimEnd('/'))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -153,9 +165,7 @@ builder.Services.AddCors(options =>
         }
         else
         {
-            // En producción, configurar orígenes específicos desde appsettings
-            var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
-            policy.WithOrigins(allowedOrigins)
+            policy.WithOrigins(corsOrigenes)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials();
@@ -229,15 +239,28 @@ app.MapFallbackToPage("/_Host");
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 var ollamaOptions = app.Services.GetRequiredService<IOptionsMonitor<OllamaOptions>>().CurrentValue;
 var iaWebOptions = app.Services.GetRequiredService<IOptionsMonitor<IaWebOptions>>().CurrentValue;
-var iaWebClave = iaWebOptions.Habilitada && !string.IsNullOrWhiteSpace(iaWebOptions.ApiKey);
+var iaWebEstado = !iaWebOptions.Habilitada
+    ? "deshabilitada (por configuración)"
+    : string.IsNullOrWhiteSpace(iaWebOptions.ApiKey)
+        ? "sin clave (solo ruta local)"
+        : "habilitada";
 logger.LogInformation(
     "GuarinoApp iniciada. Entorno: {Environment} | Ollama: {OllamaEnabled} en {OllamaUrl} | Modelo: {Modelo} | IA web en paralelo (plan gratuito): {IaWebEstado} — {IaWebModelo}",
     app.Environment.IsDevelopment() ? "Development" : "Production",
     ollamaOptions.Enabled,
     ollamaOptions.Url,
     ollamaOptions.Model,
-    iaWebClave ? "habilitada" : "sin clave (solo ruta local)",
+    iaWebEstado,
     iaWebOptions.Modelo);
+
+// Estado CORS efectivo (visibilidad en producción: sin orígenes configurados
+// la app responde solo en mismo origen).
+if (app.Environment.IsDevelopment())
+    logger.LogInformation("CORS: Development — cualquier origen habilitado.");
+else if (corsOrigenes.Length > 0)
+    logger.LogInformation("CORS: Production — solo orígenes permitidos: {Origenes}", string.Join(", ", corsOrigenes));
+else
+    logger.LogInformation("CORS: Production — solo mismo origen (Cors:AllowedOrigins vacío; peticiones cross-origin bloqueadas).");
 
 // ============================================================================
 // SEED DE BASE DE DATOS (solo Development)
