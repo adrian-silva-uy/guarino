@@ -201,7 +201,7 @@ public class GetUsersQueryHandler : IRequestHandler<GetUsersQuery, List<AppUserD
   "ConnectionStrings": {
     "DefaultConnection": "Server=prod-server;Password=MySecret123"  // ❌
   },
-  "OllamaOptions": {
+  "Ollama": {
     "Url": "http://localhost:11434"
   }
 }

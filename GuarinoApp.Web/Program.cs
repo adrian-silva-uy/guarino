@@ -36,6 +36,16 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // ============================================================================
+// NOTIFICACIONES AL ADMINISTRADOR - captura global de errores para el reporte
+// por correo. El buffer es el MISMO instance que recibe el proveedor de
+// logging y que consume el notificador (hosted service registrado en
+// Infrastructure). Solo observa: no altera la consola ni los demás providers.
+// ============================================================================
+var errorLogBuffer = new ErrorLogBuffer();
+builder.Services.AddSingleton(errorLogBuffer);
+builder.Logging.AddProvider(new ErrorLogBufferProvider(errorLogBuffer));
+
+// ============================================================================
 // CACHÉ EN MEMORIA
 // AddDistributedMemoryCache es la implementación en memoria de IDistributedCache
 // incluida en el SDK de ASP.NET Core. Para un solo servidor es suficiente;
@@ -261,6 +271,16 @@ else if (corsOrigenes.Length > 0)
     logger.LogInformation("CORS: Production — solo orígenes permitidos: {Origenes}", string.Join(", ", corsOrigenes));
 else
     logger.LogInformation("CORS: Production — solo mismo origen (Cors:AllowedOrigins vacío; peticiones cross-origin bloqueadas).");
+
+// Estado de los reportes de operación (solo para el administrador).
+var notifOpciones = app.Services.GetRequiredService<IOptionsMonitor<NotificacionesOptions>>().CurrentValue;
+if (!notifOpciones.Habilitadas)
+    logger.LogInformation("Reportes de operación al administrador: deshabilitados (Notificaciones:Habilitadas=false).");
+else if (string.IsNullOrWhiteSpace(notifOpciones.EmailAdmin) || !notifOpciones.EmailAdmin.Contains('@'))
+    logger.LogWarning("Reportes de operación al administrador: Notificaciones:EmailAdmin '{Email}' no es válida; no se enviarán reportes.", notifOpciones.EmailAdmin);
+else
+    logger.LogInformation("Reportes de operación: SOLO a {Email} cada {Minutos} min — asunto \"{Asunto}fecha_hora\".",
+        notifOpciones.EmailAdmin, Math.Max(5, notifOpciones.IntervaloMinutos), notifOpciones.Asunto);
 
 // ============================================================================
 // SEED DE BASE DE DATOS (solo Development)

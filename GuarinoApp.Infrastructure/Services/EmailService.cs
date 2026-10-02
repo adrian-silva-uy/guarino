@@ -25,7 +25,7 @@ namespace GuarinoApp.Infrastructure.Services
                 throw new ArgumentException("Destinatario (to) no proporcionado.", nameof(to));
 
             using var message = new MailMessage();
-            message.From = new MailAddress(from ?? _options.FromEmail, fromName ?? _options.FromName ?? string.Empty);
+            message.From = ConstruirRemitente(from, fromName);
             message.To.Add(new MailAddress(to));
             message.Subject = subject ?? "(sin asunto)";
             message.Body = body ?? string.Empty;
@@ -138,6 +138,26 @@ namespace GuarinoApp.Infrastructure.Services
             }
 
         /// <summary>
+        /// Dirección remitente: el parámetro recibido, luego Email:FromEmail,
+        /// luego Email:SmtpUser (el buzón autenticado). Sin ninguna de las tres
+        /// no se puede armar el remitente y se lanza un error claro.
+        /// </summary>
+        private string DireccionRemitente(string? desde) =>
+            !string.IsNullOrWhiteSpace(desde) ? desde
+            : !string.IsNullOrWhiteSpace(_options.FromEmail) ? _options.FromEmail
+            : !string.IsNullOrWhiteSpace(_options.SmtpUser) ? _options.SmtpUser
+            : throw new InvalidOperationException("No hay remitente configurado: defina Email:FromEmail o Email:SmtpUser.");
+
+        private MailAddress ConstruirRemitente(string? desde, string? nombre)
+            {
+            var direccion = DireccionRemitente(desde);
+            var displayName = nombre ?? _options.FromName ?? string.Empty;
+            return string.IsNullOrEmpty(displayName)
+                ? new MailAddress(direccion)
+                : new MailAddress(direccion, displayName);
+            }
+
+        /// <summary>
         /// Construye el From/Reply-To respetando UseCompanyMailboxForSending, UseUserNameInFromDisplay
         /// y UseReplyToUser. userDisplayName / userReplyToEmail permiten pasar datos del usuario logueado
         /// cuando se llame desde un contexto autenticado (hoy no se usan porque los métodos públicos
@@ -151,7 +171,7 @@ namespace GuarinoApp.Infrastructure.Services
                     ? $"{userDisplayName} via {_options.FromName}"
                     : _options.FromName;
 
-                message.From = new MailAddress(_options.FromEmail, displayName);
+                message.From = ConstruirRemitente(null, displayName);
 
                 if (_options.UseReplyToUser && !string.IsNullOrWhiteSpace(userReplyToEmail))
                     {
@@ -160,7 +180,7 @@ namespace GuarinoApp.Infrastructure.Services
                 }
             else
                 {
-                message.From = new MailAddress(_options.FromEmail, _options.FromName);
+                message.From = ConstruirRemitente(null, _options.FromName);
                 }
             }
 
@@ -173,7 +193,7 @@ namespace GuarinoApp.Infrastructure.Services
                 EnableSsl = _options.EnableSsl,
                 UseDefaultCredentials = _options.UseDefaultCredentials
                 };
-            _logger.LogWarning("DEBUG SMTP -> Host={Host} Port={Port} SmtpUser={SmtpUser} PasswordLength={PasswordLength} UseDefaultCredentials={UseDefaultCredentials}",
+            _logger.LogDebug("SMTP -> Host={Host} Port={Port} SmtpUser={SmtpUser} PasswordLength={PasswordLength} UseDefaultCredentials={UseDefaultCredentials}",
             _options.SmtpServer, _options.SmtpPort,
             string.IsNullOrWhiteSpace(_options.SmtpUser) ? _options.FromEmail : _options.SmtpUser,
             _options.Password?.Length ?? 0,

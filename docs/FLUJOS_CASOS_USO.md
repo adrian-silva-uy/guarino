@@ -592,15 +592,18 @@ graph TB
 **Configuración** (appsettings.json):
 ```json
 {
-  "EmailOptions": {
-    "SmtpServer": "smtp.office365.com",
+  "Email": {
+    "SmtpServer": "smtp.gmail.com",
     "SmtpPort": 587,
-    "FromEmail": "noreply@guarino.com.uy",
-    "Username": "...",
-    "Password": "..."
+    "FromEmail": "reportes@guarinoapp.com",
+    "SmtpUser": "(usuario SMTP autenticado)",
+    "Password": "(contraseña de aplicación)"
   }
 }
 ```
+
+> Los reportes automáticos de operación para el administrador (sección
+> `Notificaciones`) usan esta misma configuración SMTP.
 
 ---
 

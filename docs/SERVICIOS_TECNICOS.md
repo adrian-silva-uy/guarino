@@ -393,7 +393,7 @@ public class EmailService : IEmailService
 ```
 
 **Ubicación**: `GuarinoApp.Infrastructure/Services/EmailService.cs`  
-**Configuración**: appsettings.EmailOptions  
+**Configuración**: appsettings.Email  
 **Uso**: Notificaciones, reportes, alertas
 
 ---
@@ -445,8 +445,43 @@ public class OllamaAIService : IAIService
 ```
 
 **Ubicación**: `GuarinoApp.Infrastructure/Services/OllamaAIService.cs`  
-**Configuración**: appsettings.OllamaOptions  
+**Configuración**: appsettings.Ollama  
 **Timeout**: Mínimo 300 segundos (cold start de modelo)
+
+---
+
+### 4. NotificadorAdminService
+
+**Responsabilidad**: Reporte de operación SOLO para el administrador (único
+destinatario: `Notificaciones:EmailAdmin`). Servicio en segundo plano que cada
+`Notificaciones:IntervaloMinutos` revisa:
+
+1. **Errores del log** desde el último reporte (captura global vía
+   `ErrorLogBufferProvider` → `ErrorLogBuffer`; solo `Error`+ y avisos de los
+   servicios de IA; excluye `EmailService` y el propio notificador para no
+   generar bucles).
+2. **Salud de la IA**: servicio local (Ollama) y modelo descargado, clave y
+   modelo de la ruta web (`IaWeb`), y **cambios de estado** (si algo se cae o
+   vuelve, se notifica una sola vez).
+3. **Actualizaciones pendientes**: migraciones de base de datos.
+
+Si hay novedades envía **un** correo con asunto
+`Guarino App - logs del día : fecha_hora`. El primer ciclo (a los 40 s) manda
+siempre el resumen de arranque, lo que confirma que el SMTP funciona. Si el
+envío falla, los pendientes se conservan y se reintentan en el próximo ciclo.
+
+```csharp
+public class NotificadorAdminService : BackgroundService
+{
+    // ExecuteAsync: primera revisión a los 40 s, luego cada IntervaloMinutos.
+    // RevisarYNotificarAsync: buffer.Vaciar() + EvaluarSaludAsync() →
+    //   ConstruirCuerpo() → IEmailService.SendEmailAsync(EmailAdmin, asunto, cuerpo).
+}
+```
+
+**Ubicación**: `GuarinoApp.Infrastructure/Services/NotificadorAdminService.cs`  
+**Configuración**: appsettings.Notificaciones  
+**Uso**: errores, salud IA y actualizaciones → correo del administrador
 
 ---
 
@@ -933,6 +968,7 @@ graph TB
 | **AIService** | IAIService | OllamaAIService | Scoped | Análisis IA |
 | **AuditService** | IAuditService | AuditService | Scoped | Auditoría |
 | **AuthService** | IAuthorizationService | AuthService | Scoped | Autorización |
+| **NotificadorAdminService** | — (BackgroundService) | NotificadorAdminService | Singleton | Reportes de operación al administrador (correo) |
 
 ---
 

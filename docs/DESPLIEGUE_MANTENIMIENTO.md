@@ -100,6 +100,12 @@ dotnet ef migrations list
     "Modelo": "meta-llama/llama-4-scout-17b-16e-instruct",
     "ApiKey": ""
   },
+  "Notificaciones": {
+    "Habilitadas": true,
+    "EmailAdmin": "adriansil@hotmail.com",
+    "IntervaloMinutos": 15,
+    "Asunto": "Guarino App - logs del día : "
+  },
   "Email": {
     "SmtpServer": "smtp.gmail.com",
     "SmtpPort": 587,
@@ -309,6 +315,12 @@ repo). Sus claves deben coincidir con las secciones que la app realmente lee —
   "Cors": {
     "AllowedOrigins": [ "https://guarino.company.com" ]
   },
+  "Notificaciones": {
+    "Habilitadas": true,
+    "EmailAdmin": "adriansil@hotmail.com",
+    "IntervaloMinutos": 15,
+    "Asunto": "Guarino App - logs del día : "
+  },
   "Email": {
     "SmtpServer": "smtp.office365.com",
     "SmtpPort": 587,
@@ -365,11 +377,14 @@ Get-Content "C:\inetpub\logs\LogFiles\W3SVC1\*.log" -Tail 20
 # Abrir navegador > Consola de desarrollador > Network
 # Verificar que OpenMeteo responde
 
-# 5. Verificar el arranque de IA y CORS en los logs de la app:
+# 5. Verificar el arranque de IA, CORS y reportes en los logs de la app:
 #    "GuarinoApp iniciada ... | IA web en paralelo (plan gratuito): habilitada"
 #    "CORS: Production — solo orígenes permitidos: https://guarino.company.com"
+#    "Reportes de operación: SOLO a adriansil@hotmail.com cada 15 min ..."
 #    (si la línea de IA dice "sin clave (solo ruta local)", falta la variable
 #     IaWeb__ApiKey — la app funciona igual por la ruta local)
+#    A los ~40 s del arranque debe verse: "Reporte de operación enviado a ..."
+#    (ese primer correo confirma que el SMTP y el destinatario funcionan)
 ```
 
 ---
@@ -402,6 +417,7 @@ setx Ollama__Url "http://localhost:11434"
 setx Email__Password "app_password"
 setx IaWeb__ApiKey "gsk_..."     # clave gratuita de console.groq.com (NUNCA en el repo)
 setx Cors__AllowedOrigins__0 "https://guarino.company.com"
+setx Notificaciones__EmailAdmin "adriansil@hotmail.com"   # único destinatario de reportes
 
 # En servidor (PowerShell):
 [Environment]::SetEnvironmentVariable(

@@ -48,6 +48,13 @@ namespace GuarinoApp.Infrastructure
             services.AddScoped<IExportService, ExportService>();
             services.AddScoped<IEmailService, EmailService>();
 
+            // Reporte de operación SOLO para el administrador (único destinatario:
+            // Notificaciones:EmailAdmin). Cada N minutos envía errores del log,
+            // salud de la IA (servicio/modelo/clave) y actualizaciones pendientes
+            // con asunto "Guarino App - logs del día : fecha_hora".
+            services.Configure<NotificacionesOptions>(configuration.GetSection(NotificacionesOptions.SectionName));
+            services.AddHostedService<NotificadorAdminService>();
+
             // --- IA generativa (Ollama) con fallback a datos reales ---
             services.AddOptions<OllamaOptions>()
                 .Bind(configuration.GetSection(OllamaOptions.SectionName))

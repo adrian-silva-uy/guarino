@@ -563,9 +563,11 @@ graph TB
 - [ ] Migraciones EF actualizadas (`dotnet ef database update`)
 - [ ] Variables de entorno configuradas
   - `ConnectionStrings:DefaultConnection`
-  - `ClimateRiskSettings:Enabled`
-  - `OllamaOptions:Url`
-  - `EmailOptions:SmtpServer`
+  - `ClimateRisk:RegionalContext`
+  - `Ollama:Url`
+  - `Email:SmtpServer`
+  - `IaWeb:ApiKey` (opcional: ruta web gratuita de IA)
+  - `Notificaciones:EmailAdmin` (reportes de operación al administrador)
 - [ ] HTTPS habilitado
 - [ ] Logs centralizados (ej: Application Insights)
 - [ ] Backups automáticos de BD

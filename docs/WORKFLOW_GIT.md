@@ -591,7 +591,7 @@ git push en main  # MAL
 git commit -m "fix: corregir timeout auth
 
 El servicio de auth fallaba tras 30s. Se aumentó
-timeout a 60s en OllamaOptions.
+timeout a 60s en la sección Ollama.
 
 Fixes #456"
 
