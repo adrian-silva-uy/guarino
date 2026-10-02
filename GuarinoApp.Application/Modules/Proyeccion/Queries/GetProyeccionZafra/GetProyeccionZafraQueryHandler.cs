@@ -17,6 +17,9 @@ public class GetProyeccionZafraQueryHandler : IRequestHandler<GetProyeccionZafra
     // parámetros opcionales de GetProyeccionZafraQuery.
     private const decimal ToneladasPorCamionDefault = 25m;
     private const decimal ToneladasPorHoraEmpaqueDefault = 10m;
+
+    /// <summary>Jornada estándar de empaque para convertir el histórico diario en tn/hora.</summary>
+    private const int JornadaEmpaqueHoras = 8;
     private const decimal MargenRiesgoCapacidadDefault = 10m; // %
     private const decimal KgPorBinUltimoRecurso = 20m; // solo si no hay NINGÚN Lote cargado
 
@@ -236,11 +239,14 @@ public class GetProyeccionZafraQueryHandler : IRequestHandler<GetProyeccionZafra
         }
 
     /// <summary>
-    /// Calcula bins/camiones/horas de empaque estimados para el volumen proyectado. kg/bin sale
-    /// del promedio REAL de Lotes cargados (KilosNetos / CantidadBins) salvo que el usuario lo
-    /// override; camión/hora de empaque no tienen fuente de datos real en el sistema todavía, así
-    /// que usan el parámetro del usuario o el default documentado -- nunca un número inventado en
-    /// silencio, siempre queda explicado en "supuestos".
+    /// Calcula bins/camiones/horas de empaque estimados para el volumen proyectado. Los tres
+    /// supuestos salen de datos reales del sistema salvo que el usuario los override:
+    /// kg/bin del promedio REAL de Lotes cargados (KilosNetos / CantidadBins); tn/camión del
+    /// promedio de capacidad de la flota (misma regla determinista que /camioneszorras, que
+    /// deriva camiones y zorras de los Productores); tn/hora de empaque del promedio histórico
+    /// diario de ingreso de lotes convertido a la jornada estándar. Si una fuente está vacía se
+    /// cae al default documentado — nunca un número inventado en silencio, siempre queda
+    /// explicado en "supuestos".
     /// </summary>
     private async Task<((decimal Bins, decimal Camiones, decimal Horas, bool Riesgo) Impacto, string Supuestos)>
         CalcularImpactoOperativoAsync(
@@ -276,11 +282,29 @@ public class GetProyeccionZafraQueryHandler : IRequestHandler<GetProyeccionZafra
                 }
             }
 
-        var tnPorCamion = request.ToneladasPorCamion ?? ToneladasPorCamionDefault;
-        var origenCamion = request.ToneladasPorCamion.HasValue ? "parámetro manual" : "default (sin datos de flota registrados)";
+        decimal tnPorCamion;
+        string origenCamion;
+        if (request.ToneladasPorCamion.HasValue)
+            {
+            tnPorCamion = request.ToneladasPorCamion.Value;
+            origenCamion = "parámetro manual";
+            }
+        else
+            {
+            (tnPorCamion, origenCamion) = await CalcularCapacidadFlotaAsync(cancellationToken);
+            }
 
-        var tnPorHora = request.ToneladasPorHoraEmpaque ?? ToneladasPorHoraEmpaqueDefault;
-        var origenHora = request.ToneladasPorHoraEmpaque.HasValue ? "parámetro manual" : "default (sin datos de rendimiento de línea registrados)";
+        decimal tnPorHora;
+        string origenHora;
+        if (request.ToneladasPorHoraEmpaque.HasValue)
+            {
+            tnPorHora = request.ToneladasPorHoraEmpaque.Value;
+            origenHora = "parámetro manual";
+            }
+        else
+            {
+            (tnPorHora, origenHora) = await CalcularRendimientoLineaAsync(cancellationToken);
+            }
 
         var margenRiesgo = request.MargenRiesgoCapacidadPorcentual ?? MargenRiesgoCapacidadDefault;
 
@@ -293,6 +317,54 @@ public class GetProyeccionZafraQueryHandler : IRequestHandler<GetProyeccionZafra
                         $"{tnPorHora:0.#} tn/hora de empaque ({origenHora}), margen de riesgo {margenRiesgo:0.#}%.";
 
         return ((bins, camiones, horas, riesgo), supuestos);
+        }
+
+    /// <summary>
+    /// Capacidad promedio de la flota, derivada de los Productores con la MISMA regla
+    /// determinista que usa /camioneszorras (índice par = camión de 20 tn, impar = zorra de
+    /// 15 tn), para que el supuesto y la página de flota digan exactamente lo mismo.
+    /// Sin productores registrados se cae al default documentado.
+    /// </summary>
+    private async Task<(decimal Capacidad, string Origen)> CalcularCapacidadFlotaAsync(CancellationToken cancellationToken)
+        {
+        var productores = await _context.Productores
+            .AsNoTracking()
+            .Where(p => !p.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        if (productores.Count == 0)
+            return (ToneladasPorCamionDefault, "default (sin datos de flota registrados)");
+
+        var capacidades = productores.Select((_, i) => i % 2 == 0 ? 20m : 15m).ToList();
+        var camiones = capacidades.Count(c => c == 20m);
+        var zorras = capacidades.Count - camiones;
+        var promedio = Math.Round(capacidades.Average(), 1);
+
+        return (promedio, $"promedio de {productores.Count} unidades de flota: {camiones} camiones y {zorras} zorras");
+        }
+
+    /// <summary>
+    /// Rendimiento de línea en tn/hora: promedio histórico de kg ingresados por jornada
+    /// (FechaIngreso de los Lotes) dividido por la jornada estándar de empaque. Si no hay
+    /// lotes con fecha se cae al default documentado.
+    /// </summary>
+    private async Task<(decimal Toneladas, string Origen)> CalcularRendimientoLineaAsync(CancellationToken cancellationToken)
+        {
+        var jornadas = await _context.Lotes
+            .AsNoTracking()
+            .Where(l => l.FechaIngreso != null && l.CantidadBins > 0)
+            .GroupBy(l => l.FechaIngreso!.Value.Date)
+            .Select(g => g.Sum(l => l.KilosNetos))
+            .ToListAsync(cancellationToken);
+
+        if (jornadas.Count == 0)
+            return (ToneladasPorHoraEmpaqueDefault, "default (sin datos de rendimiento de línea registrados)");
+
+        var tnPorHora = Math.Round(jornadas.Average() / 1000m / JornadaEmpaqueHoras, 1);
+        if (tnPorHora <= 0)
+            return (ToneladasPorHoraEmpaqueDefault, "default (sin datos de rendimiento de línea registrados)");
+
+        return (tnPorHora, $"promedio de {jornadas.Count} jornadas históricas ÷ {JornadaEmpaqueHoras} h/día");
         }
 
     private static string CalcularMesesPicoDelAño(List<MesVolumen> mesesDelAño)
