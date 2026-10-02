@@ -5,6 +5,10 @@ Aplicación **Blazor Server** de gestión citrícola con Clean Architecture (`Do
 ## Resumen de cambios aplicados
 
 ### Recientes (2026)
+- **Estados de carga de IA en todas las páginas con IA** (UX de espera, antes confusa):
+  - **`/iachat` (Asistente IA)**: chip dinámico de3 estados — "Generando con IA…" mientras se generan sugerencias o la respuesta del chat (antes mostraba "Datos en vivo (sin IA generativa)" durante minutos aunque la IA estuviera activa y solo se actualizaba al terminar), "IA generativa activa" al estar lista y el warning solo cuando la IA realmente no está disponible (tooltip sin mencionar tecnología interna). El panel de "Sugerencias del Consultor IA" ahora muestra spinner + *"El consultor IA está preparando tus sugerencias… puede tardar unos segundos o minutos"* en vez de "No hay sugerencias activas", el botón pasa a "RECALCULANDO…" (deshabilitado) y la burbuja del chat dice *"Analizando tu consulta… puede tardar un momento"*.
+  - **`/dashboard`**: el "Generando Análisis..." ahora tiene spinner y texto honesto (*"…puede tardar unos minutos"*).
+  - Gerencia, Contaduría, Proyección de Zafra y Gestión de Riesgos Climáticos ya tenían spinner + "Refinando con análisis de IA…" — se verificó que todas las páginas con IA informan su estado de carga.
 - **Nomenclatura fiel a ScriptCase + nueva UI de Stock de Pallets Sin Cliente** (ADR-004):
   - **Fuente de verdad de los nombres**: etiquetas de los `.bkp` de ScriptCase (menú original `app_menu.bkp` y títulos de cada app), verificadas con el catálogo `NORIDEL_catalogo_metadata.sql` (generado desde 67 `.bkp`: apps, tablas, drill-downs y JOINs) y el dump `GuarinoAppDb.sql` de la DB real — ambos artifacts en la raíz del repo para trazabilidad.
   - **Renombres**: menú → "Pallets Sin Clientes" (detalle), "Stock de Pallets Sin Cliente" (resumen) y "Lugares de Origen y Destino"; título de `/stockgeneral` → "Stock General"; home alineado 1:1 con el menú (Panel de Gerencia, Proyección de Volcados, Proyección de Zafra Siguiente, Gestión de Empaque, Básculas, Pallets por Contramarca) y link engañoso "Ver stock en playa" → "Ver stock general".

@@ -14,6 +14,7 @@
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject Microsoft.Extensions.Logging.ILogger<IAChat> Logger
+@implements IDisposable
 
 <PageTitle>Asistente IA</PageTitle>
 
@@ -119,7 +120,15 @@
                 </CardHeaderContent>
             </MudCardHeader>
             <MudCardContent>
-                @if (AiService.IsAvailable)
+                @if (_sugerenciasCargando || _isLoading)
+                {
+                    <MudTooltip Text="El consultor IA está generando contenido con tus datos en vivo. Puede tardar unos segundos o minutos según la carga del equipo.">
+                        <MudChip Color="Color.Info" Size="Size.Small" Class="mb-3" Icon="@Icons.Material.Filled.AutoAwesome">
+                            Generando con IA…
+                        </MudChip>
+                    </MudTooltip>
+                }
+                else if (AiService.IsAvailable)
                 {
                     <MudChip Color="Color.Success" Size="Size.Small" Class="mb-3" Icon="@Icons.Material.Filled.Psychology">
                         IA generativa activa
@@ -127,7 +136,7 @@
                 }
                 else
                 {
-                    <MudTooltip Text="Ollama no está activo. Mostrando análisis automatizado con datos reales de la base de datos.">
+                    <MudTooltip Text="La IA generativa no está disponible en este momento. Se muestran análisis automatizados con datos reales de la base de datos.">
                         <MudChip Color="Color.Warning" Size="Size.Small" Class="mb-3" Icon="@Icons.Material.Filled.OfflineBolt">
                             Datos en vivo (sin IA generativa)
                         </MudChip>
@@ -167,7 +176,7 @@
                                 <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" Class="chat-bubble-icon" />
                                 <span class="chat-bubble-text">
                                     <MudProgressCircular Color="Color.Primary" Size="Size.Small" Class="mr-2" />
-                                    <span>Escribiendo...</span>
+                                    <span>Analizando tu consulta… puede tardar un momento.</span>
                                 </span>
                             </div>
                         </div>
@@ -254,7 +263,16 @@
 
                 <!-- Sugerencias activas -->
                 <MudText Typo="Typo.body2" Class="mt-2">📋 Sugerencias del Consultor IA</MudText>
-                @if (_sugerencias.Any())
+                @if (_sugerenciasCargando)
+                {
+                    <div class="d-flex align-start gap-2 mt-2">
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Secondary" Class="mt-1 flex-shrink-0" />
+                        <MudText Typo="Typo.body2" Color="Color.Tertiary">
+                            El consultor IA está preparando tus sugerencias… puede tardar unos segundos o minutos.
+                        </MudText>
+                    </div>
+                }
+                else if (_sugerencias.Any())
                 {
                     <MudList Dense="true">
                         @foreach (var sug in _sugerencias)
@@ -284,8 +302,9 @@
                     <MudText Typo="Typo.body2" Color="Color.Tertiary">No hay sugerencias activas.</MudText>
                 }
 
-                <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@ActualizarSugerencias" FullWidth="true" Class="mt-2">
-                    RECALCULAR SUGERENCIAS
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@ActualizarSugerencias" FullWidth="true" Class="mt-2"
+                           Disabled="@_sugerenciasCargando">
+                    @(_sugerenciasCargando ? "RECALCULANDO…" : "RECALCULAR SUGERENCIAS")
                 </MudButton>
 
                 <MudDivider Class="my-2" />
@@ -397,6 +416,7 @@
     private int _horizonte = 6;
     private bool _incluirEstacionalidad = true;
     private List<BusinessSuggestionDto> _sugerencias = new();
+    private bool _sugerenciasCargando = false;
     private bool _mensajeInicialEnviado = false;
 
     // Métricas dinámicas (se recalculan siempre contra datos reales).
@@ -432,10 +452,22 @@
         { Seasonality, false }
     };
 
+    // Refresco periódico del chip de estado de IA: IsAvailable puede cambiar en
+    // segundo plano (el healthcheck recupera la conexión sin que la página reciba
+    // eventos), y sin esto el chip quedaba congelado en "sin IA generativa" aunque
+    // la IA se hubiera recuperado. Cada tick solo provoca un re-render diff.
+    private System.Threading.Timer? _refrescoEstadoIa;
+
     protected override async Task OnInitializedAsync()
     {
         foreach (var k in _recommendedParams.Keys)
             _enabledExtras[k] = false;
+
+        _refrescoEstadoIa = new System.Threading.Timer(
+            _ => _ = InvokeAsync(StateHasChanged),
+            null,
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(5));
 
         await GenerarSugerencias();
 
@@ -447,6 +479,8 @@
             await SendMessage();
         }
     }
+
+    public void Dispose() => _refrescoEstadoIa?.Dispose();
 
     private void TogglePopover(string key)
     {
@@ -511,6 +545,8 @@
     /// </summary>
     private async Task GenerarSugerencias()
     {
+        _sugerenciasCargando = true;
+        StateHasChanged();
         try
         {
             _totalStockCache = await DashboardService.GetTotalStockAsync();
@@ -550,6 +586,11 @@
         {
             Logger.LogError(ex, "Error generando sugerencias de IA en /iachat");
             _sugerencias = new List<BusinessSuggestionDto>();
+        }
+        finally
+        {
+            _sugerenciasCargando = false;
+            StateHasChanged();
         }
     }
 

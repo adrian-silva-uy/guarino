@@ -150,7 +150,12 @@
 
         @if (_iaSuggestions.Count == 0)
         {
-            <MudAlert Severity="Severity.Info">Generando Análisis...</MudAlert>
+            <MudAlert Severity="Severity.Info" Class="mb-2">
+                <div class="d-flex align-center gap-2">
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+                    <span>El consultor IA está elaborando el análisis y las sugerencias… esto puede tardar unos minutos.</span>
+                </div>
+            </MudAlert>
         }
 
         <MudGrid>
