@@ -9,6 +9,7 @@ using GuarinoApp.Application.Modules.Proyeccion.Dtos;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,8 +20,9 @@ public class FallbackAIService : IAIService
     private readonly ILogger<FallbackAIService> _logger;
     private readonly IPromptProvider _promptProvider;
     private readonly IDashboardDataService _dashboardService;
+    private readonly ISkillRegistry _skillRegistry;
+    private readonly IMcpDataService _mcpDataService;
 
-    private const string FALLBACK_CHAT_KEY = "FallbackChat";
     private const string FALLBACK_SUGGESTIONS_KEY = "FallbackSuggestions";
     private const string FALLBACK_ZAFRA_KEY = "FallbackZafra";
 
@@ -28,12 +30,16 @@ public class FallbackAIService : IAIService
         OllamaAIService ollamaService,
         ILogger<FallbackAIService> logger,
         IPromptProvider promptProvider,
-        IDashboardDataService dashboardService)
+        IDashboardDataService dashboardService,
+        ISkillRegistry skillRegistry,
+        IMcpDataService mcpDataService)
         {
         _ollamaService = ollamaService;
         _logger = logger;
         _promptProvider = promptProvider;
         _dashboardService = dashboardService;
+        _skillRegistry = skillRegistry;
+        _mcpDataService = mcpDataService;
         }
 
     public bool IsAvailable => _ollamaService.IsAvailable;
@@ -57,6 +63,13 @@ public class FallbackAIService : IAIService
         return await BuildFallbackChatResponseAsync(prompt);
         }
 
+    /// <summary>
+    /// Respuesta analítica SIN IA: rutea la consulta por temas, usa primero los datos
+    /// reales consultados (habilidades del sistema y fuentes externas en vivo) y arma
+    /// hasta 5 puntos "Diagnóstico -> Acción -> Impacto" anclados en la telemetría del
+    /// día. Nunca inventa cifras ni revela la tecnología interna: los ejes sin métrica
+    /// se marcan con "Sin métrica interna" y aportan la práctica estándar de industria.
+    /// </summary>
     private async Task<string> BuildFallbackChatResponseAsync(string userPrompt)
         {
         var fecha = DateTime.Now;
@@ -65,31 +78,110 @@ public class FallbackAIService : IAIService
         var crecimiento = await _dashboardService.GetProjectedGrowthAsync(fecha);
         var stockPorVariedad = await _dashboardService.GetStockByVarietyAsync(fecha);
         var topVariedad = stockPorVariedad.OrderByDescending(kv => kv.Value).FirstOrDefault();
+        var hayVariedades = stockPorVariedad is { Count: > 0 };
 
-        var template = await _promptProvider.GetPromptAsync(FALLBACK_CHAT_KEY);
+        var consulta = NormalizarConsulta(userPrompt);
+        bool Pregunta(params string[] claves) => claves.Any(c => consulta.Contains(c, StringComparison.Ordinal));
 
-        if (string.IsNullOrWhiteSpace(template))
+        var sb = new StringBuilder();
+        sb.AppendLine($"Lectura operativa al {fecha:dd/MM/yyyy} con los datos en vivo del sistema:");
+        sb.AppendLine();
+
+        // Datos reales del sistema: si la consulta corresponde a una habilidad
+        // registrada, su resultado se muestra primero — son cifras verificables.
+        try
             {
-            var sb = new StringBuilder();
-            sb.AppendLine($"No se pudo conectar con el motor de IA. Aquí tienes un resumen operativo actualizado ({fecha:dd/MM/yyyy}):");
-            sb.AppendLine();
-            sb.AppendLine($"- **Stock Total:** {stockTotal:N0} bins");
-            sb.AppendLine($"- **Variedad Principal:** {topVariedad.Key} ({topVariedad.Value:N0} bins)");
-            sb.AppendLine($"- **Pallets sin Cliente:** {palletsSinCliente:N0}");
-            sb.AppendLine($"- **Crecimiento Proyectado:** {crecimiento:0.0}%");
-            sb.AppendLine();
-            sb.AppendLine("Para respuestas estratégicas detalladas, por favor active Ollama.");
-            return sb.ToString();
+            var skillMatch = await _skillRegistry.MatchAsync(userPrompt ?? string.Empty);
+            if (skillMatch is { Success: true })
+                {
+                sb.AppendLine("**Datos del sistema para esta consulta:**");
+                sb.AppendLine(skillMatch.Text);
+                sb.AppendLine();
+                }
+            else if (skillMatch != null)
+                {
+                sb.AppendLine($"**Consulta sin dato cargado:** {skillMatch.Text} El dato todavía no está registrado en el sistema.");
+                sb.AppendLine();
+                }
+            }
+        catch (Exception ex)
+            {
+            _logger.LogWarning(ex, "Fallback de chat: falló la consulta de datos del sistema; se continúa con telemetría.");
             }
 
-        return template
-            .Replace("{Date}", fecha.ToString("yyyy-MM-dd"))
-            .Replace("{TotalStock}", stockTotal.ToString("N0"))
-            .Replace("{PalletsWithoutClient}", palletsSinCliente.ToString("N0"))
-            .Replace("{GrowthPercent}", crecimiento.ToString("0.0"))
-            .Replace("{TopVariety}", string.IsNullOrEmpty(topVariedad.Key) ? "N/A" : topVariedad.Key)
-            .Replace("{TopVarietyValue}", topVariedad.Value.ToString("N0"))
-            .Replace("{UserPrompt}", userPrompt);
+        // Fuentes externas en vivo (orquestación determinista): van con su nombre de
+        // origen y nunca pisan los datos internos de la planta.
+        try
+            {
+            var externos = await _mcpDataService.GetContextAsync(userPrompt ?? string.Empty);
+            if (externos.Count > 0)
+                {
+                sb.AppendLine("**Datos externos en vivo:**");
+                foreach (var item in externos)
+                    sb.AppendLine($"- [{item.Server}] {item.Content}");
+                sb.AppendLine("Si contradicen los datos internos de la planta, priorizá los internos.");
+                sb.AppendLine();
+                }
+            }
+        catch (Exception ex)
+            {
+            _logger.LogWarning(ex, "Fallback de chat: fuentes externas no disponibles; se continúa con telemetría.");
+            }
+
+        // Puntos por tema: primero lo que el usuario preguntó, después el anclaje
+        // con telemetría real hasta completar 3 puntos (máximo 5).
+        var puntos = new List<string>();
+
+        if (Pregunta("mercado", "export", "destino", "comercial", "precio", "cliente", "expansi", "vietnam", "india", "paises", "venta", "competencia"))
+            puntos.Add("Sin métrica interna de precios por destino → explorar nuevos mercados de alto crecimiento (Asia: Vietnam e India) con las certificaciones al día → diversifica el ingreso y baja la exposición a pocos destinos.");
+
+        if (Pregunta("calidad", "merma", "packout", "packing", "calibrac", "envas"))
+            puntos.Add("Sin métrica interna de merma → fijar meta de packout y calendario de calibración óptica antes de la zafra → cada punto de merma evitado es ingreso exportable recuperado.");
+
+        if (Pregunta("logistic", "flete", "contenedor", "puerto", "camion", "transporte", "flota", "zorra"))
+            puntos.Add("Sin métrica interna de flete → relevar el costo por mercado y la ventana de contenedor para el pico → habilita decidir rutas y prioridades con tiempo.");
+
+        if (Pregunta("clima", "helada", "lluvia", "riego", "agroclim", "viento", "calor"))
+            puntos.Add("Sin métrica interna de clima en este panel → revisar el registro de eventos agroclimáticos y activar la prevención → anticipar el daño evita perder fruta ya formada.");
+
+        if (Pregunta("caja", "capital", "finanz", "costo", "factura", "insumo", "credito", "flujo", "presupuesto"))
+            puntos.Add("Sin métrica de caja en esta consulta → cruzar la proyección con Contaduría: capital necesario contra flujo de caja → dimensionar la brecha antes de comprometer insumos.");
+
+        if (Pregunta("cosecha", "proceso", "cadena", "planta", "fruta", "zafra", "proyecc", "crecimiento", "capacidad", "planific"))
+            puntos.Add($"Crecimiento proyectado de {crecimiento.ToString("0.0").Replace('.', ',')}% vs. período anterior → asegurar cajas, zunchos y turnos de empaque → evitar paradas de línea en el pico.");
+
+        if (puntos.Count < 3 && palletsSinCliente > 0)
+            puntos.Add($"Tenés {palletsSinCliente:N0} pallets sin cliente asignado → ofertarlos esta semana y reconciliar con los clientes → libera espacio de frío y convierte stock en caja.");
+
+        if (puntos.Count < 3)
+            puntos.Add($"Stock total de {stockTotal:N0} bins en planta → cruzar contra los compromisos de venta vigentes → detectar exceso antes que la merma y el costo de almacenaje.");
+
+        if (puntos.Count < 3)
+            puntos.Add($"Stock de {stockTotal:N0} bins con {crecimiento.ToString("0.0").Replace('.', ',')}% de crecimiento proyectado → mantener el monitoreo semanal de stock, pallets y empaque → anticipar cualquier desvío antes del pico.");
+
+        if (puntos.Count < 4 && hayVariedades && stockTotal > 0 && topVariedad.Value > stockTotal * 0.4m)
+            puntos.Add($"La variedad {topVariedad.Key} concentra {topVariedad.Value:N0} de {stockTotal:N0} bins → abrir conversaciones comerciales para ese volumen → reduce la exposición al precio de una sola variedad.");
+
+        foreach (var punto in puntos.Take(5))
+            sb.AppendLine($"- {punto}");
+
+        return sb.ToString().TrimEnd();
+        }
+
+    /// <summary>
+    /// Minúsculas y sin acentos para rutar la consulta por temas
+    /// ("expansión" y "expansion" llegan iguales a los detectores).
+    /// </summary>
+    private static string NormalizarConsulta(string? texto)
+        {
+        if (string.IsNullOrWhiteSpace(texto))
+            return string.Empty;
+        var descompuesto = texto.ToLowerInvariant().Normalize(NormalizationForm.FormD);
+        var limpio = new StringBuilder(descompuesto.Length);
+        foreach (var c in descompuesto)
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                limpio.Append(c);
+        return limpio.ToString();
         }
 
     public async Task<List<BusinessSuggestionDto>> GetBusinessSuggestionsAsync(

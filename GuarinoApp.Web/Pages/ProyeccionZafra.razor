@@ -59,6 +59,19 @@
             break-inside: avoid;
         }
 
+        /* Los cuadros del grid (Benchmarking, Plan de Acción, Escenarios) salen
+           ENTEROS: con el corte libre se partían a mitad de hoja ("cuadros
+           cortados"). Ningún ítem supera una hoja, así que no reintroduce huecos. */
+        .mud-grid-item {
+            break-inside: avoid;
+        }
+
+        /* Textos que solo tienen sentido en pantalla ("clic para ver detalle…"):
+           en papel no hay interacción y solo confunden (parecen enlaces). */
+        .solo-pantalla {
+            display: none !important;
+        }
+
         /* Si una tabla ocupa varias hojas, repetir el encabezado en cada una */
         thead {
             display: table-header-group;
@@ -569,7 +582,7 @@
                         }
                     </div>
                 </div>
-                <MudText Typo="Typo.body2" Class="mb-3 text-muted">
+                <MudText Typo="Typo.body2" Class="mb-3 text-muted solo-pantalla">
                     Un cuadro por eje de decisión — haga clic para ver impacto, riesgo y origen de cada acción.
                 </MudText>
 
@@ -586,7 +599,7 @@
                             <MudItem xs="12" sm="6" lg="4">
                                 <MudCard Elevation="2" Class="h-100 cursor-pointer hover-shadow" @onclick="() => ExpandirGrupo(categoria, accionesGrupo)">
                                     <MudCardContent>
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                                             <MudChip Size="Size.Small" Color="@(accionesGrupo.Any(a => a.Origen == "Calculado") ? Color.Primary : Color.Default)">
                                                 @categoria
                                             </MudChip>
@@ -602,7 +615,7 @@
                                                 </li>
                                             }
                                         </ul>
-                                        <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-2 d-block">
+                                        <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-2 d-block solo-pantalla">
                                             Clic para ver detalle de impacto y riesgo
                                         </MudText>
                                     </MudCardContent>
@@ -623,7 +636,7 @@
                                                 <MudText Typo="Typo.body1" Class="fw-bold" Style="@_sugerenciaColor">
                                                     @sugerencia.Text
                                                 </MudText>
-                                                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-1">
+                                                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-1 solo-pantalla">
                                                     Ver detalles en el reporte completo
                                                 </MudText>
                                             </div>
@@ -972,8 +985,20 @@
                 history: null,
                 datosFinancieros: _datosFinancieros);
 
-            if (resultado == null || token != _correlativoIA)
+            if (resultado == null)
+            {
+                Logger.LogInformation("EstrategIA: el servicio no devolvió resultado; se conserva el plan local.");
+                return;
+            }
+            if (token != _correlativoIA)
+            {
+                Logger.LogInformation("EstrategIA: respuesta descartada (llegó tras un recálculo); se conserva lo vigente.");
                 return; // se disparó un recálculo en el medio: se descarta la respuesta vieja
+            }
+
+            Logger.LogInformation("EstrategIA: resultado OK — EsIA={EsIA}, acciones={Acciones}, resumen={Resumen} chars.",
+                resultado.EsIA, resultado.AccionesEstrategicas?.Count ?? 0,
+                (resultado.ResumenEjecutivo ?? string.Empty).Length);
 
             if (_kpiFinanciero != null)
             {

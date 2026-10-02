@@ -228,12 +228,16 @@ app.MapFallbackToPage("/_Host");
 // ============================================================================
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 var ollamaOptions = app.Services.GetRequiredService<IOptionsMonitor<OllamaOptions>>().CurrentValue;
+var iaWebOptions = app.Services.GetRequiredService<IOptionsMonitor<IaWebOptions>>().CurrentValue;
+var iaWebClave = iaWebOptions.Habilitada && !string.IsNullOrWhiteSpace(iaWebOptions.ApiKey);
 logger.LogInformation(
-    "GuarinoApp iniciada. Entorno: {Environment} | Ollama: {OllamaEnabled} en {OllamaUrl} | Modelo: {Modelo}",
+    "GuarinoApp iniciada. Entorno: {Environment} | Ollama: {OllamaEnabled} en {OllamaUrl} | Modelo: {Modelo} | IA web en paralelo (plan gratuito): {IaWebEstado} — {IaWebModelo}",
     app.Environment.IsDevelopment() ? "Development" : "Production",
     ollamaOptions.Enabled,
     ollamaOptions.Url,
-    ollamaOptions.Model);
+    ollamaOptions.Model,
+    iaWebClave ? "habilitada" : "sin clave (solo ruta local)",
+    iaWebOptions.Modelo);
 
 // ============================================================================
 // SEED DE BASE DE DATOS (solo Development)

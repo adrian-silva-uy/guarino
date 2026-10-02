@@ -35,6 +35,8 @@ public class OllamaAIService : IAIService
     private readonly ISkillRegistry _skillRegistry;
     private readonly IOptionsMonitor<ClimateRiskSettings> _climateSettings;
     private readonly IMcpDataService _mcpDataService;
+    private readonly IIaWebClient _web;
+    private readonly IOptionsMonitor<IaWebOptions> _iaWeb;
 
     // Tope de tiempo propio para la llamada de estrategia de Zafra -- más corto que el timeout
     // general del HttpClient "Ollama" (60s en appsettings.json). Un JSON estructurado de 5-8
@@ -80,7 +82,9 @@ public class OllamaAIService : IAIService
         IMediator mediator,
         ISkillRegistry skillRegistry,
         IOptionsMonitor<ClimateRiskSettings> climateSettings,
-        IMcpDataService mcpDataService)
+        IMcpDataService mcpDataService,
+        IIaWebClient web,
+        IOptionsMonitor<IaWebOptions> iaWeb)
         {
         _optionsMonitor = optionsMonitor;
         _connectionState = connectionState;
@@ -92,6 +96,8 @@ public class OllamaAIService : IAIService
         _skillRegistry = skillRegistry;
         _climateSettings = climateSettings;
         _mcpDataService = mcpDataService;
+        _web = web;
+        _iaWeb = iaWeb;
         }
 
     public bool IsAvailable
@@ -99,14 +105,260 @@ public class OllamaAIService : IAIService
         get
             {
             var options = _optionsMonitor.CurrentValue;
-            return options.Enabled
+            var localLista = options.Enabled
                 && !string.IsNullOrWhiteSpace(options.Url)
                 && !string.IsNullOrWhiteSpace(options.Model)
                 && _connectionState.IsReady;
+            // Con el servicio web habilitado la IA sigue disponible aunque la
+            // ruta local no responda (la consulta sale en paralelo y el cálculo
+            // determinista de cada página queda siempre como respaldo).
+            return localLista || _web.Habilitada;
             }
         }
 
     private HttpClient CreateClient() => _httpClientFactory.CreateClient("Ollama");
+
+    // --- Carrera local ↔ servicio web -----------------------------------------
+    // Con picos de hasta ~20 usuarios, la inferencia local va con CONCURRENCIA 1:
+    // sin este candado, N generaciones simultáneas multiplican la caché KV por
+    // usuario (≈192 MB c/u con num_ctx=6144) y Ollama termina respondiendo 500
+    // por falta de memoria. La cola local no frena a nadie: mientras una
+    // consulta espera su turno, la contraparte web corre en paralelo.
+    private static readonly SemaphoreSlim _ollamaGate = new(1, 1);
+
+    /// <summary>
+    /// Si la ruta local está ocupada por otra inferencia, cuánto espera su turno
+    /// antes de rendirse y consumir la vía web (que ya está corriendo en paralelo).
+    /// Con web deshabilitada se espera el presupuesto completo: lo local es lo único.
+    /// </summary>
+    private static readonly TimeSpan GraciaColaConWeb = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// ¿El contenido devuelto es un plan de zafra parseable (JSON con su lista
+    /// de acciones)? Un modelo pequeño a veces devuelve JSON truncado o prosa
+    /// disfrazada; eso NO cuenta como "responder" frente a la vía web.
+    /// </summary>
+    private static bool EsPlanZafraUsable(string contenido)
+        {
+        if (string.IsNullOrWhiteSpace(contenido))
+            return false;
+
+        // Tolera vallas ```json y prosa alrededor: se analiza el trozo { … }.
+        var inicio = contenido.IndexOf('{');
+        var fin = contenido.LastIndexOf('}');
+        if (inicio < 0 || fin <= inicio)
+            return false;
+
+        try
+            {
+            using var doc = JsonDocument.Parse(contenido.Substring(inicio, fin - inicio + 1));
+            return doc.RootElement.ValueKind == JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("accionesEstrategicas", out var acciones)
+                && acciones.ValueKind == JsonValueKind.Array
+                && acciones.GetArrayLength() > 0;
+            }
+        catch (System.Text.Json.JsonException)
+            {
+            return false;
+            }
+        }
+
+    /// <summary>
+    /// Dispara EN PARALELO la consulta local (Ollama) y la consulta web (servicio
+    /// externo gratuito) con el mismo prompt ya armado. Prioriza la local: su
+    /// respuesta se usa si llega; la web solo se consume cuando la local no
+    /// responde (error, vacío, timeout o cola saturada). Si ninguna responde,
+    /// devuelve vacío y la página conserva su cálculo determinista — ningún
+    /// usuario espera frente a la pantalla.
+    /// </summary>
+    private async Task<string> EnviarEnParaleloAsync(
+        object solicitudOllama,
+        List<object> messages,
+        bool modoJson,
+        TimeSpan? presupuestoLocal,
+        string diagnostico,
+        Func<string, bool>? contenidoUtil = null,
+        CancellationToken cancellationToken = default)
+        {
+        var ctsWeb = new CancellationTokenSource();
+        var tareaWeb = _web.Habilitada
+            ? _web.EnviarAsync(messages, modoJson, ctsWeb.Token)
+            : Task.FromResult<string?>(null);
+
+        string local;
+        try
+            {
+            local = await EnviarAOllamaAsync(solicitudOllama, presupuestoLocal, diagnostico, cancellationToken);
+            }
+        catch
+            {
+            ctsWeb.Cancel();
+            try { await tareaWeb; } catch { /* la local se cayó: la web tampoco interesa */ }
+            ctsWeb.Dispose();
+            throw;
+            }
+
+        // "Respondió" solo cuenta si el contenido es usable: un JSON truncado o
+        // fuera de forma de la ruta local NO debe ganarle a un plan web válido.
+        var localUsable = !string.IsNullOrWhiteSpace(local)
+            && (contenidoUtil?.Invoke(local) ?? true);
+
+        if (localUsable)
+            {
+            // La ruta local respondió: se corta la web en vuelo para no gastar
+            // el cupo gratuito en una respuesta que no se va a usar.
+            ctsWeb.Cancel();
+            try { await tareaWeb; } catch { /* cancelada: no interesa */ }
+            ctsWeb.Dispose();
+            return local;
+            }
+
+        string? remota = null;
+        try
+            {
+            remota = await tareaWeb;
+            }
+        catch (OperationCanceledException)
+            {
+            // cancelada por otra vía: se trata como "sin respuesta web".
+            }
+        finally
+            {
+            ctsWeb.Dispose();
+            }
+
+        if (!string.IsNullOrWhiteSpace(remota) && (contenidoUtil?.Invoke(remota) ?? true))
+            {
+            _logger.LogInformation(
+                "{Diag}: respuesta web consumida ({Motivo}).",
+                diagnostico,
+                string.IsNullOrWhiteSpace(local) ? "la ruta local no respondió" : "la ruta local respondió contenido no usable");
+            return remota;
+            }
+
+        // Ni la web ni (con utilidad) lo local: se devuelve lo local aunque esté
+        // en prosa para que el método conserve su plan local de siempre.
+        return local;
+        }
+
+    /// <summary>
+    /// Ruta local con CONCURRENCIA 1 y presupuesto de tiempo propio: hasta 2
+    /// intentos dentro del presupuesto (misma semántica histórica de reintentos)
+    /// — o 1 intento dentro de la ventana <c>EsperaLocalSegundos</c> cuando hay
+    /// servicio web habilitado. Si la cola local está saturada y hay servicio
+    /// web, cede rápido (15 s) en vez de acumularse; con web deshabilitada
+    /// espera su turno completo.
+    /// </summary>
+    private async Task<string> EnviarAOllamaAsync(
+        object solicitudOllama,
+        TimeSpan? presupuesto,
+        string diagnostico,
+        CancellationToken cancellationToken)
+        {
+        var limite = presupuesto ?? TimeSpan.FromSeconds(300);
+
+        // Con servicio web habilitado, la local tiene una VENTANA para responder
+        // (prioridad real, pero acotada): la web ya está corriendo en paralelo y
+        // su respuesta queda lista en segundos. Sin web, la local conserva su
+        // presupuesto histórico completo porque es lo único que existe.
+        if (_web.Habilitada)
+            {
+            var ventana = TimeSpan.FromSeconds(_iaWeb.CurrentValue.EsperaLocalSegundos);
+            if (limite > ventana)
+                limite = ventana;
+            }
+
+        var esperaCola = _web.Habilitada ? TimeSpan.FromMilliseconds(Math.Min(limite.TotalMilliseconds, GraciaColaConWeb.TotalMilliseconds)) : limite;
+
+        if (!await _ollamaGate.WaitAsync(esperaCola, cancellationToken))
+            {
+            _logger.LogInformation("{Diag}: la ruta local está ocupada por otra inferencia; se consume la vía web o el cálculo local.", diagnostico);
+            return string.Empty;
+            }
+
+        try
+            {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(limite);
+            var client = CreateClient();
+
+            // Con servicio web habilitado basta UN intento local: el reintento
+            // histórico existía porque lo local era lo único que había, y ahora
+            // solo retrasaría el respaldo web. Sin web, se conservan los 2.
+            var maxIntentos = _web.Habilitada ? 1 : 2;
+
+            for (var intento = 1; intento <= maxIntentos; intento++)
+                {
+                HttpResponseMessage response;
+                try
+                    {
+                    response = await client.PostAsJsonAsync("/api/chat", solicitudOllama, cts.Token);
+                    }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                    throw; // cancelación externa (la página/circuito se fue): no es fallo local.
+                    }
+                catch (OperationCanceledException)
+                    {
+                    _logger.LogWarning("{Diag}: la ruta local superó {Segundos}s (intento {Intento}/{Intentos}); se consume la vía web o el cálculo local.", diagnostico, limite.TotalSeconds, intento, maxIntentos);
+                    return string.Empty;
+                    }
+                catch (HttpRequestException ex)
+                    {
+                    _logger.LogWarning("{Diag}: la ruta local no responde ({Error}); se consume la vía web o el cálculo local.", diagnostico, ex.GetType().Name);
+                    return string.Empty;
+                    }
+
+                if (!response.IsSuccessStatusCode)
+                    {
+                    _logger.LogWarning("{Diag}: la ruta local devolvió {Status} (intento {Intento}/{Intentos}).", diagnostico, response.StatusCode, intento, maxIntentos);
+                    MarcarFalloDeGeneracion($"HTTP {(int)response.StatusCode}");
+                    if (intento < maxIntentos)
+                        {
+                        await Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+                        continue;
+                        }
+
+                    return string.Empty;
+                    }
+
+                var envelopeJson = await response.Content.ReadAsStringAsync(cts.Token);
+                string contenido;
+                try
+                    {
+                    var envelope = JsonSerializer.Deserialize<OllamaChatResponse>(envelopeJson);
+                    contenido = envelope?.Message?.Content ?? string.Empty;
+                    }
+                catch (Exception ex)
+                    {
+                    _logger.LogWarning(ex, "{Diag}: no se pudo parsear el sobre de respuesta de la ruta local.", diagnostico);
+                    return string.Empty;
+                    }
+
+                if (!string.IsNullOrWhiteSpace(contenido))
+                    return contenido;
+
+                if (intento < maxIntentos)
+                    {
+                    _logger.LogWarning("{Diag}: la ruta local respondió sin contenido (intento {Intento}/{Intentos}); se reintenta.", diagnostico, intento, maxIntentos);
+                    await Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+                    }
+                }
+
+            return string.Empty;
+            }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+            // El presupuesto local venció (p. ej. durante la espera entre
+            // intentos): se rinde la ruta local y se consume la vía web.
+            _logger.LogWarning("{Diag}: la ruta local superó {Segundos}s en total; se consume la vía web o el cálculo local.", diagnostico, limite.TotalSeconds);
+            return string.Empty;
+            }
+        finally
+            {
+            _ollamaGate.Release();
+            }
+        }
 
     private void MarcarFalloDeGeneracion(string motivo)
         {
@@ -203,18 +455,11 @@ public class OllamaAIService : IAIService
 
             var request = new { model = options.Model, messages, stream = false };
 
-            var client = CreateClient();
-            var response = await client.PostAsJsonAsync("/api/chat", request);
-            if (!response.IsSuccessStatusCode)
-                {
-                var error = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Ollama Chat error: {Status} - {Error}", response.StatusCode, error);
-                MarcarFalloDeGeneracion($"HTTP {(int)response.StatusCode}");
+            // Carrera local ↔ web: la local (Ollama) tiene prioridad; si no
+            // responde, contesta el servicio web con el mismo prompt armado.
+            var reply = await EnviarEnParaleloAsync(request, messages, modoJson: false, presupuestoLocal: null, diagnostico: "Chat");
+            if (string.IsNullOrEmpty(reply))
                 return string.Empty;
-                }
-
-            var result = await response.Content.ReadFromJsonAsync<OllamaChatResponse>();
-            var reply = result?.Message?.Content ?? string.Empty;
 
             // AC-1: el pie de la fuente es determinista (el modelo pequeño no
             // siempre obedece la instrucción de citar la fuente dentro del prompt).
@@ -274,41 +519,9 @@ public class OllamaAIService : IAIService
                 options = new { num_predict = 400, temperature = 0.3, num_ctx = 4096 }
                 };
 
-            var client = CreateClient();
-            // Timeout duro: si Ollama está saturado por otra generación, mejor volver
-            // rápido a las sugerencias locales que dejar al usuario esperando.
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
-            HttpResponseMessage response;
-            try
-                {
-                response = await client.PostAsJsonAsync("/api/chat", requestObj, cts.Token);
-                }
-            catch (OperationCanceledException)
-                {
-                _logger.LogWarning("Ollama GetBusinessSuggestionsAsync superó 120s; se usan las sugerencias locales.");
-                return empty;
-                }
-
-            if (!response.IsSuccessStatusCode)
-                {
-                _logger.LogWarning("Ollama GetBusinessSuggestionsAsync error: {Status}", response.StatusCode);
-                MarcarFalloDeGeneracion($"HTTP {(int)response.StatusCode}");
-                return empty;
-                }
-
-            var envelopeJson = await response.Content.ReadAsStringAsync();
-            _logger.LogInformation("Sugerencias Ollama HTTP {Status}, respuesta ({Len} chars).", response.StatusCode, envelopeJson.Length);
-            string rawContent;
-            try
-                {
-                var envelope = JsonSerializer.Deserialize<OllamaChatResponse>(envelopeJson);
-                rawContent = envelope?.Message?.Content ?? string.Empty;
-                }
-            catch (Exception ex)
-                {
-                _logger.LogWarning(ex, "No se pudo parsear el sobre de respuesta de Ollama.");
-                return empty;
-                }
+            // Timeout duro (120 s) + carrera local ↔ web: mejor volver rápido a
+            // las sugerencias locales que dejar al usuario esperando.
+            var rawContent = await EnviarEnParaleloAsync(requestObj, messages, modoJson: true, presupuestoLocal: TimeSpan.FromSeconds(120), diagnostico: "GetBusinessSuggestionsAsync");
 
             // Diagnóstico: ver el inicio del contenido permite detectar prosa frente a JSON.
             var inicio = rawContent.Length > 200 ? rawContent[..200] : rawContent;
@@ -435,65 +648,14 @@ public class OllamaAIService : IAIService
                 options = new { num_predict = 1400, temperature = 0.2, num_ctx = 6144 }
                 };
 
-            var client = CreateClient();
-            string rawContent = string.Empty;
-
-            // Hasta 2 intentos: en máquinas con poca RAM libre Ollama puede fallar con
-            // 500 (bad_alloc al crear la caché KV) o contestar 200 sin contenido; el
-            // segundo intento suele salir cuando el modelo ya quedó cargado en memoria.
-            for (var intento = 1; intento <= 2 && string.IsNullOrWhiteSpace(rawContent); intento++)
-                {
-                using var cts = new CancellationTokenSource(ZafraStrategyTimeout);
-                HttpResponseMessage response;
-                try
-                    {
-                    response = await client.PostAsJsonAsync("/api/chat", requestObj, cts.Token);
-                    }
-                catch (OperationCanceledException)
-                    {
-                    _logger.LogWarning("Ollama GetZafraInteligentStrategyAsync superó el tiempo límite de {Segundos}s (intento {Intento}/2); se usa el fallback sin IA.", ZafraStrategyTimeout.TotalSeconds, intento);
-                    if (intento < 2)
-                        {
-                        // El primer intento suele agotarse cargando el modelo; el segundo
-                        // arranca con el modelo ya en memoria y es mucho más rápido.
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        continue;
-                        }
-
-                    return empty;
-                    }
-
-                if (!response.IsSuccessStatusCode)
-                    {
-                    _logger.LogWarning("Ollama GetZafraInteligentStrategyAsync error: {Status} (intento {Intento}/2).", response.StatusCode, intento);
-                    if (intento < 2)
-                        {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        continue;
-                        }
-
-                    MarcarFalloDeGeneracion($"HTTP {(int)response.StatusCode}");
-                    return empty;
-                    }
-
-                var envelopeJson = await response.Content.ReadAsStringAsync();
-                try
-                    {
-                    var envelope = JsonSerializer.Deserialize<OllamaChatResponse>(envelopeJson);
-                    rawContent = envelope?.Message?.Content ?? string.Empty;
-                    }
-                catch (Exception ex)
-                    {
-                    _logger.LogWarning(ex, "No se pudo parsear el sobre de respuesta de Ollama para ZafraStrategy.");
-                    return empty;
-                    }
-
-                if (string.IsNullOrWhiteSpace(rawContent) && intento < 2)
-                    {
-                    _logger.LogWarning("Ollama GetZafraInteligentStrategyAsync respondió sin contenido (intento {Intento}/2); se reintenta.", intento);
-                    await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                }
+            // Carrera local ↔ web con el MISMO prompt armado: la local corre con
+            // concurrencia 1 (protege la RAM) y prioridad —pero acotada a la
+            // ventana EsperaLocalSegundos cuando hay web—; si no responde o
+            // responde un JSON fuera de forma, se consume la web.
+            var rawContent = await EnviarEnParaleloAsync(requestObj, messages, modoJson: true,
+                presupuestoLocal: TimeSpan.FromSeconds(ZafraStrategyTimeout.TotalSeconds * 2 + 2),
+                diagnostico: "GetZafraInteligentStrategyAsync",
+                contenidoUtil: EsPlanZafraUsable);
 
             if (string.IsNullOrWhiteSpace(rawContent))
                 return empty;
@@ -571,60 +733,12 @@ public class OllamaAIService : IAIService
                 options = new { num_predict = 1280, temperature = 0.2, num_ctx = 6144 }
                 };
 
-            var client = CreateClient();
-            string rawContent = string.Empty;
-
-            for (var intento = 1; intento <= 2 && string.IsNullOrWhiteSpace(rawContent); intento++)
-                {
-                using var cts = new CancellationTokenSource(ZafraStrategyTimeout);
-                HttpResponseMessage response;
-                try
-                    {
-                    response = await client.PostAsJsonAsync("/api/chat", requestObj, cts.Token);
-                    }
-                catch (OperationCanceledException)
-                    {
-                    _logger.LogWarning("Ollama GetAnalisisDeModuloAsync ({Clave}) superó {Segundos}s (intento {Intento}/2); se mantiene el análisis local.", clavePrompt, ZafraStrategyTimeout.TotalSeconds, intento);
-                    if (intento < 2)
-                        {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        continue;
-                        }
-
-                    return empty;
-                    }
-
-                if (!response.IsSuccessStatusCode)
-                    {
-                    _logger.LogWarning("Ollama GetAnalisisDeModuloAsync ({Clave}) error: {Status} (intento {Intento}/2).", clavePrompt, response.StatusCode, intento);
-                    if (intento < 2)
-                        {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        continue;
-                        }
-
-                    MarcarFalloDeGeneracion($"HTTP {(int)response.StatusCode}");
-                    return empty;
-                    }
-
-                var envelopeJson = await response.Content.ReadAsStringAsync();
-                try
-                    {
-                    var envelope = JsonSerializer.Deserialize<OllamaChatResponse>(envelopeJson);
-                    rawContent = envelope?.Message?.Content ?? string.Empty;
-                    }
-                catch (Exception ex)
-                    {
-                    _logger.LogWarning(ex, "No se pudo parsear el sobre de respuesta de Ollama para {Clave}.", clavePrompt);
-                    return empty;
-                    }
-
-                if (string.IsNullOrWhiteSpace(rawContent) && intento < 2)
-                    {
-                    _logger.LogWarning("Ollama GetAnalisisDeModuloAsync ({Clave}) respondió sin contenido (intento {Intento}/2); se reintenta.", clavePrompt, intento);
-                    await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                }
+            // Carrera local ↔ web con el MISMO prompt armado: prioriza la ruta
+            // local (concurrencia 1, presupuesto histórico 2 × 330 s); si no
+            // responde, se consume el servicio web.
+            var rawContent = await EnviarEnParaleloAsync(requestObj, messages, modoJson: true,
+                presupuestoLocal: TimeSpan.FromSeconds(ZafraStrategyTimeout.TotalSeconds * 2 + 2),
+                diagnostico: "GetAnalisisDeModuloAsync " + clavePrompt);
 
             if (string.IsNullOrWhiteSpace(rawContent))
                 return empty;
@@ -1079,6 +1193,13 @@ public class OllamaAIService : IAIService
                 return MapToResultDto(fragmento);
             }
 
+        // Diagnóstico: con `format:json` Ollama garantiza sintaxis válida, así que si
+        // llegamos acá el problema es de esquema. Ver el final del contenido permite
+        // verlo sin reproducciones manuales.
+        var fin = cleaned.Length > 300 ? cleaned[^300..] : cleaned;
+        _logger.LogWarning("ZafraStrategy: JSON no parseable ({Len} chars). Fin del contenido: {Fin}",
+            cleaned.Length, fin.Replace('\n', ' ').Replace('\r', ' '));
+
         return null;
         }
 
@@ -1291,27 +1412,77 @@ public class OllamaAIService : IAIService
             }
 
         var acciones = (ai.AccionesEstrategicas ?? new List<ZafraStrategyAiAccionDto>())
-            .Where(a => !string.IsNullOrWhiteSpace(a.Texto))
+            .Where(a => !string.IsNullOrWhiteSpace(a.Texto) && !EsTextoDeEjemplo(a.Texto))
             .Select(a => new BusinessSuggestionDto
                 {
-                Text = a.Texto,
+                Text = a.Texto?.Trim() ?? string.Empty,
                 Color = string.IsNullOrWhiteSpace(a.Color) ? "#607D8B" : a.Color,
                 Icon = string.IsNullOrWhiteSpace(a.Icon) ? "info" : a.Icon,
-                Categoria = a.Categoria,
-                Origen = string.IsNullOrWhiteSpace(a.Origen) ? "Checklist" : a.Origen,
-                Impacto = a.Impacto,
-                Riesgo = a.Riesgo
+                Categoria = SaneareCategoria(a.Categoria),
+                Origen = string.IsNullOrWhiteSpace(a.Origen) ? "Checklist" : a.Origen.Split('|')[0].Trim(),
+                Impacto = ContieneTextoDeEjemplo(a.Impacto) ? null : a.Impacto,
+                Riesgo = ContieneTextoDeEjemplo(a.Riesgo) ? null : a.Riesgo
                 })
+            .GroupBy(a => a.Text, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
             .ToList();
+
+        // Resumen y benchmark: si el modelo repitió el EJEMPLO del prompt se descartan
+        // (la página conserva su texto local) — nunca texto de plantilla en pantalla.
+        var resumen = ai.ResumenEjecutivo ?? string.Empty;
+        if (ContieneTextoDeEjemplo(resumen))
+            resumen = string.Empty;
+        if (kpis != null && ContieneTextoDeEjemplo(kpis.ComparativaBenchmark))
+            kpis.ComparativaBenchmark = string.Empty;
 
         return new ZafraStrategyResultDto
             {
             KPIs = kpis,
             AccionesEstrategicas = acciones,
             Escenarios = new List<ScenarioDto>(),
-            ResumenEjecutivo = ai.ResumenEjecutivo ?? string.Empty,
+            ResumenEjecutivo = resumen,
             EsIA = true
             };
+        }
+
+    /// <summary>
+    /// Los modelos chicos a veces repiten textualmente el EJEMPLO del prompt
+    /// ("Verbo + decisión concreta, sin relleno" / "Cifra concreta en USD o kg…").
+    /// Un plan con textos de plantilla arruina el tablero y el PDF, así que se
+    /// filtra acá, antes de que la página adopte la respuesta: si no queda ninguna
+    /// acción válida, la página conserva su plan local determinista.
+    /// </summary>
+    private static bool EsTextoDeEjemplo(string texto)
+        {
+        var t = texto.Trim();
+        return t.Length < 10
+            || t.Contains("Verbo + decisión", StringComparison.OrdinalIgnoreCase)
+            || t.Contains("sin relleno", StringComparison.OrdinalIgnoreCase)
+            || t.Contains("lorem ipsum", StringComparison.OrdinalIgnoreCase)
+            || t.Contains("Cifra concreta en USD", StringComparison.OrdinalIgnoreCase)
+            || t.Contains("Riesgo o trade-off de tomar", StringComparison.OrdinalIgnoreCase)
+            || t.Contains("Veredicto de 3-4 oraciones", StringComparison.OrdinalIgnoreCase)
+            || t.Contains("Veredicto con cifras del INPUT", StringComparison.OrdinalIgnoreCase);
+        }
+
+    private static bool ContieneTextoDeEjemplo(string? texto)
+        => !string.IsNullOrWhiteSpace(texto) && EsTextoDeEjemplo(texto);
+
+    /// <summary>
+    /// El ejemplo del prompt mostraba la categoria como lista "Financiero | Calidad | …"
+    /// y el modelo chico la copia tal cual; el tablero agrupa por UN eje, así que se
+    /// queda el primer token. Sin categoría válida devuelve null (la acción conserva
+    /// su tarjeta individual en la página).
+    /// </summary>
+    private static string? SaneareCategoria(string? categoria)
+        {
+        if (string.IsNullOrWhiteSpace(categoria))
+            return categoria;
+        var primerToken = categoria
+            .Split(new[] { '|', '/', ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Trim())
+            .FirstOrDefault(p => p.Length > 0);
+        return string.IsNullOrWhiteSpace(primerToken) ? null : primerToken;
         }
 
     private async Task<string> LoadPromptTemplateAsync(string key, string embeddedFallback)
@@ -1421,29 +1592,13 @@ public class OllamaAIService : IAIService
                 keep_alive = string.IsNullOrWhiteSpace(options.KeepAlive) ? "30m" : options.KeepAlive
                 };
 
-            var client = CreateClient();
-            var response = await client.PostAsJsonAsync("/api/chat", requestObj, cancellationToken);
+            // Carrera local ↔ web con el MISMO prompt armado; si ninguna responde,
+            // se conserva la respuesta de respaldo local de siempre.
+            var contenido = await EnviarEnParaleloAsync(requestObj, messages, modoJson: true,
+                presupuestoLocal: null, diagnostico: "GetClimateRiskStrategyAsync",
+                cancellationToken: cancellationToken);
 
-            if (!response.IsSuccessStatusCode)
-                {
-                _logger.LogWarning("Ollama GetClimateRiskStrategyAsync error: {Status}", response.StatusCode);
-                MarcarFalloDeGeneracion($"HTTP {(int)response.StatusCode}", esFalloDeServidor: true);
-                return GetFallbackResponse(inputJson);
-                }
-
-            var envelopeJson = await response.Content.ReadAsStringAsync(cancellationToken);
-            string rawContent;
-            try
-                {
-                var envelope = JsonSerializer.Deserialize<OllamaChatResponse>(envelopeJson);
-                rawContent = StripJsonFences(envelope?.Message?.Content ?? string.Empty);
-                }
-            catch (Exception ex)
-                {
-                _logger.LogWarning(ex, "No se pudo parsear el sobre de respuesta de Ollama para ClimateRisk.");
-                return GetFallbackResponse(inputJson);
-                }
-
+            var rawContent = StripJsonFences(contenido ?? string.Empty);
             if (string.IsNullOrWhiteSpace(rawContent))
                 return GetFallbackResponse(inputJson);
 

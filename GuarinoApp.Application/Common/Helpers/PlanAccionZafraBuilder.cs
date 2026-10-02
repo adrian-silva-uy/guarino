@@ -155,6 +155,16 @@ public static class PlanAccionZafraBuilder
             Origen = "Checklist"
             });
 
+        acciones.Add(new BusinessSuggestionDto
+            {
+            Text = "Armar la grilla de ventanas de precio por mercado destino y el listado de requisitos de entrada (protocolo fitosanitario, certificaciones GLOBALG.A.P./BRCGS) para avanzar hacia nuevos mercados, con Asia (Vietnam, India) como franja prioritaria.",
+            Color = "#00BCD4",
+            Icon = "public",
+            Categoria = "Mercados",
+            Origen = "Checklist",
+            Riesgo = "Concentrar la venta en pocos destinos deja el ingreso expuesto al precio y a la demanda de esos mercados."
+            });
+
         return acciones;
         }
     }

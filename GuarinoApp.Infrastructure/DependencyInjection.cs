@@ -70,6 +70,28 @@ namespace GuarinoApp.Infrastructure
             services.AddScoped<IAIService, FallbackAIService>();
             services.AddHostedService<OllamaStartupService>();
 
+            // --- Servicio web de IA en PARALELO a la ruta local (plan gratuito) ---
+            // La consulta armada sale simultáneamente a Ollama y al servicio web;
+            // la ruta local tiene prioridad y la respuesta web solo se consume
+            // cuando la local no responde. Sin clave configurada, Habilitada=false
+            // y todo sigue igual que antes (local + cálculo determinista).
+            // La clave NUNCA va al repo: user-secrets (dev) o IaWeb__ApiKey (prod).
+            services.AddOptions<IaWebOptions>()
+                .Bind(configuration.GetSection(IaWebOptions.SectionName))
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            services.AddHttpClient("IaWeb", (sp, client) =>
+            {
+                var options = sp.GetRequiredService<IOptionsMonitor<IaWebOptions>>().CurrentValue;
+                client.BaseAddress = new Uri(options.UrlBase.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(Math.Max(options.TimeoutSegundos, 5));
+            });
+
+            // Singleton: el candado de consultas simultáneas del cupo gratuito
+            // debe ser único para toda la aplicación (no por circuito).
+            services.AddSingleton<IIaWebClient, IaWebClient>();
+
             // --- MCP: cliente de servidores externos (SPEC 003) ---
             // Solo lectura, allowlist por configuración y orquestación
             // determinista (ADR-003). Cada llamada saliente queda auditada.

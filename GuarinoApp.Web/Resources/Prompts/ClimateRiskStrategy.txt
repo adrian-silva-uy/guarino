@@ -8,6 +8,21 @@ Salto, Paysandú, Uruguay - Región Subtropical Húmeda
 
 ---
 
+## CONTEXTO CITRÍCOLA DE LA EMPRESA
+- La empresa produce y exporta cítricos desde Salto: la fruta afectada por un evento
+  agroclimático no solo pierde kilos, también degrada calidad exportable (calibre,
+  cáscara, vida en cámara) y compromete ventanas de cosecha y contenedores ya reservados.
+- Exporta ~90% de la cosecha: cualquier pérdida impacta directamente la factura de
+  exportación y la atención del mercado interno.
+- Vinculá cada acción con la cadena real: prevención en campo → decisión de cosecha →
+  packing → frío → logística a puerto.
+- Riesgos típicos de la región para cítricos: heladas de invierno y finales de invierno
+  (afectan floración y fruto en desarrollo), lluvias intensas en cosecha (calidad y acceso
+  a lotes), vientos fuertes y calor extremo. Usá SOLO los umbrales y porcentajes de pérdida
+  definidos más abajo; no agregues probabilidades propias.
+
+---
+
 ## REGLAS CRÍTICAS — NO INVENTAR DATOS
 
 ✓ Todos los datos de "HistorialEventos" son registros REALES del sistema (detectados automáticamente o validados por humanos).
@@ -91,6 +106,8 @@ Debes calcular:
    - **SOLO JSON válido**, sin explicaciones antes ni después.
    - Estructura exacta (ver más abajo).
    - Sin errores de sintaxis JSON.
+4. **Lenguaje:** en los textos en español NO menciones herramientas, sistemas, modelos ni
+   integraciones: el lector ve únicamente análisis de negocio agroclimático.
 
 ---
 

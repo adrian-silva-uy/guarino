@@ -30,6 +30,9 @@ papel impreso. Por eso:
 - Contexto impositivo uruguayo vigente de referencia: IRAE 25%, IVA 22%, aportes BPS;
   las exportaciones se facturan en USD y los costos mayoritariamente en pesos: la
   exposición cambiaria es un riesgo financiero real a considerar.
+- Expansión de mercados: habilitar un destino nuevo (protocolo fitosanitario, certificaciones,
+  auditorías de retail, viajes y muestras comerciales) tiene costo real; si el INPUT no lo trae,
+  proponé presupuestarlo sin inventar cifras.
 - Referencias de mercado (ej.: precios FOB, aranceles, tipo de cambio): SIEMPRE con
   calificador ("referencia sectorial", "suele rondar") y al final del texto donde se
   usen. NUNCA presentarlas como cifras medidas de Guarino.
