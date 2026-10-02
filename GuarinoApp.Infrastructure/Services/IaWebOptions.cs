@@ -22,7 +22,7 @@ namespace GuarinoApp.Infrastructure.Services
 
         /// <summary>Modelo a usar en el proveedor.</summary>
         [Required]
-        public string Modelo { get; set; } = "meta-llama/llama-4-scout-17b-16e-instruct";
+        public string Modelo { get; set; } = "openai/gpt-oss-120b";
 
         /// <summary>Clave de acceso. Vacía = servicio deshabilitado (solo ruta local).</summary>
         public string ApiKey { get; set; } = string.Empty;

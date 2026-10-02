@@ -97,7 +97,7 @@ dotnet ef migrations list
   "IaWeb": {
     "Habilitada": true,
     "UrlBase": "https://api.groq.com/openai/v1",
-    "Modelo": "meta-llama/llama-4-scout-17b-16e-instruct",
+    "Modelo": "openai/gpt-oss-120b",
     "ApiKey": ""
   },
   "Notificaciones": {
@@ -128,7 +128,7 @@ dotnet run
 # Salida esperada:
 # info: GuarinoApp.Web.Program[0]
 #     GuarinoApp iniciada. Entorno: Development | Ollama: True en http://localhost:11434 | ...
-#     IA web en paralelo (plan gratuito): sin clave (solo ruta local) — meta-llama/llama-4-scout-17b-16e-instruct
+#     IA web en paralelo (plan gratuito): sin clave (solo ruta local) — openai/gpt-oss-120b
 # info: GuarinoApp.Web.Program[0]
 #     CORS: Development — cualquier origen habilitado.
 # info: Microsoft.Hosting.Lifetime[0]
@@ -306,7 +306,7 @@ repo). Sus claves deben coincidir con las secciones que la app realmente lee —
   "IaWeb": {
     "Habilitada": true,
     "UrlBase": "https://api.groq.com/openai/v1",
-    "Modelo": "meta-llama/llama-4-scout-17b-16e-instruct",
+    "Modelo": "openai/gpt-oss-120b",
     "ApiKey": "",
     "TimeoutSegundos": 45,
     "ConsultasWebSimultaneas": 8,
