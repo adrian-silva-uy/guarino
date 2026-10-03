@@ -42,6 +42,13 @@ namespace GuarinoApp.Infrastructure.Services
         /// ruta local conserva su presupuesto histórico completo.
         /// </summary>
         [Range(10, 600)]
-        public int EsperaLocalSegundos { get; set; } = 90;
+        /// <summary>
+        /// Segundos que la ruta local tiene para responder cuando la web está
+        /// habilitada. Con 90 s el usuario esperaba una respuesta local lenta
+        /// aunque la web ya estuviera lista en 1-3 s; con 12 s la local solo
+        /// gana cuando responde rápido (modelo tibio, prompt corto) y el pico
+        /// de usuarios se responde por la vía web o por la caché de resultados.
+        /// </summary>
+        public int EsperaLocalSegundos { get; set; } = 12;
         }
     }

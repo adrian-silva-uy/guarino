@@ -453,7 +453,22 @@ public class OllamaAIService : IAIService
 
             messages.Add(new { role = "user", content = prompt });
 
-            var request = new { model = options.Model, messages, stream = false };
+            // options explícitos: sin num_ctx Ollama usa 2048 y el prompt de
+            // chat (plantilla + datos en vivo + MCP + habilidad + historial de
+            // 10 turnos) puede excederlo y truncarse. num_predict acota la
+            // respuesta para que el turno de la compuerta local se libere antes.
+            var request = new
+                {
+                model = options.Model,
+                messages,
+                stream = false,
+                options = new
+                    {
+                    num_ctx = 4096,
+                    num_predict = 700,
+                    temperature = options.Temperature ?? 0.2
+                    }
+                };
 
             // Carrera local ↔ web: la local (Ollama) tiene prioridad; si no
             // responde, contesta el servicio web con el mismo prompt armado.

@@ -310,7 +310,7 @@ repo). Sus claves deben coincidir con las secciones que la app realmente lee —
     "ApiKey": "",
     "TimeoutSegundos": 45,
     "ConsultasWebSimultaneas": 4,
-    "EsperaLocalSegundos": 90
+    "EsperaLocalSegundos": 12
   },
   "Cors": {
     "AllowedOrigins": [ "https://guarino.company.com" ]

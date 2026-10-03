@@ -22,6 +22,7 @@ public class FallbackAIService : IAIService
     private readonly IDashboardDataService _dashboardService;
     private readonly ISkillRegistry _skillRegistry;
     private readonly IMcpDataService _mcpDataService;
+    private readonly AiResultCache _cache;
 
     private const string FALLBACK_SUGGESTIONS_KEY = "FallbackSuggestions";
     private const string FALLBACK_ZAFRA_KEY = "FallbackZafra";
@@ -32,7 +33,8 @@ public class FallbackAIService : IAIService
         IPromptProvider promptProvider,
         IDashboardDataService dashboardService,
         ISkillRegistry skillRegistry,
-        IMcpDataService mcpDataService)
+        IMcpDataService mcpDataService,
+        AiResultCache cache)
         {
         _ollamaService = ollamaService;
         _logger = logger;
@@ -40,19 +42,33 @@ public class FallbackAIService : IAIService
         _dashboardService = dashboardService;
         _skillRegistry = skillRegistry;
         _mcpDataService = mcpDataService;
+        _cache = cache;
         }
 
     public bool IsAvailable => _ollamaService.IsAvailable;
 
     public async Task<string> ChatAsync(string prompt, List<ChatMessage> history)
         {
+        // Misma consulta repetida en el período pico (p. ej. el chip de
+        // sugerencia que varios usuarios tocan a la vez): respuesta IA al
+        // instante sin volver a consumir cupo.
+        var clave = AiResultCache.Clave("chat", prompt, history);
+        if (_cache.TryGet<string>(clave, out var cacheada) && !string.IsNullOrEmpty(cacheada))
+            {
+            _logger.LogInformation("Chat: respuesta IA reutilizada desde caché (misma consulta).");
+            return cacheada;
+            }
+
         if (_ollamaService.IsAvailable)
             {
             try
                 {
                 var response = await _ollamaService.ChatAsync(prompt, history);
                 if (!string.IsNullOrEmpty(response))
+                    {
+                    _cache.Set(clave, response);
                     return response;
+                    }
                 }
             catch (Exception ex)
                 {
@@ -188,13 +204,26 @@ public class FallbackAIService : IAIService
         BusinessSuggestionRequest request,
         List<ChatMessage>? history = null)
         {
+        // Varias cargas de dashboard con la misma data generan el mismo request:
+        // la primera paga la consulta y el resto recibe las sugerencias IA
+        // instantáneas (clave incluye historial para no cortar conversaciones).
+        var clave = AiResultCache.Clave("sugerencias", request, history);
+        if (_cache.TryGet<List<BusinessSuggestionDto>>(clave, out var cacheadas) && cacheadas is { Count: > 0 })
+            {
+            _logger.LogInformation("Sugerencias: resultado IA reutilizado desde caché (misma solicitud).");
+            return cacheadas;
+            }
+
         if (_ollamaService.IsAvailable)
             {
             try
                 {
                 var aiSuggestions = await _ollamaService.GetBusinessSuggestionsAsync(request, history);
                 if (aiSuggestions != null && aiSuggestions.Any())
+                    {
+                    _cache.Set(clave, aiSuggestions);
                     return aiSuggestions;
+                    }
                 }
             catch (Exception ex)
                 {
@@ -302,13 +331,29 @@ public class FallbackAIService : IAIService
         List<BusinessSuggestionDto>? history = null,
         FinancialDataDto? datosFinancieros = null)
         {
+        // La estrategIA se dispara en cada carga de la página y en cada cambio
+        // del campo de %: con la misma data de entrada se reutiliza la respuesta
+        // IA (solo si EsIA=true: los planes deterministas no entran al caché).
+        var clave = AiResultCache.Clave(
+            "zafra", projectedZafra, capacidadMaxHistorica, stockActualBins, history, datosFinancieros);
+        if (_cache.TryGet<ZafraStrategyResultDto>(clave, out var cacheada)
+            && cacheada is { EsIA: true, AccionesEstrategicas.Count: > 0 })
+            {
+            _logger.LogInformation("EstrategIA: resultado IA reutilizado desde caché (misma data de entrada).");
+            return cacheada;
+            }
+
         if (_ollamaService.IsAvailable)
             {
             try
                 {
                 var aiResult = await _ollamaService.GetZafraInteligentStrategyAsync(projectedZafra, capacidadMaxHistorica, stockActualBins, history, datosFinancieros);
                 if (aiResult != null && (aiResult.AccionesEstrategicas.Any() || aiResult.KPIs != null))
+                    {
+                    if (aiResult.EsIA)
+                        _cache.Set(clave, aiResult);
                     return aiResult;
+                    }
                 }
             catch (Exception ex)
                 {
@@ -321,13 +366,25 @@ public class FallbackAIService : IAIService
 
     public async Task<ModuloInsightDto> GetAnalisisDeModuloAsync(string clavePrompt, string contextoJson)
         {
+        // Gerencia y Contaduría se analizan solos en cada carga de página: con
+        // la misma data de contexto, los demás circuitos usan el caché IA.
+        var clave = AiResultCache.Clave("modulo", clavePrompt, contextoJson);
+        if (_cache.TryGet<ModuloInsightDto>(clave, out var cacheada) && cacheada is { EsIA: true })
+            {
+            _logger.LogInformation("AnalisisModulo {Clave}: resultado IA reutilizado desde caché.", clavePrompt);
+            return cacheada;
+            }
+
         if (_ollamaService.IsAvailable)
             {
             try
                 {
                 var aiResult = await _ollamaService.GetAnalisisDeModuloAsync(clavePrompt, contextoJson);
                 if (aiResult is { EsIA: true })
+                    {
+                    _cache.Set(clave, aiResult);
                     return aiResult;
+                    }
                 }
             catch (Exception ex)
                 {

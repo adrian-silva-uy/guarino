@@ -77,6 +77,12 @@ namespace GuarinoApp.Infrastructure
             services.AddScoped<IAIService, FallbackAIService>();
             services.AddHostedService<OllamaStartupService>();
 
+            // Caché de resultados IA: en picos (~20 usuarios) la misma consulta
+            // repetida por varias cargas de página se contesta una sola vez y el
+            // resto sale del caché al instante (ahorra cupo del plan gratuito y
+            // turnos de la compuerta local). Singleton: compartida por circuitos.
+            services.AddSingleton<AiResultCache>();
+
             // --- Servicio web de IA en PARALELO a la ruta local (plan gratuito) ---
             // La consulta armada sale simultáneamente a Ollama y al servicio web;
             // la ruta local tiene prioridad y la respuesta web solo se consume
