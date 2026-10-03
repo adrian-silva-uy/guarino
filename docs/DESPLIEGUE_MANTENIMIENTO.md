@@ -309,7 +309,7 @@ repo). Sus claves deben coincidir con las secciones que la app realmente lee —
     "Modelo": "openai/gpt-oss-120b",
     "ApiKey": "",
     "TimeoutSegundos": 45,
-    "ConsultasWebSimultaneas": 8,
+    "ConsultasWebSimultaneas": 4,
     "EsperaLocalSegundos": 90
   },
   "Cors": {

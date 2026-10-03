@@ -73,7 +73,12 @@ namespace GuarinoApp.Infrastructure.Services
                     ["model"] = opciones.Modelo,
                     ["messages"] = messages,
                     ["temperature"] = 0.2,
-                    ["max_tokens"] = 1400
+                    // 2500: el modelo de razonamiento gasta tokens pensando antes de
+                    // responder; con 1400 las consultas largas devolvían content vacío.
+                    ["max_tokens"] = 2500,
+                    // Razonamiento acotado: mismas respuestas útiles con menos tokens
+                    // (menos latencia y menos consumo del cupo por minuto del plan gratis).
+                    ["reasoning_effort"] = "low"
                     };
                 // NOTA: no se envía response_format=json_object: el modelo del plan
                 // gratuito (openai/gpt-oss-120b) lo rechaza con 400 y Groq aún no lo

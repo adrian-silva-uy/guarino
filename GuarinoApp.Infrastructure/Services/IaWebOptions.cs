@@ -33,7 +33,7 @@ namespace GuarinoApp.Infrastructure.Services
 
         /// <summary>Máximo de consultas web simultáneas (cupo por minuto del plan gratuito).</summary>
         [Range(1, 20)]
-        public int ConsultasWebSimultaneas { get; set; } = 8;
+        public int ConsultasWebSimultaneas { get; set; } = 4;
 
         /// <summary>
         /// Ventana que se le concede a la ruta local (Ollama) para responder antes
