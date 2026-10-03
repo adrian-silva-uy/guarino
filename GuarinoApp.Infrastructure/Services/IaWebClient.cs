@@ -75,8 +75,12 @@ namespace GuarinoApp.Infrastructure.Services
                     ["temperature"] = 0.2,
                     ["max_tokens"] = 1400
                     };
-                if (modoJson)
-                    cuerpo["response_format"] = new { type = "json_object" };
+                // NOTA: no se envía response_format=json_object: el modelo del plan
+                // gratuito (openai/gpt-oss-120b) lo rechaza con 400 y Groq aún no lo
+                // soporta para modelos de razonamiento. La exigencia de JSON estricto
+                // ya está en todos los prompts ("SOLO JSON válido, sin texto antes ni
+                // después"), así que el contrato de salida se mantiene igual.
+                _ = modoJson; // parámetro reservado para modelos que lo soporten
 
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(TimeSpan.FromSeconds(opciones.TimeoutSegundos));
