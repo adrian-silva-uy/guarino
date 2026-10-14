@@ -19,7 +19,7 @@
 <PageTitle>Contaduría - Datos Financieros</PageTitle>
 
 <div class="container-fluid p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-wrap justify-space-between align-center gap-3 mb-4">
         <div>
             <h2 class="fw-bold text-dark">📊 Contaduría</h2>
             <p class="text-muted mb-0">Ingreso de datos financieros para KPIs y proyecciones</p>
@@ -213,7 +213,7 @@
         @* ====== Análisis para Contaduría: local de inmediato, la IA refina en segundo plano ====== *@
         <MudCard Elevation="2" Class="mt-4">
             <MudCardContent>
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div class="d-flex flex-wrap justify-space-between align-center gap-2 mb-2">
                     <MudText Typo="Typo.h6"> Análisis Financiero para Contaduría</MudText>
                     @if (_refinadoConIA)
                     {
@@ -258,7 +258,7 @@
                         {
                             <MudCard Elevation="0" Class="mb-2" Style="background: #f8f9fa;">
                                 <MudCardContent Class="py-2">
-                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                    <div class="d-flex flex-wrap justify-space-between align-start gap-2">
                                         <MudText Typo="Typo.body2">@a.Texto</MudText>
                                         <div class="d-flex gap-2">
                                             <MudChip T="string" Size="Size.Small" Color="Color.Info">@a.Plazo</MudChip>

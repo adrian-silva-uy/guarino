@@ -42,6 +42,9 @@ namespace GuarinoApp.Infrastructure.Migrations
                     b.Property<DateTime?>("DeactivatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Email")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(200)

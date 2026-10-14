@@ -21,6 +21,7 @@ public class GetUsersQueryHandler : IRequestHandler<GetUsersQuery, List<AppUserD
                 Id = u.Id,
                 UserName = u.UserName,
                 FullName = u.FullName,
+                Email = u.Email,
                 Role = u.Role.Name,
                 IsActive = u.IsActive,
                 ActivatedAt = u.ActivatedAt,

@@ -16,7 +16,7 @@ namespace GuarinoApp.Infrastructure.Data
     /// </summary>
     public static class DbInitializer
         {
-        public static void Initialize(ApplicationDbContext context)
+        public static void Initialize(ApplicationDbContext context, string? emailAdmin = null)
             {
             var random = new Random(12345);
 
@@ -347,6 +347,10 @@ namespace GuarinoApp.Infrastructure.Data
             // Sólo si ya existe al menos un usuario: se preserva FR-8 (el primer
             // usuario creado manualmente es Admin y su contraseña no se toca).
             SembrarUsuariosDeRol(context);
+
+            // 10.55 Correo de los Admin: los usuarios creados antes de existir
+            // la columna Email quedan con NULL y no recibirían reportes.
+            AsegurarEmailAdmin(context, emailAdmin);
 
             // 10.6 LogEntries de auditoría variados (sin datos sensibles).
             SembrarLogEntries(context, random);
@@ -1282,6 +1286,29 @@ VALUES
                     IsDeleted = false
                     });
                 }
+
+            context.SaveChanges();
+            }
+
+        /// <summary>
+        /// Completa el correo de los usuarios con rol Admin que todavía no
+        /// tengan (la columna Email se agregó después de la primera siembra,
+        /// por lo que las bases existentes quedan con NULL). Idempotente: no
+        /// pisa correos ya cargados ni toca a los usuarios que no son Admin.
+        /// </summary>
+        private static void AsegurarEmailAdmin(ApplicationDbContext context, string? emailAdmin)
+            {
+            if (string.IsNullOrWhiteSpace(emailAdmin))
+                return;
+
+            var adminsSinCorreo = context.Users
+                .Where(u => !u.IsDeleted
+                    && (u.Email == null || u.Email == "")
+                    && u.Role != null && u.Role.Name == "Admin")
+                .ToList();
+
+            foreach (var admin in adminsSinCorreo)
+                admin.Email = emailAdmin;
 
             context.SaveChanges();
             }

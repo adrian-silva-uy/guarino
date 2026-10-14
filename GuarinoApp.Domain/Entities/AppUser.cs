@@ -15,6 +15,12 @@ public class AppUser : BaseEntity
     /// <summary>Nombre completo a mostrar en la interfaz.</summary>
     public string FullName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Correo del usuario: destino de los reportes que pide desde la interfaz.
+    /// Opcional; si está vacío los reportes van al administrador.
+    /// </summary>
+    public string? Email { get; set; }
+
     /// <summary>Contraseña en formato PBKDF2 (nunca en texto plano).</summary>
     public string PasswordHash { get; set; } = string.Empty;
 

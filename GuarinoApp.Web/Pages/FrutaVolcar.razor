@@ -7,10 +7,12 @@
 @using GuarinoApp.Application.Modules.FrutaVolcar.Dtos
 @inject IMediator Mediator
 @inject IExportService ExportService
+@inject IEmailService EmailService
+@inject IReportMailRouter ReportMailRouter
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
 
-<div class="d-flex align-center justify-space-between mb-4">
+<div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
     <MudText Typo="Typo.h4" Class="d-flex align-center gap-2">
         <span style="font-size: 1.8rem; line-height: 1;">🍊</span>
         Cítricos - Fruta a Volcar
@@ -23,7 +25,8 @@
                    IsLoading="_loading"
                    OnExportPdf="ExportToPdf"
                    OnExportExcel="ExportToExcel"
-                   OnExportCsv="ExportToCsv" />
+                   OnExportCsv="ExportToCsv"
+                   OnExportEmail="ExportarEmail" />
 </div>
 
 <MudCard>
@@ -53,7 +56,7 @@
                 </MudItem>
             </MudGrid>
 
-            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm" Class="mt-6">
+            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm" RowsPerPage="25" Class="mt-6">
                 <HeaderContent>
                     <MudTh>Lote</MudTh>
                     <MudTh>Productor</MudTh>
@@ -72,6 +75,11 @@
                     <MudTd DataLabel="Saldo" Numeric="true">@context.Saldo</MudTd>
                     <MudTd DataLabel="Kg Saldo" Numeric="true">@context.KgSaldo.ToString("N0")</MudTd>
                 </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }"
+                                   RowsPerPageString="Filas por página:"
+                                   InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+                </PagerContent>
             </MudTable>
         }
         else if (!_loading && _cargado)
@@ -196,6 +204,38 @@
         var fileName = $"Citricos_Fruta_a_Volcar_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
         await JS.InvokeVoidAsync("downloadFileFromText", fileName, ExportService.ExportToCsv(_data), "text/csv");
         Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+    }
+
+    private async Task ExportarEmail()
+    {
+        if (!await EnsureDataForExportAsync()) return;
+        try
+        {
+            var bytes = await ExportService.ExportToPdfAsync(_data, "Cítricos - Fruta a Volcar");
+            var nombreArchivo = $"Citricos_Fruta_a_Volcar_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+
+            // Va al usuario que pidió el reporte, con copia al administrador.
+            var (para, copia) = ReportMailRouter.GetRecipients();
+
+            await EmailService.SendEmailAsync(
+                para,
+                $"Reporte Cítricos - Fruta a Volcar {DateTime.Now:dd/MM/yyyy}",
+                $"Adjunto el reporte de fruta a volcar con {_data.Count} registros.",
+                bytes,
+                nombreArchivo,
+                cc: copia);
+
+            Snackbar.Add(copia == null
+                    ? $"📧 Email enviado correctamente a {para}."
+                    : $"📧 Email enviado correctamente a {para} (copia a {copia}).",
+                Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error enviando email: {ex}");
+            Snackbar.Add($"⚠️ No se pudo enviar el email: {ex.Message}", Severity.Error,
+                config => config.VisibleStateDuration = 8000);
+        }
     }
 
     private Task<bool> EnsureDataForExportAsync()

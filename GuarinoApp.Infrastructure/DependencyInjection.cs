@@ -48,6 +48,10 @@ namespace GuarinoApp.Infrastructure
             services.AddScoped<IExportService, ExportService>();
             services.AddScoped<IEmailService, EmailService>();
 
+            // Destinatarios de los reportes pedidos desde la interfaz:
+            // usuario logueado con copia al administrador (Notificaciones:EmailAdmin).
+            services.AddScoped<IReportMailRouter, ReportMailRouter>();
+
             // Reporte de operación SOLO para el administrador (único destinatario:
             // Notificaciones:EmailAdmin). Cada N minutos envía errores del log,
             // salud de la IA (servicio/modelo/clave) y actualizaciones pendientes

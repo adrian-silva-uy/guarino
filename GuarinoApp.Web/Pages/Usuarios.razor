@@ -7,6 +7,7 @@
 @using GuarinoApp.Application.Modules.Auth.Commands.CreateUser
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @inject ILogger<Usuarios> Logger
 
 <PageTitle>Usuarios - Guarino App</PageTitle>
@@ -46,6 +47,14 @@
                                       Label="Nombre completo"
                                       Variant="Variant.Outlined"
                                       Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudTextField @bind-Value="_newUser.Email"
+                                      Label="Correo (opcional)"
+                                      InputType="InputType.Email"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      HelperText="Destino de sus reportes; vacío = al administrador" />
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
                         <MudTextField @bind-Value="_newUser.Password"
@@ -106,6 +115,7 @@ else
         <HeaderContent>
             <MudTh>Usuario</MudTh>
             <MudTh>Nombre</MudTh>
+            <MudTh>Correo</MudTh>
             <MudTh>Rol</MudTh>
             <MudTh>Activo</MudTh>
             <MudTh>Estado desde</MudTh>
@@ -116,6 +126,22 @@ else
                 <MudText Typo="Typo.body2">@context.UserName</MudText>
             </MudTd>
             <MudTd DataLabel="Nombre">@context.FullName</MudTd>
+            <MudTd DataLabel="Correo">
+                <div class="d-flex align-center gap-1">
+                    <MudText Typo="Typo.body2">@(context.Email ?? "—")</MudText>
+                    @* El correo lo Admin lo edita (el handler también lo valida server-side). *@
+                    <AuthorizeView Roles="Admin" Context="emailCtx">
+                        <Authorized>
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           Title="Editar correo"
+                                           Disabled="_saving"
+                                           OnClick="@(() => EditarEmailAsync(context))" />
+                        </Authorized>
+                    </AuthorizeView>
+                </div>
+            </MudTd>
             <MudTd DataLabel="Rol">
                 <MudSelect T="string"
                            Value="@context.Role"
@@ -170,6 +196,7 @@ else
     {
         public string UserName { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
         public string Role { get; set; } = "Operador";
     }
@@ -196,7 +223,8 @@ else
                 _newUser.UserName,
                 _newUser.FullName,
                 _newUser.Password,
-                _newUser.Role));
+                _newUser.Role,
+                _newUser.Email));
 
             if (result.Success)
             {
@@ -263,6 +291,50 @@ else
     private async Task ChangeActiveAsync(AppUserDto user, bool isActive)
     {
         await SaveAsync(user, isActive: isActive);
+    }
+
+    /// <summary>Abre el diálogo para editar el correo del usuario (destino de
+    /// sus reportes). El alta/edición se valida server-side en el handler.</summary>
+    private async Task EditarEmailAsync(AppUserDto user)
+    {
+        var parameters = new DialogParameters<EditUserEmailDialog>
+        {
+            { x => x.UserName, user.UserName },
+            { x => x.Email, user.Email ?? string.Empty }
+        };
+
+        var dialogRef = await DialogService.ShowAsync<EditUserEmailDialog>("Correo del usuario", parameters);
+        var result = await dialogRef.Result;
+
+        if (result is null || result.Canceled)
+            return; // el usuario canceló, no se guarda nada
+
+        var email = (string)result.Data!;
+
+        _saving = true;
+        try
+        {
+            var save = await Mediator.Send(new UpdateUserEmailCommand(user.Id, email));
+
+            if (save.Success)
+            {
+                Snackbar.Add(
+                    email.Length == 0
+                        ? "Correo eliminado: sus reportes irán al administrador."
+                        : "Correo actualizado correctamente.",
+                    Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(save.Error ?? "No se pudo actualizar el correo.", Severity.Error);
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
     }
 
     private async Task SaveAsync(AppUserDto user, string? role = null, bool? isActive = null)

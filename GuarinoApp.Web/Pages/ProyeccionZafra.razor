@@ -98,7 +98,7 @@
 
 <div class="container-fluid p-4">
     <!-- Encabezado Estratégico -->
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div class="d-flex flex-wrap justify-space-between align-start gap-3 mb-4">
         <div class="me-4">
             <h2 class="fw-bold text-dark mb-1">Tablero de Decisión Financiera</h2>
             <p class="text-muted mb-0">Proyección de la próxima zafra — lectura ejecutiva para Gerencia y Contaduría</p>
@@ -216,7 +216,7 @@
                     <MudItem xs="12" sm="6" md="4">
                         <MudCard Elevation="1" Class="h-100 border-top-4 border-primary bg-light">
                             <MudCardContent>
-                                <div class="d-flex justify-content-between align-items-start">
+                                <div class="d-flex flex-wrap justify-space-between align-start">
                                     <div>
                                         <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="text-transform: uppercase; font-weight: bold;">
                                             Capital de Trabajo Necesario
@@ -273,7 +273,7 @@
                     <MudItem xs="12" sm="6" md="4">
                         <MudCard Elevation="1" Class="h-100 border-top-4 border-danger bg-light">
                             <MudCardContent>
-                                <div class="d-flex justify-content-between align-items-start">
+                                <div class="d-flex flex-wrap justify-space-between align-start">
                                     <div>
                                         <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="text-transform: uppercase; font-weight: bold;">
                                             Índice de Riesgo de Liquidez
@@ -306,7 +306,7 @@
                     <MudItem xs="12" sm="6" md="4">
                         <MudCard Elevation="1" Class="h-100 border-top-4 border-success bg-light">
                             <MudCardContent>
-                                <div class="d-flex justify-content-between align-items-start">
+                                <div class="d-flex flex-wrap justify-space-between align-start">
                                     <div>
                                         <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="text-transform: uppercase; font-weight: bold;">
                                             Oportunidad de Inversión (CAPEX)
@@ -566,7 +566,7 @@
                 <!-- Fila 5: Recomendaciones Estratégicas — UN cuadro por eje de decisión
                      (antes cada acción tenía su tarjeta y las categorías se repetían) -->
                 <MudDivider Class="my-4" />
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+                <div class="d-flex flex-wrap justify-space-between align-center gap-2 mb-1">
                     <MudText Typo="Typo.h5" Color="Color.Primary">
                         🚀 Plan de Acción Estratégico
                     </MudText>
@@ -599,7 +599,7 @@
                             <MudItem xs="12" sm="6" lg="4">
                                 <MudCard Elevation="2" Class="h-100 cursor-pointer hover-shadow" @onclick="() => ExpandirGrupo(categoria, accionesGrupo)">
                                     <MudCardContent>
-                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                        <div class="d-flex flex-wrap justify-space-between align-center gap-2 mb-2">
                                             <MudChip Size="Size.Small" Color="@(accionesGrupo.Any(a => a.Origen == "Calculado") ? Color.Primary : Color.Default)">
                                                 @categoria
                                             </MudChip>

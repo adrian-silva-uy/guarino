@@ -58,6 +58,10 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, AuthR
         if (password.Length < 6)
             return AuthResultDto.Fail("La contraseña debe tener al menos 6 caracteres.");
 
+        var email = (request.Email ?? string.Empty).Trim();
+        if (email.Length > 0 && !EsCorreoValido(email))
+            return AuthResultDto.Fail("El correo electrónico no es válido.");
+
         var exists = await _context.Users
             .AnyAsync(u => u.UserName == userName && !u.IsDeleted, ct);
         if (exists)
@@ -67,6 +71,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, AuthR
         {
             UserName = userName,
             FullName = fullName,
+            Email = email.Length == 0 ? null : email,
             PasswordHash = _passwordHasher.Hash(password),
             RoleId = role.Id,
             IsActive = true,
@@ -83,5 +88,19 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, AuthR
             $"Alta de usuario {user.UserName} con rol {role.Name} por {_currentUser.UserName}.");
 
         return AuthResultDto.Ok();
+    }
+
+    /// <summary>Formato básico de correo (vacío se maneja aparte: es opcional).</summary>
+    private static bool EsCorreoValido(string email)
+    {
+        try
+        {
+            _ = new System.Net.Mail.MailAddress(email);
+            return true;
+        }
+        catch (System.FormatException)
+        {
+            return false;
+        }
     }
 }

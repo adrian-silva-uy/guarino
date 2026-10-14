@@ -19,7 +19,7 @@ namespace GuarinoApp.Infrastructure.Services
             _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
             }
 
-        public async Task SendEmailAsync(string to, string subject, string body, byte[]? attachment = null, string attachmentName = "", string? from = null, string? fromName = null)
+        public async Task SendEmailAsync(string to, string subject, string body, byte[]? attachment = null, string attachmentName = "", string? from = null, string? fromName = null, string? cc = null)
             {
             if (string.IsNullOrWhiteSpace(to))
                 throw new ArgumentException("Destinatario (to) no proporcionado.", nameof(to));
@@ -30,6 +30,10 @@ namespace GuarinoApp.Infrastructure.Services
             message.Subject = subject ?? "(sin asunto)";
             message.Body = body ?? string.Empty;
             message.IsBodyHtml = false;
+
+            // Copia al administrador: se omite si es la misma dirección que "para".
+            if (!string.IsNullOrWhiteSpace(cc) && !string.Equals(cc, to, StringComparison.OrdinalIgnoreCase))
+                message.CC.Add(new MailAddress(cc));
 
             if (attachment != null && attachment.Length > 0)
                 {
@@ -43,7 +47,10 @@ namespace GuarinoApp.Infrastructure.Services
             using var client = BuildSmtpClient();
 
             await client.SendMailAsync(message).ConfigureAwait(false);
-            _logger.LogInformation("Email enviado correctamente a {To}", to);
+            _logger.LogInformation("Email enviado correctamente a {To}{Copia}", to,
+                string.IsNullOrWhiteSpace(cc) || string.Equals(cc, to, StringComparison.OrdinalIgnoreCase)
+                    ? string.Empty
+                    : $" (copia: {cc})");
             }
 
         public async Task<EmailResult> SendEmailWithTemplateAndAttachmentAsync(string to, string subject, string templateFilePath, IDictionary<string, string>? templatePlaceholders, string? attachmentFilePath)

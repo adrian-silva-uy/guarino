@@ -6,6 +6,7 @@
 @using GuarinoApp.Web.Shared
 @inject IExportService ExportService
 @inject IEmailService EmailService
+@inject IReportMailRouter ReportMailRouter
 @inject IDashboardDataService DashboardService
 @inject IAIService AiService
 @inject ISender Mediator
@@ -545,7 +546,9 @@
     {
         var parameters = new DialogParameters<SendEmailDialog>
         {
-            { x => x.Email, "adriansil@hotmail.com" } // valor por defecto, editable en el diálogo
+            // Por defecto, el usuario que pidió el reporte (si no registró
+            // correo, aparece el del administrador). Editable en el diálogo.
+            { x => x.Email, ReportMailRouter.GetRecipients().Para }
         };
 
         var dialogRef = await DialogService.ShowAsync<SendEmailDialog>("Enviar reporte por email", parameters);
@@ -555,14 +558,20 @@
             return; // el usuario canceló, no se envía nada
 
         var recipientEmail = (string)result.Data!;
+        // Copia al administrador salvo que el destinatario ya sea él.
+        var (para, copia) = ReportMailRouter.ForRecipient(recipientEmail);
 
         try
         {
             var data = _tableData.Select(t => new { t.Productor, t.Variedad, t.KgsVolcados, t.Bins, t.Zafra }).ToList();
             var bytes = await ExportService.ExportToExcelAsync(data, "Volcados");
-            await EmailService.SendEmailAsync(recipientEmail, $"Reporte de Volcados {PeriodLabel}",
-                "Adjunto encontrarás el reporte detallado.", bytes, $"Volcados_{_selectedDate:yyyyMM}.xlsx");
-            Snackbar.Add($"📧 Email enviado correctamente a {recipientEmail}.", Severity.Success);
+            await EmailService.SendEmailAsync(para, $"Reporte de Volcados {PeriodLabel}",
+                "Adjunto encontrarás el reporte detallado.", bytes, $"Volcados_{_selectedDate:yyyyMM}.xlsx",
+                cc: copia);
+            Snackbar.Add(copia == null
+                    ? $"📧 Email enviado correctamente a {para}."
+                    : $"📧 Email enviado correctamente a {para} (copia a {copia}).",
+                Severity.Success);
         }
         catch (Exception ex)
         {

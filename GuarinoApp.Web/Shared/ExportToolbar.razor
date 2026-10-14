@@ -5,7 +5,7 @@
     <!-- SECCIÓN IZQUIERDA: FILTROS DE FECHA (OPCIONALES) -->
     @if (ShowDateFilters)
     {
-        <div class="d-flex align-center gap-2">
+        <div class="d-flex flex-wrap align-center gap-2">
             <MudDatePicker Label="Fecha Desde" 
                            Date="@FechaDesde" 
                            DateChanged="HandleFechaDesdeChanged" 
@@ -37,7 +37,7 @@
     }
 
     <!-- SECCIÓN DERECHA: BOTONERA DE EXPORTACIÓN -->
-    <div class="d-flex align-center gap-1 ms-auto">
+    <div class="d-flex flex-wrap align-center gap-1 ms-auto">
         <MudText Typo="Typo.subtitle2" Color="Color.Tertiary" Class="mr-2">Exportar:</MudText>
         
         <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" 

@@ -207,6 +207,11 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider, IA
             if (!string.IsNullOrWhiteSpace(user.FullName))
                 claims.Add(new Claim(AuthClaims.FullName, user.FullName));
 
+            // Correo del usuario: es el destino de los reportes que pide
+            // desde la interfaz (IReportMailRouter lo lee como claim).
+            if (!string.IsNullOrWhiteSpace(user.Email))
+                claims.Add(new Claim(ClaimTypes.Email, user.Email));
+
             return new ClaimsIdentity(claims, "GuarinoAuth");
         }
         catch

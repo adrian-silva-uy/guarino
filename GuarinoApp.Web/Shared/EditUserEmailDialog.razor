@@ -1,0 +1,60 @@
+@using MudBlazor
+@using System.Net.Mail
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            Correo de reportes de <strong>@UserName</strong>.
+        </MudText>
+        <MudTextField @bind-Value="Email"
+                      Label="Correo"
+                      Variant="Variant.Outlined"
+                      InputType="InputType.Email"
+                      Immediate="true"
+                      HelperText="Vacío: los reportes van al administrador."
+                      Validation="@(new Func<string, string>(ValidateEmail))" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Guardar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string UserName { get; set; } = string.Empty;
+    [Parameter] public string Email { get; set; } = string.Empty;
+
+    /// <summary>Vacío es válido (quita el correo); lo demás debe tener formato.</summary>
+    private string ValidateEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            _ = new MailAddress(email);
+            return string.Empty;
+        }
+        catch (FormatException)
+        {
+            return "Correo inválido";
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Submit()
+    {
+        var error = ValidateEmail(Email);
+        if (string.IsNullOrEmpty(error))
+        {
+            MudDialog.Close(DialogResult.Ok((Email ?? string.Empty).Trim()));
+        }
+    }
+}

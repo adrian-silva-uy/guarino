@@ -10,11 +10,12 @@
 @inject ISender Mediator
 @inject IExportService ExportService
 @inject IEmailService EmailService
+@inject IReportMailRouter ReportMailRouter
 @inject GuarinoApp.Infrastructure.Services.IPdfGenerator PdfGenerator
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
 
-<div class="d-flex justify-content-between align-items-center mb-1">
+<div class="d-flex flex-wrap justify-space-between align-center gap-3 mb-1">
     <div>
         <MudText Typo="Typo.h5" Class="fw-bold d-flex align-items-center gap-2">
             <MudIcon Icon="@Icons.Material.Filled.ViewModule" Color="Color.Primary" />
@@ -326,15 +327,21 @@
             var nombreArchivo =
                 $"Pallets_Definitivos_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
 
+            // Va al usuario que pidió el reporte, con copia al administrador.
+            var (para, copia) = ReportMailRouter.GetRecipients();
+
             await EmailService.SendEmailAsync(
-                "adriansil@hotmail.com",
+                para,
                 $"Reporte de Pallets Definitivos {DateTime.Now:dd/MM/yyyy}",
                 "Adjunto encontrarás el listado de pallets definitivos del período seleccionado.",
                 bytes,
-                nombreArchivo);
+                nombreArchivo,
+                cc: copia);
 
             Snackbar.Add(
-                "📧 Email enviado correctamente a adriansil@hotmail.com.",
+                copia == null
+                    ? $"📧 Email enviado correctamente a {para}."
+                    : $"📧 Email enviado correctamente a {para} (copia a {copia}).",
                 Severity.Success);
         }
         catch (Exception ex)

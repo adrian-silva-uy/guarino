@@ -66,3 +66,34 @@ a, .btn-link {
     .blazor-error-boundary::after {
         content: "An error has occurred."
     }
+
+/* ==========================================================================
+   UTILIDADES DE DISEÑO
+   Las páginas usan estas clases de flex/typography; se definen aquí porque
+   la app sólo carga el CSS de MudBlazor (no el de Bootstrap completo).
+   ========================================================================== */
+.fw-bold { font-weight: 700; }
+.w-100 { width: 100%; }
+
+.justify-content-between { justify-content: space-between; }
+.justify-content-center { justify-content: center; }
+.justify-content-end { justify-content: flex-end; }
+
+.align-items-center { align-items: center; }
+.align-items-start { align-items: flex-start; }
+.align-items-end { align-items: flex-end; }
+
+.text-uppercase { text-transform: uppercase; }
+.text-primary { color: #1976d2; }
+.text-secondary { color: #6c757d; }
+.text-success { color: #2e7d32; }
+.text-danger { color: #dc3545; }
+.text-warning { color: #e65100; }
+.text-info { color: #0288d1; }
+
+.shadow { box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); }
+
+/* Impresión: "no-print" oculta la barra de acciones al imprimir. */
+@media print {
+    .no-print { display: none !important; }
+}

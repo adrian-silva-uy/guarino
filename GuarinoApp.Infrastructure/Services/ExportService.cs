@@ -43,40 +43,73 @@ namespace GuarinoApp.Infrastructure.Services
             {
                 container.Page(page =>
                 {
-                    page.Size(PageSizes.A4);
-                    page.Margin(20);
-                    page.DefaultTextStyle(x => x.FontSize(10));
+                    // Horizontal: los reportes anchos (p. ej. 17 columnas) no
+                    // entran en A4 vertical y las columnas se pisaban entre sí.
+                    page.Size(PageSizes.A4.Landscape());
+                    page.Margin(15);
+                    page.DefaultTextStyle(x => x.FontSize(9));
 
-                    page.Header().Text(title).SemiBold().FontSize(14).AlignCenter();
-
-                    page.Content().PaddingVertical(10).Column(column =>
+                    page.Header().PaddingBottom(6).Column(header =>
                     {
-                        // Cabecera
-                        column.Item().Row(row =>
+                        header.Item().Text(title).SemiBold().FontSize(14).AlignCenter();
+                        header.Item().Text($"Generado el {DateTime.Now:g} - GuarinoApp")
+                              .FontSize(8).FontColor(Colors.Grey.Darken1).AlignCenter();
+                    });
+
+                    // Tabla real de QuestPDF: cada celda tiene su ancho y su
+                    // texto; si no entra, hace salto de línea dentro de la
+                    // celda (nunca se solapa) y el encabezado se repite en
+                    // cada página.
+                    page.Content().PaddingVertical(4).Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            foreach (var prop in properties)
+                                columns.RelativeColumn(EsNumerico(prop.PropertyType) ? 1.15f : 1.7f);
+                        });
+
+                        table.Header(header =>
                         {
                             foreach (var prop in properties)
                                 {
-                                row.RelativeItem().Text(prop.Name).Bold().FontSize(9);
+                                header.Cell()
+                                      .Background(Colors.Grey.Lighten3)
+                                      .BorderBottom(1)
+                                      .BorderColor(Colors.Grey.Medium)
+                                      .Padding(3)
+                                      .Text(prop.Name)
+                                      .Bold()
+                                      .FontSize(8.5f);
                                 }
                         });
 
-                        column.Item().LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
-
-                        // Filas
+                        var numeroFila = 0;
                         foreach (var item in rows)
                             {
-                            column.Item().Row(r =>
-                            {
-                                foreach (var prop in properties)
-                                    {
-                                    var value = prop.GetValue(item)?.ToString() ?? string.Empty;
-                                    r.RelativeItem().Text(value).FontSize(9);
-                                    }
-                            });
+                            var fondo = numeroFila % 2 == 1 ? Colors.Grey.Lighten4 : Colors.White;
+                            foreach (var prop in properties)
+                                {
+                                var valor = prop.GetValue(item)?.ToString() ?? string.Empty;
+                                var celda = table.Cell()
+                                    .Background(fondo)
+                                    .BorderBottom(0.5f)
+                                    .BorderColor(Colors.Grey.Lighten2)
+                                    .Padding(3);
+                                var texto = celda.Text(valor).FontSize(8.5f);
+                                if (EsNumerico(prop.PropertyType))
+                                    texto = texto.AlignRight();
+                                }
+                            numeroFila++;
                             }
                     });
 
-                    page.Footer().AlignCenter().Text(x => x.Span($"GuarinoApp • {DateTime.Now:G}").FontSize(9));
+                    page.Footer().AlignCenter().Text(text =>
+                    {
+                        text.Span("Página ").FontSize(8);
+                        text.CurrentPageNumber().FontSize(8);
+                        text.Span(" de ").FontSize(8);
+                        text.TotalPages().FontSize(8);
+                    });
                 });
             }).GeneratePdf();
 
@@ -89,6 +122,15 @@ namespace GuarinoApp.Infrastructure.Services
             var lines = new List<string> { string.Join(",", properties.Select(property => Escape(property.Name))) };
             lines.AddRange(data.Select(item => string.Join(",", properties.Select(property => Escape(property.GetValue(item)?.ToString() ?? string.Empty)))));
             return string.Join(Environment.NewLine, lines);
+            }
+
+        /// <summary>Distingue columnas numéricas (alineadas a la derecha en el PDF).</summary>
+        private static bool EsNumerico(Type t)
+            {
+            var tipo = Nullable.GetUnderlyingType(t) ?? t;
+            return tipo == typeof(short) || tipo == typeof(int) || tipo == typeof(long) ||
+                   tipo == typeof(ushort) || tipo == typeof(uint) || tipo == typeof(ulong) ||
+                   tipo == typeof(decimal) || tipo == typeof(double) || tipo == typeof(float);
             }
 
         private static string Escape(string value) =>
