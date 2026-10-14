@@ -136,6 +136,14 @@
 }
 
 @code {
+    // Orden de las columnas del PDF (ver comentario en ExportarPdf).
+    private static readonly string[] ColumnasPdf =
+    {
+        "Pallet", "Orden", "Variedad", "Productor", "Cliente", "Marca",
+        "Calibre", "Envase", "Estado", "Fecha", "SemanaProd", "Lote",
+        "FecCosecha", "CantEnvases", "PesoNeto"
+    };
+
     private DateTime? _fechaDesde = DateTime.Now.AddDays(-30);
     private DateTime? _fechaHasta = DateTime.Now;
     private bool _isLoading;
@@ -282,9 +290,19 @@
 
         try
         {
+            // Columnas del PDF: las mismas que muestra la tabla de la pantalla
+            // (Pallet, Orden, Variedad, Productor, Cliente, Marca, Calibre,
+            // Envase, Estado, Envases, Peso Neto) + Fecha, SemanaProd, Lote y
+            // FecCosecha, típicos de un reporte de packing/exportación. Las
+            // otras 13 del DTO (O_Obs3, SPA, Cuadros, TipoPallet, Frio,
+            // Produccion, Cantidad...) son campos internos que al PDF no se
+            // llevan: con las 28, las fechas y los números se partían al
+            // medio de la celda.
             var bytes = await ExportService.ExportToPdfAsync(
                 _pallets,
-                "Pallets Definitivos");
+                "Pallets Definitivos",
+                fontSize: 6.5f,
+                columns: ColumnasPdf);
 
             await JS.InvokeVoidAsync(
                 "downloadFileFromByteArray",

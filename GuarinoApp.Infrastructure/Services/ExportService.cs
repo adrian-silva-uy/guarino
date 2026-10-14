@@ -2,6 +2,7 @@ using ClosedXML.Excel;
 using GuarinoApp.Application.Common.Interfaces;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
+using System.Globalization;
 
 namespace GuarinoApp.Infrastructure.Services
     {
@@ -34,10 +35,26 @@ namespace GuarinoApp.Infrastructure.Services
             return Task.FromResult(stream.ToArray());
             }
 
-        public Task<byte[]> ExportToPdfAsync<T>(IEnumerable<T> data, string title)
+        public Task<byte[]> ExportToPdfAsync<T>(IEnumerable<T> data, string title, float? fontSize = null, IEnumerable<string>? columns = null)
             {
-            var properties = typeof(T).GetProperties();
+            // Si el llamador pide columnas, van solo esas y en ese orden
+            // (refleja lo que la pantalla muestra; el resto son campos
+            // internos que ensucian el reporte).
+            var columnas = columns?.ToArray();
+            var properties = columnas == null
+                ? typeof(T).GetProperties()
+                : columnas.Select(nombre => typeof(T).GetProperty(nombre))
+                          .Where(prop => prop != null)
+                          .Select(prop => prop!)
+                          .ToArray();
             var rows = data.ToList();
+
+            // El tamaño por defecto es 8.5 pt (con relleno 3). Reportes muy
+            // densos —Pallets Definitivos tiene 28 columnas— se piden con
+            // fuente más chica y menos relleno solo en ese PDF, para que las
+            // celdas entren en una línea y el texto quede legible.
+            var cuerpo = fontSize ?? 8.5f;
+            var relleno = fontSize.HasValue ? 2f : 3f;
 
             var bytes = Document.Create(container =>
             {
@@ -76,10 +93,10 @@ namespace GuarinoApp.Infrastructure.Services
                                       .Background(Colors.Grey.Lighten3)
                                       .BorderBottom(1)
                                       .BorderColor(Colors.Grey.Medium)
-                                      .Padding(3)
+                                      .Padding(relleno)
                                       .Text(prop.Name)
                                       .Bold()
-                                      .FontSize(8.5f);
+                                      .FontSize(cuerpo);
                                 // Los encabezados numéricos van pegados a la
                                 // derecha, al mismo filo que sus valores: si
                                 // quedaran a la izquierda de una celda ancha,
@@ -102,8 +119,8 @@ namespace GuarinoApp.Infrastructure.Services
                                     .Background(fondo)
                                     .BorderBottom(0.5f)
                                     .BorderColor(Colors.Grey.Lighten2)
-                                    .Padding(3);
-                                var texto = celda.Text(valor).FontSize(8.5f);
+                                    .Padding(relleno);
+                                var texto = celda.Text(valor).FontSize(cuerpo);
                                 if (EsNumerico(prop.PropertyType))
                                     texto = texto.AlignRight();
                                 }
@@ -152,6 +169,12 @@ namespace GuarinoApp.Infrastructure.Services
                 DateTime fecha => fecha.TimeOfDay == TimeSpan.Zero
                     ? fecha.ToString("dd/MM/yyyy")
                     : fecha.ToString("dd/MM/yyyy HH:mm"),
+                // Campos como FecCosecha vienen de la base como texto ISO
+                // ("2026-10-09"); en el PDF van con el mismo formato que el
+                // resto de las fechas. Cualquier otro texto no se toca.
+                string texto when DateTime.TryParseExact(texto, "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var iso)
+                    => iso.ToString("dd/MM/yyyy"),
                 _ => valor?.ToString() ?? string.Empty
                 };
 
