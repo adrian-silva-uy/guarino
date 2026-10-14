@@ -475,10 +475,17 @@ namespace GuarinoApp.Infrastructure.Data
                         if (!productorPorId.TryGetValue(quinta.ProductorId, out var productorQuinta))
                             continue;
 
+                        // IMPORTANTE: ProductorChacra no declara propiedad FK a
+                        // Productor, por lo que EF mapea una FK shadow "ProductorId"
+                        // (columna real de la tabla). Si no se asigna la navegación,
+                        // el insert manda ProductorId = 0 y SQL Server rechaza la
+                        // fila por la FK (el error aparece como MERGE porque el
+                        // lote de inserts múltiples se emite con MERGE ... OUTPUT).
                         context.ProductoresChacra.Add(new ProductorChacra
                             {
                             IdProductor = quinta.ProductorId,
                             IdChacra = quinta.Id,
+                            Productor = productorQuinta,
                             Descripcion = $"{productorQuinta.Nombre} - {quinta.Nombre}"
                             });
                         }
