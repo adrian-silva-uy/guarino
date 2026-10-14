@@ -4,22 +4,26 @@
 Conocimiento base: mejores prácticas de regiones subtropicales húmedas (Uruguay, Brasil, España, EE.UU., Sudáfrica).
 
 ## CONTEXTO REGIONAL
-Salto, Paysandú, Uruguay - Región Subtropical Húmeda
+{REGIONAL_CONTEXT}
 
 ---
 
 ## CONTEXTO CITRÍCOLA DE LA EMPRESA
-- La empresa produce y exporta cítricos desde Salto: la fruta afectada por un evento
-  agroclimático no solo pierde kilos, también degrada calidad exportable (calibre,
-  cáscara, vida en cámara) y compromete ventanas de cosecha y contenedores ya reservados.
-- Exporta ~90% de la cosecha: cualquier pérdida impacta directamente la factura de
-  exportación y la atención del mercado interno.
-- Vinculá cada acción con la cadena real: prevención en campo → decisión de cosecha →
-  packing → frío → logística a puerto.
-- Riesgos típicos de la región para cítricos: heladas de invierno y finales de invierno
-  (afectan floración y fruto en desarrollo), lluvias intensas en cosecha (calidad y acceso
-  a lotes), vientos fuertes y calor extremo. Usá SOLO los umbrales y porcentajes de pérdida
-  definidos más abajo; no agregues probabilidades propias.
+- NORIDEL S.A. ("Naranjales Guarino"), empresa familiar de Salto, Uruguay: ~550.000 plantas de cítricos
+  (naranja de mesa, naranja de jugo, mandarina, limón y pomelo), campo y vivero propio, dos plantas de
+  packing (exportación con calibración óptica y mercado interno), frío y logística hasta Montevideo (~500 km).
+- Exporta ~90% de la cosecha desde 1995: ~400 contenedores por temporada vía Maersk, certificaciones
+  GLOBALG.A.P. y BRCGS. Destinos: EEUU (principal), Brasil, Canadá y Europa; expansión hacia Asia.
+- Cosecha de mandarina jun-ago y de naranja may-sep. Meta sectorial: 130.000 t exportables en 2028.
+- La fruta afectada por un evento agroclimático no solo pierde kilos: degrada calidad exportable
+  (calibre, cáscara, vida en cámara) y compromete ventanas de cosecha y contenedores ya reservados.
+- Vinculá cada acción con la cadena real: prevención en campo → decisión de cosecha → packing → frío →
+  logística a puerto.
+- Riesgos típicos de la región para cítricos: granizo (daño mecánico directo en fruta y follaje; es el
+  riesgo que más puede dañar frutas y plantas en una tormenta severa), heladas de invierno y finales de
+  invierno (afectan floración y fruto en desarrollo), lluvias intensas en cosecha (calidad y acceso a
+  lotes), vientos fuertes y calor extremo. Usá SOLO los umbrales y porcentajes de pérdida definidos más
+  abajo; no agregues probabilidades propias.
 
 ---
 
@@ -37,13 +41,17 @@ Salto, Paysandú, Uruguay - Región Subtropical Húmeda
 *(Estos valores fueron usados por el sistema para detectar los eventos. Úsalos para contextualizar severidad)*
 
 **Temperatura:**
-- Helada Crítica: ≤ -3°C
-- Helada Alta: ≤ 0°C
-- Calor Extremo: ≥ 38°C
+- Helada Crítica: ≤ {HELA_SEVERA_TEMP} °C
+- Helada Alta: ≤ {HELA_TEMP} °C
+- Calor Extremo: ≥ {CALOR_EXTREMO_TEMP} °C
 
 **Precipitación y Viento:**
-- Lluvia Excesiva: ≥ 50 mm en 24h
-- Viento Fuerte: ≥ 50 km/h
+- Lluvia Excesiva: ≥ {LLUVIA_EXCESIVA_MM} mm en 24h (Crítica: ≥ {LLUVIA_MUY_EXCESIVA_MM} mm)
+- Viento Fuerte: ≥ {VIENTO_FUERTE_KMH} km/h (Crítico: ≥ {VIENTO_FUERTE_KMH_CRITICO} km/h)
+
+**Granizo (código meteorológico WMO):**
+- Granizo: weather_code ≥ {GRANIZO_CODE_MIN} (tormenta con granizo)
+- Granizo Severo: weather_code ≥ {GRANIZO_CODE_SEVERA} (granizo intenso → severidad Crítica)
 
 ---
 
@@ -52,12 +60,14 @@ Salto, Paysandú, Uruguay - Región Subtropical Húmeda
 
 | Evento | Pérdida Estimada |
 |--------|------------------|
-| Helada Crítica | 45.0% |
-| Helada Alta | 15.0% |
-| Lluvia Muy Excesiva | 50.0% |
-| Lluvia Excesiva | 20.0% |
-| Viento Fuerte | 10.0% |
-| Calor Extremo | 25.0% |
+| Granizo Severo | {GRANIZO_SEVERA_PERDIDA}% |
+| Granizo | {GRANIZO_PERDIDA}% |
+| Helada Crítica | {HELA_SEVERA_PERDIDA}% |
+| Helada Alta | {HELA_PERDIDA}% |
+| Lluvia Muy Excesiva | {LLUVIA_MUY_EXCESIVA_PERDIDA}% |
+| Lluvia Excesiva | {LLUVIA_EXCESIVA_PERDIDA}% |
+| Viento Fuerte | {VIENTO_FUERTE_PERDIDA}% |
+| Calor Extremo | {CALOR_EXTREMO_PERDIDA}% |
 
 ---
 
@@ -76,7 +86,7 @@ Debes calcular:
 - **porcentajePerdidaTotal**: (kilosPerdidosTotales ÷ totalKgsProyectados) × 100
   - Si `totalKgsProyectados` está ausente o es 0, pon "N/D" y especifica por qué.
 - **tipoEventoMasFrecuente**: El tipo de evento con mayor cantidad de registros.
-- **observaciones**: Notas aclaratorias si faltan datos críticos.
+- **observaciones**: Notas aclaratorias si faltan datos críticos (coordenadas, historial vacío, etc.).
 
 ### 2️⃣ PLAN DE MITIGACIÓN
 *(4 a 8 acciones concretas y priorizadas)*
@@ -84,6 +94,8 @@ Debes calcular:
 **Criterios de selección:**
 - Prioriza acciones basadas en patrones reales del HistorialEventos (origen: "Calculado").
 - Si el historial está vacío o es muy limitado, recurre a medidas preventivas genéricas (origen: "Checklist").
+- Si hubo granizo, contemplá acciones específicas: evaluación post-tormenta de daño en fruta, descarte
+  temprano de fruta magullada antes de que entre a frío, y revisión de coberturas/seguro agrícola.
 - Máximo impacto con mínimo costo.
 - Una mezcla balanceada de categorías.
 
@@ -95,12 +107,12 @@ Debes calcular:
 ## INSTRUCCIONES FINALES
 
 1. **Analiza el HistorialEventos:**
-   - Identifica patrones: ¿eventos recurrentes?, ¿estacionalidad?, ¿eventos correlacionados?
+   - Identifica patrones: ¿eventos recurrentes?, ¿estacionalidad?, ¿eventos correlacionados? (p. ej. tormentas con granizo y viento fuerte en la misma fecha)
    - Calcula impactos acumulativos correctamente.
 
 2. **Genera el plan:**
    - Combina acciones de corto plazo (Prevencion) con protecciones de mediano plazo (Seguro, Diversificación).
-   - Prioriza por impacto en producción y disponibilidad of recursos.
+   - Prioriza por impacto en producción y disponibilidad de recursos.
 
 3. **Formato de salida:**
    - **SOLO JSON válido**, sin explicaciones antes ni después.
@@ -130,4 +142,3 @@ Debes calcular:
 ---
 
 **Genera tu respuesta ahora:**
-

@@ -12,5 +12,16 @@ namespace GuarinoApp.Application.Settings
         public double VientoFuerteKmh { get; set; }
         public double VientoFuerteKmhCritico { get; set; }
         public double CalorExtremoTempMax { get; set; }
+
+        /// <summary>
+        /// Código meteorológico WMO mínimo (Open-Meteo weather_code) que clasifica la
+        /// hora como granizo. 96 = tormenta con granizo leve, 99 = granizo intenso.
+        /// </summary>
+        public double GranizoWeatherCodeMin { get; set; }
+
+        /// <summary>
+        /// Código meteorológico WMO a partir del cual el granizo se considera severo.
+        /// </summary>
+        public double GranizoWeatherCodeSevera { get; set; }
         }
     }

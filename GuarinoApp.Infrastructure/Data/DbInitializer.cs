@@ -1,8 +1,19 @@
+using System.Data;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using GuarinoApp.Domain.Entities;
 using GuarinoApp.Domain.Enums;
+using GuarinoApp.Infrastructure.Services.Auth;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace GuarinoApp.Infrastructure.Data
     {
+    /// <summary>
+    /// Inicializador de datos de prueba (sólo Development). Cada bloque está
+    /// protegido por un guard por tabla (idempotente): si la tabla ya tiene
+    /// filas — p. ej. datos reales o cargas previas — jamás se pisa.
+    /// </summary>
     public static class DbInitializer
         {
         public static void Initialize(ApplicationDbContext context)
@@ -91,6 +102,10 @@ namespace GuarinoApp.Infrastructure.Data
                 context.SaveChanges(); // Guardamos para tener IDs reales
                 }
 
+            // 4.5 Catálogos operativos: Básculas (IDs exactos 1-4), Emboquilles,
+            // TiposLote, DestinosInternos, Responsables, Lugares y ProductoresChacra.
+            SembrarCatalogosOperativos(context);
+
             // Obtener IDs para asignación
             var variedades = context.Variedades.ToList();
             var productores = context.Productores.ToList();
@@ -103,7 +118,7 @@ namespace GuarinoApp.Infrastructure.Data
                 return;
                 }
 
-            // 5. Seed Lotes (Con FKs válidas)
+            // 5. Seed Lote (Con FKs válidas)
             if (!context.Lotes.Any())
                 {
                 var lotes = new List<Lote>();
@@ -129,7 +144,24 @@ namespace GuarinoApp.Infrastructure.Data
                         });
                     }
                 context.Lotes.AddRange(lotes);
+                // Guardamos ya: los bloques siguientes (CompletarLotes,
+                // LotesEmboquille, EventosClimaticos, RitmosCalibradora)
+                // necesitan los IDs reales de Lotes.
+                context.SaveChanges();
                 }
+
+            // 5.5 Completar Lotes: coordenadas GPS (zona Salto), KilosNetos,
+            // FKs a catálogos y remito — sólo campos vacíos/cero.
+            CompletarLotes(context, random);
+            context.SaveChanges();
+
+            // 5.6 Completar Productores: RazonSocial y Ruc cuando están vacíos.
+            CompletarProductores(context);
+            context.SaveChanges();
+
+            // 5.7 LotesEmboquille: pesajes/emboquilles históricos (>= 2 temporadas,
+            // picos may-sep) que alimentan Stock Playa y la Gráfica de Procesos.
+            SembrarLotesEmboquille(context, random);
 
             // 6. Seed VolcadosHistoricos
             if (!context.VolcadosHistoricos.Any())
@@ -281,6 +313,18 @@ namespace GuarinoApp.Infrastructure.Data
                     }
                 }
 
+            // 9.5 Completar Pallets sembrados: Produccion, PesoNeto, Estado mixto
+            // (EnFrio/PreFrio para la página "Pallets en Frío"), Frio, Especie,
+            // SemanaProd, Fecha/Hora, Lote, TipoPallet, Embalaje, etc.
+            CompletarPallets(context, random);
+
+            // 9.6 Eventos climáticos: históricos + últimos días + pronosticados.
+            SembrarEventosClimaticos(context, random);
+
+            // 9.7 vRitmoCalibradora: crea la tabla si no existe (ToView no la crea
+            // en migraciones) y la siembra coherente con LotesEmboquille.
+            SembrarRitmosCalibradora(context, random);
+
             // 10. Seed FinancialData (datos de Contaduría para los KPIs de la proyección de zafra)
             // Solo si la tabla está vacía: si Contaduría ya cargó sus cifras, jamás se pisan.
             if (!context.FinancialData.Any())
@@ -299,7 +343,1013 @@ namespace GuarinoApp.Infrastructure.Data
                     });
                 }
 
+            // 10.5 Usuarios de aplicación por rol (Gerencia/Contador/Operador).
+            // Sólo si ya existe al menos un usuario: se preserva FR-8 (el primer
+            // usuario creado manualmente es Admin y su contraseña no se toca).
+            SembrarUsuariosDeRol(context);
+
+            // 10.6 LogEntries de auditoría variados (sin datos sensibles).
+            SembrarLogEntries(context, random);
+
             // Save final solo para datos dependientes
+            context.SaveChanges();
+            }
+
+        // ------------------------------------------------------------------
+        // Catálogos operativos
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Siembra Básculas (IDs exactos 1-4: los datos históricos de playa los
+        /// referencian), Emboquilles, TiposLote, DestinosInternos, Responsables,
+        /// Lugares/LugarOrigen/LugarDestino y ProductoresChacra.
+        /// </summary>
+        private static void SembrarCatalogosOperativos(ApplicationDbContext context)
+            {
+            // Básculas: reseedear el identity para que las 4 filas reciban
+            // exactamente los IDs 1-4. Si el DBCC falla (permisos, motor no SQL),
+            // se insertan igual con el identity vigente.
+            if (!context.Basculas.Any())
+                {
+                try
+                    {
+                    context.Database.ExecuteSqlRaw("DBCC CHECKIDENT ('Basculas', RESEED, 0);");
+                    }
+                catch
+                    {
+                    // Mejor esfuerzo: los catálogos internos usan los IDs reales.
+                    }
+
+                context.Basculas.AddRange(
+                    new Bascula { Descripcion = "Báscula 1 - Patio" },
+                    new Bascula { Descripcion = "Báscula 2 - Empaque" },
+                    new Bascula { Descripcion = "Báscula 3 - Exportación" },
+                    new Bascula { Descripcion = "Báscula 4 - Playa" }
+                );
+                context.SaveChanges();
+                }
+
+            if (!context.Emboquilles.Any())
+                {
+                context.Emboquilles.AddRange(
+                    new Emboquille { Descripcion = "Emboquille 1 - Línea 1" },
+                    new Emboquille { Descripcion = "Emboquille 2 - Línea 2" },
+                    new Emboquille { Descripcion = "Emboquille 3 - Línea 3" }
+                );
+                context.SaveChanges();
+                }
+
+            if (!context.TiposLote.Any())
+                {
+                context.TiposLote.AddRange(
+                    new TipoLote { Descripcion = "Cosecha propia" },
+                    new TipoLote { Descripcion = "Compra" },
+                    new TipoLote { Descripcion = "Devolución" }
+                );
+                context.SaveChanges();
+                }
+
+            if (!context.DestinosInternos.Any())
+                {
+                context.DestinosInternos.AddRange(
+                    new DestinoInterno { Descripcion = "Calibradora" },
+                    new DestinoInterno { Descripcion = "Empaque" },
+                    new DestinoInterno { Descripcion = "Playa de Frío" },
+                    new DestinoInterno { Descripcion = "Volcado" }
+                );
+                context.SaveChanges();
+                }
+
+            if (!context.Responsables.Any())
+                {
+                context.Responsables.AddRange(
+                    new Responsable { Descripcion = "Juan Pérez" },
+                    new Responsable { Descripcion = "María Gómez" },
+                    new Responsable { Descripcion = "Carlos Rodríguez" }
+                );
+                context.SaveChanges();
+                }
+
+            // Tablas legacy (mapeadas con ToTable en el DbContext); se siembran
+            // sólo si están vacías.
+            if (!context.Lugares.Any())
+                {
+                context.Lugares.AddRange(
+                    new Lugar { Nombre = "Patio Principal", Tipo = "Playa", Direccion = "Ruta 3 km 480" },
+                    new Lugar { Nombre = "Empaque Central", Tipo = "Empaque", Direccion = "Av. Principal 1234" },
+                    new Lugar { Nombre = "Playa de Frío Norte", Tipo = "Playa", Direccion = "Ruta 31 km 12" }
+                );
+                context.SaveChanges();
+                }
+
+            if (!context.LugaresOrigen.Any())
+                {
+                context.LugaresOrigen.AddRange(
+                    new LugarOrigen { Nombre = "Quinta La Esperanza", Direccion = "Ruta 5 km 120", Localidad = "Salto" },
+                    new LugarOrigen { Nombre = "Finca San José", Direccion = "Ruta 8 km 45", Localidad = "Paysandú" },
+                    new LugarOrigen { Nombre = "Campo del Este", Direccion = "Ruta 3 km 210", Localidad = "Artigas" }
+                );
+                context.SaveChanges();
+                }
+
+            if (!context.LugaresDestino.Any())
+                {
+                context.LugaresDestino.AddRange(
+                    new LugarDestino { Nombre = "Frigorífico Puerto", Direccion = "Rambla Gran Bretaña s/n", Localidad = "Montevideo" },
+                    new LugarDestino { Nombre = "Terminal Canelones", Direccion = "Ruta 8 km 42", Localidad = "Canelones" },
+                    new LugarDestino { Nombre = "Depósito Colonia", Direccion = "Ruta 1 km 218", Localidad = "Colonia" }
+                );
+                context.SaveChanges();
+                }
+
+            // ProductoresChacra: nexo productor <-> chacra (Quinta).
+            if (!context.ProductoresChacra.Any())
+                {
+                var productoresDb = context.Productores.ToList();
+                var quintasDb = context.Quintas.ToList();
+                if (productoresDb.Any() && quintasDb.Any())
+                    {
+                    var productorPorId = productoresDb.ToDictionary(p => p.Id);
+                    foreach (var quinta in quintasDb)
+                        {
+                        if (!productorPorId.TryGetValue(quinta.ProductorId, out var productorQuinta))
+                            continue;
+
+                        context.ProductoresChacra.Add(new ProductorChacra
+                            {
+                            IdProductor = quinta.ProductorId,
+                            IdChacra = quinta.Id,
+                            Descripcion = $"{productorQuinta.Nombre} - {quinta.Nombre}"
+                            });
+                        }
+                    context.SaveChanges();
+                    }
+                }
+            }
+
+        // ------------------------------------------------------------------
+        // Completar Lotes (sólo campos vacíos/cero)
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Completa los Lotes sembrados sin pisar datos existentes:
+        /// coordenadas GPS (zona Salto: ~-31.30/-57.60), KilosNetos a partir de
+        /// bins (~400-440 kg/bin), FKs a catálogos, IdRemito y bins
+        /// despachados/envasados coherentes (saldo >= 0).
+        /// </summary>
+        private static void CompletarLotes(ApplicationDbContext context, Random random)
+            {
+            var tiposLote = context.TiposLote.AsNoTracking().Where(t => !t.IsDeleted).ToList();
+            var basculas = context.Basculas.AsNoTracking().Where(b => !b.IsDeleted).ToList();
+            var destinosInternos = context.DestinosInternos.AsNoTracking().Where(d => !d.IsDeleted).ToList();
+            if (tiposLote.Count == 0 || basculas.Count == 0 || destinosInternos.Count == 0)
+                return;
+
+            var lotes = context.Lotes.Where(l => !l.IsDeleted).ToList();
+            foreach (var lote in lotes)
+                {
+                var cambio = false;
+
+                if (!lote.Latitude.HasValue)
+                    {
+                    lote.Latitude = Math.Round(-31.30m - (decimal)(random.NextDouble() * 0.30), 6);
+                    cambio = true;
+                    }
+                if (!lote.Longitude.HasValue)
+                    {
+                    lote.Longitude = Math.Round(-57.60m - (decimal)(random.NextDouble() * 0.40), 6);
+                    cambio = true;
+                    }
+
+                if (lote.KilosNetos == 0 && lote.CantidadBins > 0)
+                    {
+                    var kilosPorBin = 400 + random.Next(0, 41); // 400..440 kg
+                    lote.KilosNetos = Math.Round(lote.CantidadBins * (decimal)kilosPorBin, 2);
+                    cambio = true;
+                    }
+
+                if (!lote.TipoLoteId.HasValue)
+                    {
+                    lote.TipoLoteId = tiposLote[random.Next(tiposLote.Count)].Id;
+                    cambio = true;
+                    }
+                if (!lote.BasculaId.HasValue)
+                    {
+                    lote.BasculaId = basculas[random.Next(basculas.Count)].Id;
+                    cambio = true;
+                    }
+                if (!lote.DestinoInternoId.HasValue)
+                    {
+                    lote.DestinoInternoId = destinosInternos[random.Next(destinosInternos.Count)].Id;
+                    cambio = true;
+                    }
+
+                if (string.IsNullOrWhiteSpace(lote.IdRemito))
+                    {
+                    var anioRemito = (lote.FechaIngreso ?? DateTime.Today).Year;
+                    lote.IdRemito = $"REM-{anioRemito}-{lote.Id:00000}";
+                    cambio = true;
+                    }
+
+                if (lote.CantidadBinsDesp == 0 && lote.CantidadBinsEmb == 0 && lote.CantidadBins > 0)
+                    {
+                    // 30-90 % despachados; el resto se reparte en envasado
+                    // dejando saldo >= 0 (bins sin movimiento).
+                    var pctDesp = 30 + random.Next(0, 61);
+                    var despachados = lote.CantidadBins * pctDesp / 100;
+                    var envasados = (lote.CantidadBins - despachados) * random.Next(0, 101) / 100;
+                    lote.CantidadBinsDesp = despachados;
+                    lote.CantidadBinsEmb = envasados;
+                    cambio = true;
+                    }
+
+                // Auditoría sólo si hubo cambios reales: la segunda corrida del
+                // seed no debe marcar UpdatedAt en lotes ya completos.
+                if (cambio)
+                    {
+                    lote.UpdatedAt = DateTime.UtcNow;
+                    lote.UpdatedBy = "DbInitializer";
+                    }
+                }
+            }
+
+        // ------------------------------------------------------------------
+        // Completar Productores (sólo campos vacíos)
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Completa RazonSocial ("{Nombre} S.A.") y Ruc uruguayo de estructura
+        /// 80XXXXXXXX-N donde estén vacíos. El Ruc es inventado (no validado
+        /// contra DGI): sólo da forma al dato para las pantallas.
+        /// </summary>
+        private static void CompletarProductores(ApplicationDbContext context)
+            {
+            var productores = context.Productores.Where(p => !p.IsDeleted).ToList();
+            foreach (var productor in productores)
+                {
+                var cambio = false;
+
+                if (string.IsNullOrWhiteSpace(productor.RazonSocial))
+                    {
+                    productor.RazonSocial = $"{productor.Nombre} S.A.";
+                    cambio = true;
+                    }
+
+                if (string.IsNullOrWhiteSpace(productor.Ruc))
+                    {
+                    // Semilla determinística por Id para que el seed sea estable.
+                    var rnd = new Random(4321 + productor.Id);
+                    var digitos = new char[8];
+                    for (int i = 0; i < digitos.Length; i++)
+                        digitos[i] = (char)('0' + rnd.Next(0, 10));
+                    productor.Ruc = $"80{new string(digitos)}-{rnd.Next(0, 10)}";
+                    cambio = true;
+                    }
+
+                if (cambio)
+                    {
+                    productor.UpdatedAt = DateTime.UtcNow;
+                    productor.UpdatedBy = "DbInitializer";
+                    }
+                }
+            }
+
+        // ------------------------------------------------------------------
+        // LotesEmboquille (Stock Playa)
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Siembra pesajes/emboquilles de las temporadas {año-1, año} dentro de
+        /// la ventana abril 15 - octubre 31 (limitada a hoy), con tasas
+        /// filas-día por especie que reproducen el pico may-sep (~980 filas).
+        /// Estado "E" (en playa) para los últimos 60 días con saldo >= 0; los
+        /// más antiguos quedan cerrados como "D" (despachado) o "V" (volcado).
+        /// </summary>
+        private static void SembrarLotesEmboquille(ApplicationDbContext context, Random random)
+            {
+            if (context.LotesEmboquille.Any())
+                return;
+
+            var basculas = context.Basculas.AsNoTracking().Where(b => !b.IsDeleted).Select(b => b.Id).ToList();
+            var destinos = context.DestinosInternos.AsNoTracking().Where(d => !d.IsDeleted).Select(d => d.Id).ToList();
+            var empaques = context.Empaques.AsNoTracking().Where(e => !e.IsDeleted).Select(e => e.Id).ToList();
+            var emboquilles = context.Emboquilles.AsNoTracking().Where(e => !e.IsDeleted).Select(e => e.Id).ToList();
+            if (basculas.Count == 0 || destinos.Count == 0 || empaques.Count == 0 || emboquilles.Count == 0)
+                return;
+
+            // Lotes por especie (vía Variedad -> EspecieId), rotativos por fila.
+            var lotes = context.Lotes.AsNoTracking()
+                .Include(l => l.Variedad)
+                .Where(l => !l.IsDeleted)
+                .AsEnumerable()
+                .Where(l => l.Variedad != null && l.Variedad.EspecieId.HasValue)
+                .ToList();
+            if (lotes.Count == 0)
+                return;
+
+            var lotesPorEspecie = lotes
+                .GroupBy(l => l.Variedad!.EspecieId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+            var rotacion = new Dictionary<int, int>();
+
+            var especies = context.Especies.AsNoTracking().ToList();
+            int? IdEspecie(string descripcion) =>
+                especies.FirstOrDefault(e => e.Descripcion == descripcion)?.Id;
+
+            // Tasas filas-día por especie (pico: jun-agosto).
+            var tasasPorEspecie = new Dictionary<int, Dictionary<int, double>>();
+            void AgregarTasa(int? idEspecie, Dictionary<int, double> tasas)
+                {
+                if (idEspecie.HasValue && lotesPorEspecie.ContainsKey(idEspecie.Value))
+                    tasasPorEspecie[idEspecie.Value] = tasas;
+                }
+
+            AgregarTasa(IdEspecie("Naranja"), new Dictionary<int, double>
+                { [4] = 0.12, [5] = 0.45, [6] = 1.5, [7] = 1.9, [8] = 1.5, [9] = 0.6, [10] = 0.18 });
+            AgregarTasa(IdEspecie("Mandarina"), new Dictionary<int, double>
+                { [5] = 0.15, [6] = 1.0, [7] = 1.3, [8] = 1.15, [9] = 0.4, [10] = 0.12 });
+            AgregarTasa(IdEspecie("Limón"), new Dictionary<int, double>
+                { [4] = 0.10, [5] = 0.20, [6] = 0.50, [7] = 0.60, [8] = 0.60, [9] = 0.60, [10] = 0.50 });
+            AgregarTasa(IdEspecie("Pomelo"), new Dictionary<int, double>
+                { [5] = 0.25, [6] = 0.75, [7] = 0.95, [8] = 0.85, [9] = 0.35, [10] = 0.12 });
+            if (tasasPorEspecie.Count == 0)
+                return;
+
+            var hoy = DateTime.Today;
+            var inicio = new DateTime(hoy.Year - 1, 4, 15);
+            var fin = new DateTime(hoy.Year, 10, 31);
+            if (fin > hoy)
+                fin = hoy;
+
+            // Acumulador fraccional por especie: la tasa diaria va "ahorrando"
+            // filas para emitir una fila entera cuando supera 1.
+            var acumulador = tasasPorEspecie.Keys.ToDictionary(k => k, _ => 0d);
+            var filas = new List<LoteEmboquille>();
+
+            for (var fecha = inicio; fecha <= fin; fecha = fecha.AddDays(1))
+                {
+                foreach (var especieKvp in tasasPorEspecie)
+                    {
+                    var especieId = especieKvp.Key;
+                    var tasa = especieKvp.Value.TryGetValue(fecha.Month, out var t) ? t : 0d;
+                    if (tasa <= 0)
+                        continue;
+
+                    acumulador[especieId] += tasa;
+                    if (acumulador[especieId] < 1.0)
+                        continue;
+                    acumulador[especieId] -= 1.0;
+
+                    // Bins por fila según el mes de la temporada.
+                    int bins;
+                    if (fecha.Month == 6 || fecha.Month == 7 || fecha.Month == 8)
+                        bins = random.Next(38, 81);      // 38..80
+                    else if (fecha.Month == 5 || fecha.Month == 9)
+                        bins = random.Next(22, 51);      // 22..50
+                    else
+                        bins = random.Next(15, 36);      // 15..35 (abr/oct)
+
+                    var kgPorBin = 400 + random.Next(0, 41); // 400..440 kg
+
+                    // Lote rotativo de la misma especie; se prefiere uno con
+                    // CantidadBins suficiente para no excederlo.
+                    var candidatos = lotesPorEspecie[especieId];
+                    var indice = rotacion.TryGetValue(especieId, out var idx) ? idx : 0;
+                    rotacion[especieId] = indice + 1;
+                    Lote? loteElegido = null;
+                    for (int intento = 0; intento < candidatos.Count; intento++)
+                        {
+                        var candidato = candidatos[(indice + intento) % candidatos.Count];
+                        if (candidato.CantidadBins >= bins)
+                            {
+                            loteElegido = candidato;
+                            break;
+                            }
+                        }
+                    loteElegido ??= candidatos[indice % candidatos.Count];
+
+                    // Estado: en playa (saldo >= 0) si el pesaje es reciente;
+                    // si no, cerrado como despachado (70 %) o volcado.
+                    string estado;
+                    int binsDespachados = 0;
+                    int binsVolcados = 0;
+                    if (fecha >= hoy.AddDays(-60))
+                        {
+                        estado = "E";
+                        var consumidos = random.Next(0, bins); // saldo >= 0 siempre
+                        if (random.Next(100) < 60)
+                            binsDespachados = consumidos;
+                        else
+                            binsVolcados = consumidos;
+                        }
+                    else if (random.Next(100) < 70)
+                        {
+                        estado = "D";
+                        binsDespachados = bins;
+                        }
+                    else
+                        {
+                        estado = "V";
+                        binsVolcados = bins;
+                        }
+
+                    filas.Add(new LoteEmboquille
+                        {
+                        LoteId = loteElegido.Id,
+                        EmboquilleId = emboquilles[random.Next(emboquilles.Count)],
+                        FechaProduccion = fecha.AddHours(random.Next(6, 18)),
+                        KilosNetos = Math.Round(bins * (decimal)kgPorBin, 2),
+                        CantidadBins = bins,
+                        Zafra = fecha.Year.ToString(),
+                        IdBascula = basculas[random.Next(basculas.Count)],
+                        IdDestinoInterno = destinos[random.Next(destinos.Count)],
+                        IdEmpaque = empaques[random.Next(empaques.Count)],
+                        CantidadBinsDespachados = binsDespachados,
+                        CantidadBinsVolcados = binsVolcados,
+                        Estado = estado,
+                        CreatedAt = fecha,
+                        CreatedBy = "DbInitializer",
+                        IsDeleted = false
+                        });
+                    }
+                }
+
+            context.LotesEmboquille.AddRange(filas);
+            context.SaveChanges();
+            }
+
+        // ------------------------------------------------------------------
+        // Pallets: completar campos de producción/estado
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Completa los pallets sembrados por DbInitializer (o sin autor):
+        /// Produccion ("Zafra {año}"), PesoNeto (envases × kg del envase) y
+        /// Estado mixto por antigüedad para que "Pallets en Frío" muestre datos
+        /// reales (EnFrio/PreFrio junto a Despachado/Rearmado/Bajado).
+        /// Idempotente: sólo toca pallets con Produccion vacío o PesoNeto NULL.
+        /// </summary>
+        private static void CompletarPallets(ApplicationDbContext context, Random random)
+            {
+            var lotesCodigos = context.Lotes.AsNoTracking()
+                .Where(l => !l.IsDeleted)
+                .Select(l => l.Codigo)
+                .ToList();
+
+            var pallets = context.Pallets
+                .Where(p => !p.IsDeleted &&
+                            (p.CreatedBy == null || p.CreatedBy == "DbInitializer") &&
+                            (p.Produccion == null || p.Produccion == "" || p.PesoNeto == null))
+                .ToList();
+
+            var hoy = DateTime.Today;
+            foreach (var pallet in pallets)
+                {
+                var fechaPallet = (pallet.Fecha ?? pallet.CreatedAt).Date;
+                var dias = (hoy - fechaPallet).Days;
+
+                if (string.IsNullOrWhiteSpace(pallet.Produccion))
+                    pallet.Produccion = $"Zafra {fechaPallet.Year}";
+
+                if (pallet.PesoNeto == null && pallet.CantidadEnvases.HasValue)
+                    pallet.PesoNeto = Math.Round(pallet.CantidadEnvases.Value * KilosPorEnvase(pallet.Envase), 2);
+
+                // Estado mixto según antigüedad (sólo pallets de esta semilla).
+                pallet.Estado = EstadoMixtoPorAntiguedad(dias, random);
+
+                if (string.IsNullOrWhiteSpace(pallet.Frio))
+                    pallet.Frio = pallet.Estado == EstadoPallet.EnFrio || pallet.Estado == EstadoPallet.PreFrio ? "Si" : "No";
+
+                if (string.IsNullOrWhiteSpace(pallet.Especie) && !string.IsNullOrWhiteSpace(pallet.Variedad))
+                    pallet.Especie = EspecieDeVariedad(pallet.Variedad);
+
+                if (pallet.SemanaProd == null)
+                    {
+                    try
+                        {
+                        pallet.SemanaProd = ISOWeek.GetWeekOfYear(fechaPallet);
+                        }
+                    catch
+                        {
+                        // Fecha fuera de rango ISO: se omite el dato.
+                        }
+                    }
+
+                if (pallet.Fecha == null)
+                    pallet.Fecha = fechaPallet;
+
+                if (string.IsNullOrWhiteSpace(pallet.Hora))
+                    pallet.Hora = $"{random.Next(6, 18):00}:{random.Next(0, 60):00}";
+
+                if (string.IsNullOrWhiteSpace(pallet.Lote) && lotesCodigos.Count > 0)
+                    pallet.Lote = lotesCodigos[random.Next(lotesCodigos.Count)];
+
+                if (string.IsNullOrWhiteSpace(pallet.TipoPallet))
+                    pallet.TipoPallet = "Definitivo";
+
+                if (string.IsNullOrWhiteSpace(pallet.Embalaje))
+                    pallet.Embalaje = "Caja Cartón";
+
+                if (string.IsNullOrWhiteSpace(pallet.FormaEmbalado))
+                    pallet.FormaEmbalado = random.Next(100) < 50 ? "Red" : "Plástico";
+
+                if (string.IsNullOrWhiteSpace(pallet.Cuadros))
+                    pallet.Cuadros = (90 + random.Next(0, 7) * 10).ToString();
+
+                if (string.IsNullOrWhiteSpace(pallet.SPA))
+                    pallet.SPA = $"SPA-{random.Next(100, 1000)}";
+
+                pallet.UpdatedAt = DateTime.UtcNow;
+                pallet.UpdatedBy = "DbInitializer";
+                }
+
+            context.SaveChanges();
+            }
+
+        private static decimal KilosPorEnvase(string? envase)
+            {
+            if (string.IsNullOrWhiteSpace(envase))
+                return 15m;
+
+            var match = Regex.Match(envase, @"(\d+(?:[.,]\d+)?)\s*kg", RegexOptions.IgnoreCase);
+            if (match.Success &&
+                decimal.TryParse(match.Groups[1].Value.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out var kg) &&
+                kg > 0)
+                return kg;
+
+            return 15m; // bandejas/envases sin kg declarados
+            }
+
+        private static EstadoPallet EstadoMixtoPorAntiguedad(int dias, Random random)
+            {
+            var r = random.Next(100);
+            if (dias <= 20)
+                {
+                // Recientes: predominan los que están en cámara de frío.
+                if (r < 50) return EstadoPallet.EnFrio;
+                if (r < 75) return EstadoPallet.PreFrio;
+                if (r < 90) return EstadoPallet.Rearmado;
+                return EstadoPallet.Despachado;
+                }
+            if (dias <= 45)
+                {
+                if (r < 55) return EstadoPallet.Despachado;
+                if (r < 85) return EstadoPallet.EnFrio;
+                return EstadoPallet.Rearmado;
+                }
+
+            // Antiguos: casi todos despachados.
+            if (r < 85) return EstadoPallet.Despachado;
+            if (r < 95) return EstadoPallet.EnFrio;
+            return EstadoPallet.Bajado;
+            }
+
+        private static string? EspecieDeVariedad(string variedad)
+            {
+            var v = variedad.Trim();
+            if (v.StartsWith("Valencia", StringComparison.OrdinalIgnoreCase) ||
+                v.StartsWith("Navel", StringComparison.OrdinalIgnoreCase))
+                return "Naranja";
+            if (v.StartsWith("Satsuma", StringComparison.OrdinalIgnoreCase) ||
+                v.StartsWith("Murcott", StringComparison.OrdinalIgnoreCase))
+                return "Mandarina";
+            if (v.StartsWith("Eureka", StringComparison.OrdinalIgnoreCase) ||
+                v.StartsWith("Lisboa", StringComparison.OrdinalIgnoreCase))
+                return "Limón";
+            if (v.StartsWith("Marsh", StringComparison.OrdinalIgnoreCase) ||
+                v.StartsWith("Star Ruby", StringComparison.OrdinalIgnoreCase))
+                return "Pomelo";
+            return null;
+            }
+
+        // ------------------------------------------------------------------
+        // Eventos climáticos
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Siembra eventos climáticos: ~45 históricos (450 días, tipo según
+        /// estación), 18 en los últimos 30 días, 2-3 frescos por día en los
+        /// últimos 4 días y ~4 pronosticados (próximos 6 días). Severidad sólo
+        /// "Crítica"/"Alta" y porcentajes alineados con ImpactEstimates de
+        /// appsettings.json; KilosPerdidosEstimados = % × KilosNetos del lote.
+        /// </summary>
+        private static void SembrarEventosClimaticos(ApplicationDbContext context, Random random)
+            {
+            if (context.EventosClimaticos.Any())
+                return;
+
+            var lotes = context.Lotes.AsNoTracking()
+                .Where(l => !l.IsDeleted && l.KilosNetos > 0)
+                .ToList();
+            if (lotes.Count == 0)
+                lotes = context.Lotes.AsNoTracking().Where(l => !l.IsDeleted).ToList();
+            if (lotes.Count == 0)
+                return;
+
+            var nombresCampo = new[] { "Juan Pérez", "María Gómez", "Carlos Rodríguez" };
+            var hoy = DateTime.Today;
+            var eventos = new List<EventoClimatico>();
+
+            string TipoPorEstacionalidad(int mes)
+                {
+                if (mes >= 5 && mes <= 9) return "Helada";              // invierno
+                if (mes == 12 || mes == 1 || mes == 2 || mes == 3) return "CalorExtremo"; // verano
+                var tormentas = new[] { "LluviaExcesiva", "VientoFuerte", "Granizo" };
+                return tormentas[random.Next(tormentas.Length)];
+                }
+
+            string Severidad(string tipo)
+                {
+                if (tipo == "CalorExtremo") return "Alta"; // según appsettings: siempre Alta
+                return random.Next(100) < 45 ? "Crítica" : "Alta";
+                }
+
+            decimal Porcentaje(string tipo, string severidad)
+                {
+                var critica = severidad == "Crítica";
+                return tipo switch
+                    {
+                    "Helada" => critica ? 45m : 15m,
+                    "LluviaExcesiva" => critica ? 50m : 20m,
+                    "VientoFuerte" => 10m,
+                    "CalorExtremo" => 25m,
+                    "Granizo" => critica ? 75m : 35m,
+                    _ => 20m
+                    };
+                }
+
+            string Observacion(string tipo)
+                {
+                return tipo switch
+                    {
+                    "Helada" => $"Temp mínima: {-1 - random.Next(0, 5)}°C a las {random.Next(3, 7)}:00. Riesgo de daño a frutos.",
+                    "LluviaExcesiva" => $"Acumulado 24h: {random.Next(50, 121)}mm. Riesgo de gomosis.",
+                    "VientoFuerte" => $"Viento máximo: {random.Next(50, 96)} km/h. Riesgo de ramas/fruta.",
+                    "CalorExtremo" => $"Temp máxima: {random.Next(38, 46)}°C a las {random.Next(13, 18)}:00. Riesgo de golpe de sol en fruta.",
+                    "Granizo" => $"weather_code {random.Next(96, 100)} a las {random.Next(12, 18)}:00. Daño mecánico en fruta y follaje.",
+                    _ => "Evento climático registrado."
+                    };
+                }
+
+            EventoClimatico CrearEvento(DateTime fecha, string tipo)
+                {
+                var severidad = Severidad(tipo);
+                var porcentaje = Porcentaje(tipo, severidad);
+                var lote = lotes[random.Next(lotes.Count)];
+
+                var automatica = random.Next(100) < 70;
+                var fuente = automatica
+                    ? (random.Next(100) < 40
+                        ? "Detección Automática - OpenMeteo (Salto, Paysandú, Uruguay)"
+                        : "Detección Automática - OpenMeteo")
+                    : $"Reporte de Campo - {nombresCampo[random.Next(nombresCampo.Length)]}";
+
+                return new EventoClimatico
+                    {
+                    LoteId = lote.Id,
+                    ProductorId = lote.ProductorId,
+                    Fecha = fecha.Date,
+                    TipoEvento = tipo,
+                    SeveridadEstimada = severidad,
+                    PorcentajePerdidaEstimada = porcentaje,
+                    KilosPerdidosEstimados = Math.Round(lote.KilosNetos * porcentaje / 100m, 2),
+                    Fuente = fuente,
+                    Observaciones = Observacion(tipo),
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = automatica ? "OpenMeteoClimateService" : "DbInitializer",
+                    IsDeleted = false
+                    };
+                }
+
+            // Históricos: últimos 450 días (excluyendo el último mes).
+            for (int i = 0; i < 45; i++)
+                {
+                var fecha = hoy.AddDays(-random.Next(31, 451));
+                eventos.Add(CrearEvento(fecha, TipoPorEstacionalidad(fecha.Month)));
+                }
+
+            // Últimos 30 días (del día 5 al 30 atrás).
+            for (int i = 0; i < 18; i++)
+                {
+                var fecha = hoy.AddDays(-random.Next(5, 31));
+                eventos.Add(CrearEvento(fecha, TipoPorEstacionalidad(fecha.Month)));
+                }
+
+            // Frescos: 2-3 por día en los últimos 4 días.
+            for (int diasAtras = 4; diasAtras >= 1; diasAtras--)
+                {
+                var cantidad = random.Next(2, 4);
+                for (int i = 0; i < cantidad; i++)
+                    {
+                    var fecha = hoy.AddDays(-diasAtras);
+                    eventos.Add(CrearEvento(fecha, TipoPorEstacionalidad(fecha.Month)));
+                    }
+                }
+
+            // Pronosticados: ~4 en los próximos 6 días (la app los distingue
+            // por Fecha futura).
+            for (int i = 0; i < 4; i++)
+                {
+                var fecha = hoy.AddDays(random.Next(1, 7));
+                eventos.Add(CrearEvento(fecha, TipoPorEstacionalidad(fecha.Month)));
+                }
+
+            context.EventosClimaticos.AddRange(eventos);
+            context.SaveChanges();
+            }
+
+        // ------------------------------------------------------------------
+        // vRitmoCalibradora (Gráfica de Procesos)
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Crea la tabla [dbo].[vRitmoCalibradora] si no existe (la entidad está
+        /// mapeada con ToView, por lo que las migraciones no la crean) y la
+        /// siembra coherente con LotesEmboquille: calibradora = kilos procesados
+        /// del día por especie, ritmo1 = calibradora/hscal y ritmo2 =
+        /// calibradora/(hscal+hspar), las fórmulas que usa GraficaProcesos.razor.
+        /// Se inserta por ADO.NET porque la entidad es keyless (no acepta Add).
+        /// </summary>
+        private static void SembrarRitmosCalibradora(ApplicationDbContext context, Random random)
+            {
+            context.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.vRitmoCalibradora') IS NULL
+    CREATE TABLE [dbo].[vRitmoCalibradora](
+        [Loteroda]      [nvarchar](50)  NULL,
+        [fecha]         [datetime2](7)  NOT NULL,
+        [idespecie]     [int]           NULL,
+        [especie]       [nvarchar](100) NULL,
+        [variedad]      [nvarchar](100) NULL,
+        [idvariedad]    [int]           NULL,
+        [calibradora]   [int]           NULL,
+        [dcte_sincera]  [int]           NULL,
+        [volcado]       [int]           NULL,
+        [hscal]         [decimal](10,2) NULL,
+        [hspar]         [decimal](10,2) NULL,
+        [ritmo1]        [int]           NULL,
+        [ritmo2]        [int]           NULL,
+        [observacion]   [nvarchar](200) NULL
+    );");
+
+            if (context.RitmosCalibradora.Any())
+                return;
+
+            // Filas por (día, especie) de los últimos 90 días de pesajes
+            // (rango por defecto de GraficaProcesos: últimos 3 meses).
+            var desde = DateTime.Today.AddDays(-90);
+            var pesajes = context.LotesEmboquille.AsNoTracking()
+                .Include(le => le.Lote).ThenInclude(l => l.Variedad).ThenInclude(v => v!.Especie)
+                .Where(le => !le.IsDeleted && le.FechaProduccion >= desde)
+                .AsEnumerable()
+                .Where(le => le.Lote?.Variedad?.EspecieId.HasValue == true)
+                .ToList();
+
+            if (pesajes.Count == 0)
+                {
+                // Respaldo: usar todos los pesajes si no hay filas en los últimos 90 días.
+                pesajes = context.LotesEmboquille.AsNoTracking()
+                    .Include(le => le.Lote).ThenInclude(l => l.Variedad).ThenInclude(v => v!.Especie)
+                    .Where(le => !le.IsDeleted)
+                    .AsEnumerable()
+                    .Where(le => le.Lote?.Variedad?.EspecieId.HasValue == true)
+                    .ToList();
+                }
+            if (pesajes.Count == 0)
+                return;
+
+            var grupos = pesajes
+                .GroupBy(le => new
+                    {
+                    Dia = le.FechaProduccion.Date,
+                    EspecieId = le.Lote!.Variedad!.EspecieId!.Value
+                    })
+                .OrderBy(g => g.Key.Dia)
+                .ToList();
+
+            var filas = new List<RitmoCalibradora>();
+            foreach (var grupo in grupos)
+                {
+                var kilosDelDia = (int)Math.Round(grupo.Sum(le => le.KilosNetos));
+                if (kilosDelDia <= 0)
+                    continue;
+
+                var variedad = grupo.First().Lote!.Variedad!;
+                var hscal = Math.Round((decimal)(8 + random.NextDouble() * 6), 2);     // 8..14 h calibradora
+                var hspar = Math.Round((decimal)(0.5 + random.NextDouble() * 2.5), 2); // 0.5..3 h paradas
+                var ritmo1 = (int)Math.Round(kilosDelDia / hscal);                     // kg/h con paradas fuera
+                var ritmo2 = (int)Math.Round(kilosDelDia / (hscal + hspar));           // kg/h con paradas incluidas
+
+                filas.Add(new RitmoCalibradora
+                    {
+                    Loteroda = grupo.First().Lote!.Codigo,
+                    Fecha = grupo.Key.Dia,
+                    IdEspecie = variedad.EspecieId,
+                    Especie = variedad.Especie?.Descripcion,
+                    Variedad = variedad.Nombre,
+                    IdVariedad = variedad.Id,
+                    Calibradora = kilosDelDia,
+                    DcteSincera = random.Next(20, 121),
+                    Volcado = (int)Math.Round(kilosDelDia * (0.9 + random.NextDouble() * 0.2)),
+                    Hscal = hscal,
+                    Hspar = hspar,
+                    Ritmo1 = ritmo1,
+                    Ritmo2 = ritmo2,
+                    Observacion = random.Next(100) < 15 ? "Paradas por ajuste de línea" : null
+                    });
+                }
+
+            if (filas.Count == 0)
+                return;
+
+            // Entidad keyless: no pasa por el ChangeTracker. Insert crudo sobre
+            // la misma conexión del contexto.
+            var connection = context.Database.GetDbConnection();
+            var cerrarConexion = connection.State != ConnectionState.Open;
+            if (cerrarConexion)
+                connection.Open();
+
+            try
+                {
+                using var command = connection.CreateCommand();
+                command.CommandText = @"
+INSERT INTO [dbo].[vRitmoCalibradora]
+    (Loteroda, fecha, idespecie, especie, variedad, idvariedad,
+     calibradora, dcte_sincera, volcado, hscal, hspar, ritmo1, ritmo2, observacion)
+VALUES
+    (@Loteroda, @fecha, @idespecie, @especie, @variedad, @idvariedad,
+     @calibradora, @dcte_sincera, @volcado, @hscal, @hspar, @ritmo1, @ritmo2, @observacion);";
+
+                var pLoteroda = command.CreateParameter(); pLoteroda.ParameterName = "@Loteroda"; pLoteroda.DbType = DbType.String; pLoteroda.Size = 50; command.Parameters.Add(pLoteroda);
+                var pFecha = command.CreateParameter(); pFecha.ParameterName = "@fecha"; pFecha.DbType = DbType.DateTime2; command.Parameters.Add(pFecha);
+                var pIdEspecie = command.CreateParameter(); pIdEspecie.ParameterName = "@idespecie"; pIdEspecie.DbType = DbType.Int32; command.Parameters.Add(pIdEspecie);
+                var pEspecie = command.CreateParameter(); pEspecie.ParameterName = "@especie"; pEspecie.DbType = DbType.String; pEspecie.Size = 100; command.Parameters.Add(pEspecie);
+                var pVariedad = command.CreateParameter(); pVariedad.ParameterName = "@variedad"; pVariedad.DbType = DbType.String; pVariedad.Size = 100; command.Parameters.Add(pVariedad);
+                var pIdVariedad = command.CreateParameter(); pIdVariedad.ParameterName = "@idvariedad"; pIdVariedad.DbType = DbType.Int32; command.Parameters.Add(pIdVariedad);
+                var pCalibradora = command.CreateParameter(); pCalibradora.ParameterName = "@calibradora"; pCalibradora.DbType = DbType.Int32; command.Parameters.Add(pCalibradora);
+                var pDcte = command.CreateParameter(); pDcte.ParameterName = "@dcte_sincera"; pDcte.DbType = DbType.Int32; command.Parameters.Add(pDcte);
+                var pVolcado = command.CreateParameter(); pVolcado.ParameterName = "@volcado"; pVolcado.DbType = DbType.Int32; command.Parameters.Add(pVolcado);
+                var pHscal = command.CreateParameter(); pHscal.ParameterName = "@hscal"; pHscal.DbType = DbType.Decimal; command.Parameters.Add(pHscal);
+                var pHspar = command.CreateParameter(); pHspar.ParameterName = "@hspar"; pHspar.DbType = DbType.Decimal; command.Parameters.Add(pHspar);
+                var pRitmo1 = command.CreateParameter(); pRitmo1.ParameterName = "@ritmo1"; pRitmo1.DbType = DbType.Int32; command.Parameters.Add(pRitmo1);
+                var pRitmo2 = command.CreateParameter(); pRitmo2.ParameterName = "@ritmo2"; pRitmo2.DbType = DbType.Int32; command.Parameters.Add(pRitmo2);
+                var pObservacion = command.CreateParameter(); pObservacion.ParameterName = "@observacion"; pObservacion.DbType = DbType.String; pObservacion.Size = 200; command.Parameters.Add(pObservacion);
+
+                foreach (var fila in filas)
+                    {
+                    pLoteroda.Value = (object?)fila.Loteroda ?? DBNull.Value;
+                    pFecha.Value = fila.Fecha;
+                    pIdEspecie.Value = (object?)fila.IdEspecie ?? DBNull.Value;
+                    pEspecie.Value = (object?)fila.Especie ?? DBNull.Value;
+                    pVariedad.Value = (object?)fila.Variedad ?? DBNull.Value;
+                    pIdVariedad.Value = (object?)fila.IdVariedad ?? DBNull.Value;
+                    pCalibradora.Value = (object?)fila.Calibradora ?? DBNull.Value;
+                    pDcte.Value = (object?)fila.DcteSincera ?? DBNull.Value;
+                    pVolcado.Value = (object?)fila.Volcado ?? DBNull.Value;
+                    pHscal.Value = (object?)fila.Hscal ?? DBNull.Value;
+                    pHspar.Value = (object?)fila.Hspar ?? DBNull.Value;
+                    pRitmo1.Value = (object?)fila.Ritmo1 ?? DBNull.Value;
+                    pRitmo2.Value = (object?)fila.Ritmo2 ?? DBNull.Value;
+                    pObservacion.Value = (object?)fila.Observacion ?? DBNull.Value;
+
+                    command.ExecuteNonQuery();
+                    }
+                }
+            finally
+                {
+                if (cerrarConexion)
+                    connection.Close();
+                }
+            }
+
+        // ------------------------------------------------------------------
+        // Usuarios por rol y auditoría
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Siembra usuarios de respaldo gerencia/contador/operador con la
+        /// contraseña "Guarino2026" hasheada con el PasswordHasher existente
+        /// (PBKDF2-SHA256, nunca texto plano). Sólo si ya existe al menos un
+        /// usuario: se preserva FR-8 (el primer usuario creado manualmente es
+        /// Admin) y el usuario admin existente jamás se modifica.
+        /// </summary>
+        private static void SembrarUsuariosDeRol(ApplicationDbContext context)
+            {
+            if (!context.Users.Any())
+                return;
+
+            var roles = context.Roles.AsNoTracking().Where(r => !r.IsDeleted && r.IsActive).ToList();
+            // Collation CI en la base: el chequeo debe ser case-insensitive para
+            // no chocar con el índice único de UserName.
+            var existentes = context.Users.AsNoTracking()
+                .Select(u => u.UserName)
+                .AsEnumerable()
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var hasher = new PasswordHasher();
+
+            var candidatos = new (string UserName, string FullName, string Rol)[]
+                {
+                ("gerencia", "Gerencia General", "Gerencia"),
+                ("contador", "Contaduría General", "Contador"),
+                ("operador", "Operador de Planta", "Operador")
+                };
+
+            foreach (var (userName, fullName, nombreRol) in candidatos)
+                {
+                if (existentes.Contains(userName))
+                    continue;
+
+                var rol = roles.FirstOrDefault(r => r.Name == nombreRol);
+                if (rol == null)
+                    continue;
+
+                context.Users.Add(new AppUser
+                    {
+                    UserName = userName,
+                    FullName = fullName,
+                    PasswordHash = hasher.Hash("Guarino2026"),
+                    RoleId = rol.Id,
+                    IsActive = true,
+                    ActivatedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = "DbInitializer",
+                    IsDeleted = false
+                    });
+                }
+
+            context.SaveChanges();
+            }
+
+        /// <summary>
+        /// Siembra ~48 LogEntries variados (View/Export/Create/Update/Delete/
+        /// Login/LoginFailed/Consulta IA/McpCall/Error) con timestamps
+        /// decrecientes. Sin datos sensibles: AdditionalData queda NULL y las
+        /// contraseñas jamás se registran.
+        /// </summary>
+        private static void SembrarLogEntries(ApplicationDbContext context, Random random)
+            {
+            if (context.LogEntries.Any())
+                return;
+
+            var usuarios = context.Users.AsNoTracking()
+                .Select(u => new { u.UserName, Rol = u.Role != null ? u.Role.Name : "Admin" })
+                .ToList();
+            if (usuarios.Count == 0)
+                usuarios =
+                    [
+                    new { UserName = "admin", Rol = "Admin" }
+                    ];
+
+            var acciones = new[]
+                {
+                "View", "Export", "Create", "Update", "Delete",
+                "Login", "LoginFailed", "Consulta IA", "McpCall", "Error"
+                };
+            var modulos = new[]
+                {
+                "Acceso", "Usuarios", "Stock Playa", "Auditoría", "Asistente IA",
+                "Gerencia", "Registro de Pesadas", "Contaduría", "Proyección de Zafra",
+                "Riesgo Climático", "Gráfica de Procesos", "Pallets"
+                };
+
+            var logs = new List<LogEntry>();
+            for (int i = 0; i < 48; i++)
+                {
+                var usuario = usuarios[random.Next(usuarios.Count)];
+                var accion = acciones[random.Next(acciones.Length)];
+                var modulo = modulos[random.Next(modulos.Length)];
+
+                var descripcion = accion switch
+                    {
+                    "Login" => "Inicio de sesión exitoso.",
+                    "LoginFailed" => "Intento de inicio de sesión fallido (usuario o contraseña incorrectos).",
+                    "Consulta IA" => "Realizó una consulta al asistente IA.",
+                    "McpCall" => "Invocó una herramienta MCP de datos.",
+                    "Error" => $"Error interno procesando una solicitud del módulo {modulo}.",
+                    "Export" => $"Exportó datos del módulo {modulo} a Excel.",
+                    "Create" => $"Creó un registro en {modulo}.",
+                    "Update" => $"Actualizó un registro en {modulo}.",
+                    "Delete" => $"Eliminó (borrado lógico) un registro en {modulo}.",
+                    _ => $"Consultó el módulo {modulo}."
+                    };
+
+                logs.Add(new LogEntry
+                    {
+                    UserName = usuario.UserName,
+                    Role = usuario.Rol,
+                    Action = accion,
+                    Module = modulo,
+                    Description = descripcion,
+                    // Entre 5 minutos y ~21 días hacia atrás.
+                    Timestamp = DateTime.UtcNow.AddMinutes(-random.Next(5, 30241)),
+                    IpAddress = $"10.0.0.{random.Next(2, 254)}",
+                    AdditionalData = null,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = usuario.UserName,
+                    IsDeleted = false
+                    });
+                }
+
+            context.LogEntries.AddRange(logs);
             context.SaveChanges();
             }
         }

@@ -11,5 +11,7 @@ namespace GuarinoApp.Application.Settings
         public double LluviaMuyExcesivaPerdida { get; set; }
         public double VientoFuertePerdida { get; set; }
         public double CalorExtremoPerdida { get; set; }
+        public double GranizoPerdida { get; set; }
+        public double GranizoSeveraPerdida { get; set; }
         }
     }

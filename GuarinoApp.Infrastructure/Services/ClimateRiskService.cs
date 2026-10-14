@@ -82,12 +82,16 @@ public class ClimateRiskService : IClimateRiskService
             .Replace("{VIENTO_FUERTE_KMH}", t.VientoFuerteKmh.ToString("F1"))
             .Replace("{VIENTO_FUERTE_KMH_CRITICO}", t.VientoFuerteKmhCritico.ToString("F1"))
             .Replace("{CALOR_EXTREMO_TEMP}", t.CalorExtremoTempMax.ToString("F1"))
+            .Replace("{GRANIZO_CODE_MIN}", t.GranizoWeatherCodeMin.ToString("F0"))
+            .Replace("{GRANIZO_CODE_SEVERA}", t.GranizoWeatherCodeSevera.ToString("F0"))
             .Replace("{HELA_PERDIDA}", i.HeladaPerdida.ToString("F1"))
             .Replace("{HELA_SEVERA_PERDIDA}", i.HeladaSeveraPerdida.ToString("F1"))
             .Replace("{LLUVIA_EXCESIVA_PERDIDA}", i.LluviaExcesivaPerdida.ToString("F1"))
             .Replace("{LLUVIA_MUY_EXCESIVA_PERDIDA}", i.LluviaMuyExcesivaPerdida.ToString("F1"))
             .Replace("{VIENTO_FUERTE_PERDIDA}", i.VientoFuertePerdida.ToString("F1"))
             .Replace("{CALOR_EXTREMO_PERDIDA}", i.CalorExtremoPerdida.ToString("F1"))
+            .Replace("{GRANIZO_PERDIDA}", i.GranizoPerdida.ToString("F1"))
+            .Replace("{GRANIZO_SEVERA_PERDIDA}", i.GranizoSeveraPerdida.ToString("F1"))
             .Replace("{INPUT_JSON}", inputJson);
         }
 

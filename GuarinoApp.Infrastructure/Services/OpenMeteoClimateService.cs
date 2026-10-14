@@ -228,7 +228,7 @@ namespace GuarinoApp.Infrastructure.Services
             // el evento impacte la fruta exportable. Antes dependía del default no documentado
             // de Open-Meteo (7 días); ahora queda explícito en el código.
             var url = $"{_settings.OpenMeteoApiUrl}?latitude={latitudeStr}&longitude={longitudeStr}" +
-                "&hourly=temperature_2m,precipitation,wind_speed_10m&timezone=auto&past_days=3&forecast_days=7";
+                "&hourly=temperature_2m,precipitation,wind_speed_10m,weather_code&timezone=auto&past_days=3&forecast_days=7";
 
             try
                 {
@@ -281,11 +281,15 @@ namespace GuarinoApp.Infrastructure.Services
                 var temp = climaData.Hourly.Temperature_2m[i] ?? 999;
                 var lluvia = climaData.Hourly.Precipitation[i] ?? 0;
                 var viento = climaData.Hourly.Wind_speed_10m[i] ?? 0;
+                var weatherCode = (i < climaData.Hourly.Weather_code.Count)
+                    ? climaData.Hourly.Weather_code[i]
+                    : null;
 
                 DetectarHelada(lote, thresholds, impacto, fechaHora, temp, eventosDetectados, registrosProcesados);
                 DetectarLluvia(lote, thresholds, impacto, fechaHora, lluvia, eventosDetectados, registrosProcesados);
                 DetectarViento(lote, thresholds, impacto, fechaHora, viento, eventosDetectados, registrosProcesados);
                 DetectarCalor(lote, thresholds, impacto, fechaHora, temp, eventosDetectados, registrosProcesados);
+                DetectarGranizo(lote, thresholds, impacto, fechaHora, weatherCode, eventosDetectados, registrosProcesados);
                 }
 
             return eventosDetectados;
@@ -410,6 +414,44 @@ namespace GuarinoApp.Infrastructure.Services
                 });
             procesados.Add(key);
             }
+
+        /// <summary>
+        /// Granizo por código meteorológico WMO (weather_code de Open-Meteo):
+        /// 96 = tormenta con granizo leve, 99 = granizo intenso. Es el evento que más
+        /// daño mecánico provoca en fruta y follaje (magulladuras, caída de fruta),
+        /// por lo que sus pérdidas estimadas son las más altas de la configuración.
+        /// </summary>
+        private void DetectarGranizo(
+            LoteInfo lote,
+            ThresholdsConfig thresholds,
+            ImpactEstimatesConfig impacto,
+            DateTime fechaHora,
+            double? weatherCode,
+            List<EventoClimatico> eventos,
+            HashSet<(string, DateTime)> procesados)
+            {
+            if (weatherCode is not double codigo || codigo < thresholds.GranizoWeatherCodeMin) return;
+
+            var key = ("Granizo", fechaHora.Date);
+            if (procesados.Contains(key)) return;
+
+            var severo = codigo >= thresholds.GranizoWeatherCodeSevera;
+            var severidad = severo ? "Crítica" : "Alta";
+            var perdida = severo ? impacto.GranizoSeveraPerdida : impacto.GranizoPerdida;
+
+            eventos.Add(new EventoClimatico
+                {
+                LoteId = lote.Id,
+                ProductorId = lote.ProductorId,
+                Fecha = fechaHora.Date,
+                TipoEvento = "Granizo",
+                SeveridadEstimada = severidad,
+                PorcentajePerdidaEstimada = (decimal?)perdida,
+                Fuente = "Detección Automática - OpenMeteo",
+                Observaciones = $"weather_code {codigo:0} a las {fechaHora.Hour}:00. Daño mecánico en fruta y follaje."
+                });
+            procesados.Add(key);
+            }
         }
 
     public class OpenMeteoResponse
@@ -423,5 +465,11 @@ namespace GuarinoApp.Infrastructure.Services
         public List<double?> Temperature_2m { get; set; } = [];
         public List<double?> Precipitation { get; set; } = [];
         public List<double?> Wind_speed_10m { get; set; } = [];
+
+        /// <summary>
+        /// Código meteorológico WMO por hora (0-99). Open-Meteo lo devuelve como entero;
+        /// se modela como doble nullable para tolerar ausencia del campo en respuestas viejas.
+        /// </summary>
+        public List<double?> Weather_code { get; set; } = [];
         }
     }

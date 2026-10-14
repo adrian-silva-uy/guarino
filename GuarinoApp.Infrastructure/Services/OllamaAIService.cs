@@ -1575,12 +1575,18 @@ public class OllamaAIService : IAIService
                 .Replace("{LLUVIA_EXCESIVA_MM}", settings.Thresholds.LluviaExcesivaMm.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("{VIENTO_FUERTE_KMH}", settings.Thresholds.VientoFuerteKmh.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("{CALOR_EXTREMO_TEMP}", settings.Thresholds.CalorExtremoTempMax.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("{LLUVIA_MUY_EXCESIVA_MM}", settings.Thresholds.LluviaMuyExcesivaMm.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("{VIENTO_FUERTE_KMH_CRITICO}", settings.Thresholds.VientoFuerteKmhCritico.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("{GRANIZO_CODE_MIN}", settings.Thresholds.GranizoWeatherCodeMin.ToString("F0", System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("{GRANIZO_CODE_SEVERA}", settings.Thresholds.GranizoWeatherCodeSevera.ToString("F0", System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("{HELA_SEVERA_PERDIDA}", settings.ImpactEstimates.HeladaSeveraPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("{HELA_PERDIDA}", settings.ImpactEstimates.HeladaPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("{LLUVIA_MUY_EXCESIVA_PERDIDA}", settings.ImpactEstimates.LluviaMuyExcesivaPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("{LLUVIA_EXCESIVA_PERDIDA}", settings.ImpactEstimates.LluviaExcesivaPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("{VIENTO_FUERTE_PERDIDA}", settings.ImpactEstimates.VientoFuertePerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("{CALOR_EXTREMO_PERDIDA}", settings.ImpactEstimates.CalorExtremoPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("{GRANIZO_PERDIDA}", settings.ImpactEstimates.GranizoPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("{GRANIZO_SEVERA_PERDIDA}", settings.ImpactEstimates.GranizoSeveraPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("{INPUT_JSON}", inputJson);
 
             // 3. Construir la solicitud a Ollama
