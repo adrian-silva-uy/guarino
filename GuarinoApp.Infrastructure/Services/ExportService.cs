@@ -72,7 +72,7 @@ namespace GuarinoApp.Infrastructure.Services
                         {
                             foreach (var prop in properties)
                                 {
-                                header.Cell()
+                                var encabezado = header.Cell()
                                       .Background(Colors.Grey.Lighten3)
                                       .BorderBottom(1)
                                       .BorderColor(Colors.Grey.Medium)
@@ -80,6 +80,14 @@ namespace GuarinoApp.Infrastructure.Services
                                       .Text(prop.Name)
                                       .Bold()
                                       .FontSize(8.5f);
+                                // Los encabezados numéricos van pegados a la
+                                // derecha, al mismo filo que sus valores: si
+                                // quedaran a la izquierda de una celda ancha,
+                                // cada valor parecería caer en la columna
+                                // siguiente (el encabezado de esa columna
+                                // empieza justo después).
+                                if (EsNumerico(prop.PropertyType))
+                                    encabezado = encabezado.AlignRight();
                                 }
                         });
 
@@ -89,7 +97,7 @@ namespace GuarinoApp.Infrastructure.Services
                             var fondo = numeroFila % 2 == 1 ? Colors.Grey.Lighten4 : Colors.White;
                             foreach (var prop in properties)
                                 {
-                                var valor = prop.GetValue(item)?.ToString() ?? string.Empty;
+                                var valor = FormatoCelda(prop.GetValue(item));
                                 var celda = table.Cell()
                                     .Background(fondo)
                                     .BorderBottom(0.5f)
@@ -132,6 +140,20 @@ namespace GuarinoApp.Infrastructure.Services
                    tipo == typeof(ushort) || tipo == typeof(uint) || tipo == typeof(ulong) ||
                    tipo == typeof(decimal) || tipo == typeof(double) || tipo == typeof(float);
             }
+
+        /// <summary>
+        /// Texto de cada celda del PDF. Las fechas salen sin "0:00:00" cuando
+        /// no traen hora (los reportes quedaban con una hora fantasma en cada
+        /// fila) y con hora solo si el valor la tiene.
+        /// </summary>
+        private static string FormatoCelda(object? valor)
+            => valor switch
+                {
+                DateTime fecha => fecha.TimeOfDay == TimeSpan.Zero
+                    ? fecha.ToString("dd/MM/yyyy")
+                    : fecha.ToString("dd/MM/yyyy HH:mm"),
+                _ => valor?.ToString() ?? string.Empty
+                };
 
         private static string Escape(string value) =>
             value.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0
