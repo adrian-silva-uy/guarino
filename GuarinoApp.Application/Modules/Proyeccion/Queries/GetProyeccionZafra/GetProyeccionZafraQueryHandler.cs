@@ -23,8 +23,6 @@ public class GetProyeccionZafraQueryHandler : IRequestHandler<GetProyeccionZafra
     private const decimal MargenRiesgoCapacidadDefault = 10m; // %
     private const decimal KgPorBinUltimoRecurso = 20m; // solo si no hay NINGÚN Lote cargado
 
-    private sealed record MesVolumen(int Year, int Month, decimal TotalKilos);
-
     private readonly IApplicationDbContext _context;
 
     public GetProyeccionZafraQueryHandler(IApplicationDbContext context)

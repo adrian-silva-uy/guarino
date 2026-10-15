@@ -112,7 +112,7 @@
 
                 @if (_monthlySeries.Any() && _monthlySeries[0].Data.Any(d => d > 0))
                 {
-                    <InteractiveChart @key="_monthlyChartKey" Series="_monthlySeries" Labels="_monthLabels" Type="InteractiveChart.InteractiveChartType.Bar" Height="300px" />
+                    <InteractiveChart @key="_monthlyChartKey" Series="_monthlySeries" Labels="_monthLabels" Type="InteractiveChartType.Bar" Height="300px" />
                 }
                 else
                 {
@@ -133,7 +133,7 @@
 
                 @if (_stockVarietySeries.Any())
                 {
-                    <InteractiveChart @key="_stockVarietyChartKey" Series="_stockVarietySeries" Labels="_stockVarietyLabels" Type="InteractiveChart.InteractiveChartType.Bar" Height="300px" />
+                    <InteractiveChart @key="_stockVarietyChartKey" Series="_stockVarietySeries" Labels="_stockVarietyLabels" Type="InteractiveChartType.Bar" Height="300px" />
                 }
                 else
                 {
@@ -579,24 +579,6 @@
             Snackbar.Add($"⚠️ No se pudo enviar el email: {ex.Message} | Detalle: {ex.InnerException?.Message}",
                 Severity.Error, config => config.VisibleStateDuration = 8000);
         }
-    }
-
-    // --- Clases auxiliares ---
-    public class KPI
-    {
-        public string? Title { get; set; }
-        public string? Value { get; set; }
-        public string? PeriodLabel { get; set; }
-        public string? TrendText { get; set; }
-        public Color TrendColor { get; set; }
-        public string? TrendIcon { get; set; }
-    }
-
-    public class IASuggestionSimple
-    {
-        public string? Text { get; set; }
-        public string? Color { get; set; }
-        public string? Icon { get; set; }
     }
 
     private string GetCardStyle(string? color) => $"border-left: 4px solid {color}; height: 100%;";

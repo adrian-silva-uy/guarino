@@ -51,19 +51,6 @@ public class OllamaRecuperacionService : BackgroundService
     {
     private static readonly TimeSpan VentanaDeReinicios = TimeSpan.FromHours(1);
 
-    // Diagnóstico de la generación de prueba.
-    private enum Diagnostico
-        {
-        Ok,                 // 2xx: la IA local funciona (falso positivo o ya se recuperó).
-        ErrorDeGeneracion,  // 5xx: el API responde pero la generación falla ("colgado").
-        SinConexion,        // conexión rechazada/sin host: proceso caído.
-        ErrorDeClientes,    // 4xx: falta el modelo o hay un problema de configuración (NO se reinicia).
-        Indeciso            // la verificación no pudo responder a tiempo (NO se reinicia).
-        }
-
-    private sealed record ResultadoVerificacion(Diagnostico Diagnostico, string Detalle);
-    private sealed record ResultadoReparacion(bool Exitosa, string Detalle);
-
     private readonly IHttpClientFactory _httpFactory;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptionsMonitor<OllamaOptions> _optionsMonitor;

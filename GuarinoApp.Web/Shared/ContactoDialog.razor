@@ -82,19 +82,6 @@
     /// <summary>Nulo = alta; con valores = edición.</summary>
     [Parameter] public ContactoDto? Contacto { get; set; }
 
-    /// <summary>Datos del formulario que la página recibe al cerrar el diálogo.</summary>
-    public class Modelo
-        {
-        public string Nombre { get; set; } = string.Empty;
-        public string Empresa { get; set; } = string.Empty;
-        public string? Pais { get; set; }
-        public string? Email { get; set; }
-        public string? Telefono { get; set; }
-        public string? Interes { get; set; }
-        public string? Notas { get; set; }
-        public string Estado { get; set; } = ContactoEstados.Nuevo;
-        }
-
     private string Nombre = string.Empty;
     private string Empresa = string.Empty;
     private string? Pais;
@@ -168,7 +155,7 @@
             return;
         }
 
-        MudDialog.Close(DialogResult.Ok(new Modelo
+        MudDialog.Close(DialogResult.Ok(new ContactoDialogModelo
         {
             Nombre = Nombre.Trim(),
             Empresa = Empresa.Trim(),

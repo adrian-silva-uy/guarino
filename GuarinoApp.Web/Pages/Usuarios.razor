@@ -190,17 +190,6 @@ else
     private bool _showForm;
     private NuevoUsuario _newUser = new();
 
-    /// <summary>Datos del formulario de alta (la contraseña solo vive en
-    /// memoria hasta hashearse en el servidor).</summary>
-    private sealed class NuevoUsuario
-    {
-        public string UserName { get; set; } = string.Empty;
-        public string FullName { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-        public string Role { get; set; } = "Operador";
-    }
-
     private void ToggleForm()
     {
         _showForm = !_showForm;

@@ -27,13 +27,7 @@ public class AiResultCache
     private static readonly TimeSpan Ttl = TimeSpan.FromMinutes(10);
     private const int MaxEntradas = 256;
 
-    private readonly ConcurrentDictionary<string, Entrada> _datos = new();
-
-    private sealed class Entrada
-        {
-        public DateTime Expira { get; init; }
-        public object? Valor { get; init; }
-        }
+    private readonly ConcurrentDictionary<string, AiResultCacheEntrada> _datos = new();
 
     /// <summary>Clave estable y compacta a partir de la operación y sus argumentos.</summary>
     public static string Clave(string operacion, params object?[] partes)
@@ -98,6 +92,6 @@ public class AiResultCache
                 }
             }
 
-        _datos[clave] = new Entrada { Expira = DateTime.UtcNow.Add(Ttl), Valor = valor };
+        _datos[clave] = new AiResultCacheEntrada { Expira = DateTime.UtcNow.Add(Ttl), Valor = valor };
         }
     }

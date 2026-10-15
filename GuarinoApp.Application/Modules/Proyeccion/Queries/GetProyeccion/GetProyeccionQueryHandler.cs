@@ -132,7 +132,5 @@ namespace GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccion
 
             return data;
             }
-
-        private sealed record HistoricoMensual(int Año, int Mes, decimal KgsVolcados);
         }
     }

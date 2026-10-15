@@ -170,7 +170,7 @@
     {
         var dialog = await DialogService.ShowAsync<ContactoDialog>("Nuevo contacto");
         var result = await dialog.Result;
-        if (result is null || result.Canceled || result.Data is not ContactoDialog.Modelo modelo)
+        if (result is null || result.Canceled || result.Data is not ContactoDialogModelo modelo)
         {
             return;
         }
@@ -199,7 +199,7 @@
         };
         var dialog = await DialogService.ShowAsync<ContactoDialog>($"Editar: {contacto.Nombre}", parameters);
         var result = await dialog.Result;
-        if (result is null || result.Canceled || result.Data is not ContactoDialog.Modelo modelo)
+        if (result is null || result.Canceled || result.Data is not ContactoDialogModelo modelo)
         {
             return;
         }
