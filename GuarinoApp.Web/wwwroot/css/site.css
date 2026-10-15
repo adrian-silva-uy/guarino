@@ -108,3 +108,16 @@ a, .btn-link {
     max-width: 340px !important;
     line-height: 1.45 !important;
 }
+
+/* Rango de fechas del ExportToolbar: en pantallas chicas el picker ocupa el
+   ancho disponible (evita que la fecha "15-07-2026" se corte); desde 600px
+   (tablets/desktop) fija un ancho comodo de 200px. */
+.toolbar-fecha-picker {
+    max-width: 100%;
+}
+
+@media (min-width: 600px) {
+    .toolbar-fecha-picker {
+        max-width: 200px;
+    }
+}

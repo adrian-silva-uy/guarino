@@ -1,22 +1,30 @@
 @page "/registropesadas"
 @using MediatR
 @using MudBlazor
+@using GuarinoApp.Application.Common.Interfaces
 @using GuarinoApp.Application.Modules.RegistroPesadas.Queries.GetRegistroPesadas
 @using GuarinoApp.Application.Modules.RegistroPesadas.Dtos
 @inject IMediator Mediator
+@inject IExportService ExportService
+@inject IEmailService EmailService
+@inject IReportMailRouter ReportMailRouter
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
 
 <MudText Typo="Typo.h4" GutterBottom="true">⚖️ Registro de Pesadas</MudText>
 <MudText Typo="Typo.body2" Class="mb-4">Listado de Registro de Pesadas</MudText>
 
 <MudCard>
     <MudCardContent>
-        <MudGrid>
-            <MudItem xs="12" sm="4">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
-                    @(_loading ? "Cargando..." : "Actualizar")
-                </MudButton>
-            </MudItem>
-        </MudGrid>
+        <ExportToolbar ReportName="Registro_Pesadas"
+                       @bind-FechaDesde="_fechaDesde"
+                       @bind-FechaHasta="_fechaHasta"
+                       OnRefresh="LoadData"
+                       IsLoading="_loading"
+                       OnExportPdf="ExportToPdf"
+                       OnExportExcel="ExportToExcel"
+                       OnExportCsv="ExportToCsv"
+                       OnExportEmail="ExportarEmail" />
 
         @if (_data.Any())
         {
@@ -36,19 +44,26 @@
                 </RowTemplate>
             </MudTable>
 
-            <DataSourceFooter EsDummy="true" Origen="Base de datos DTrace" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
+            <!-- refleja lo que devolvió el handler. -->
+            <DataSourceFooter EsDummy="@_esDummy" Origen="@(_esDummy ? "Datos de ejemplo" : "Base de datos DTrace")" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
         }
         else if (!_loading && _cargado)
         {
-            <MudAlert Severity="Severity.Info">No se encontraron registros.</MudAlert>
+            <MudAlert Severity="Severity.Info">No se encontraron registros para el rango seleccionado. Ajustá las fechas o limpiar el filtro para ver el histórico completo.</MudAlert>
         }
     </MudCardContent>
 </MudCard>
 
 @code {
     private List<RegistroPesadaDto> _data = new();
+    private bool _esDummy = false;
     private bool _loading = false;
     private bool _cargado = false;
+
+    // Rango por defecto: últimos 3 meses (mismo criterio que el resto de la app);
+    // limpiar el picker deja el límite libre y muestra el histórico completo.
+    private DateTime? _fechaDesde = DateTime.Now.AddMonths(-3);
+    private DateTime? _fechaHasta = DateTime.Now;
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,11 +72,19 @@
 
     async Task LoadData()
     {
+        // Misma validación que Dashboard/GraficaProcesos: el rango debe ser coherente.
+        if (_fechaDesde.HasValue && _fechaHasta.HasValue && _fechaDesde.Value.Date > _fechaHasta.Value.Date)
+        {
+            Snackbar.Add("La fecha desde no puede ser posterior a la fecha hasta.", Severity.Warning);
+            return;
+        }
         _loading = true;
         _cargado = false;
         try
         {
-            _data = await Mediator.Send(new GetRegistroPesadasQuery());
+            var resultado = await Mediator.Send(new GetRegistroPesadasQuery(_fechaDesde, _fechaHasta));
+            _data = resultado.Pesadas;
+            _esDummy = resultado.EsDummy;
         }
         catch (Exception ex)
         {
@@ -72,6 +95,87 @@
             _loading = false;
             _cargado = true;
             StateHasChanged();
+        }
+    }
+
+    private async Task ExportToPdf()
+    {
+        if (!await EnsureDataForExportAsync()) return;
+        await ExportAsync(
+            () => ExportService.ExportToPdfAsync(_data, "Registro de Pesadas"),
+            $"Registro_Pesadas_{DateTime.Now:yyyyMMdd_HHmmss}.pdf",
+            "application/pdf");
+    }
+
+    private async Task ExportToExcel()
+    {
+        if (!await EnsureDataForExportAsync()) return;
+        await ExportAsync(
+            () => ExportService.ExportToExcelAsync(_data, "Registro de Pesadas"),
+            $"Registro_Pesadas_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+
+    private async Task ExportToCsv()
+    {
+        if (!await EnsureDataForExportAsync()) return;
+        var fileName = $"Registro_Pesadas_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+        await JS.InvokeVoidAsync("downloadFileFromText", fileName, ExportService.ExportToCsv(_data), "text/csv");
+        Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+    }
+
+    private async Task ExportarEmail()
+    {
+        if (!await EnsureDataForExportAsync()) return;
+        try
+        {
+            var bytes = await ExportService.ExportToPdfAsync(_data, "Registro de Pesadas");
+            var nombreArchivo = $"Registro_Pesadas_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+
+            // Va al usuario que pidió el reporte, con copia al administrador.
+            var (para, copia) = ReportMailRouter.GetRecipients();
+
+            await EmailService.SendEmailAsync(
+                para,
+                $"Reporte Registro de Pesadas {DateTime.Now:dd/MM/yyyy}",
+                $"Adjunto el reporte de registro de pesadas con {_data.Count} registros.",
+                bytes,
+                nombreArchivo,
+                cc: copia);
+
+            Snackbar.Add(copia == null
+                    ? $"📧 Email enviado correctamente a {para}."
+                    : $"📧 Email enviado correctamente a {para} (copia a {copia}).",
+                Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error enviando email: {ex}");
+            Snackbar.Add($"⚠️ No se pudo enviar el email: {ex.Message}", Severity.Error,
+                config => config.VisibleStateDuration = 8000);
+        }
+    }
+
+    private Task<bool> EnsureDataForExportAsync()
+    {
+        if (_data.Any()) return Task.FromResult(true);
+        Snackbar.Add("No hay datos para exportar.", Severity.Warning);
+        return Task.FromResult(false);
+    }
+
+    private async Task ExportAsync(Func<Task<byte[]>> createFile, string fileName, string mimeType)
+    {
+        try
+        {
+            var bytes = await createFile();
+            if (bytes.Length == 0) throw new InvalidOperationException("El archivo generado esta vacio.");
+            await JS.InvokeVoidAsync("downloadFileFromByteArray", fileName, bytes, mimeType);
+            Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error exportando: {ex}");
+            Snackbar.Add($"No se pudo generar el archivo: {ex.Message}", Severity.Error);
         }
     }
 }

@@ -2,4 +2,4 @@
 using MediatR;
 
 namespace GuarinoApp.Application.Modules.RegistroPesadas.Queries.GetRegistroPesadas;
-public record GetRegistroPesadasQuery() : IRequest<List<RegistroPesadaDto>>;
+public record GetRegistroPesadasQuery(DateTime? FechaDesde = null, DateTime? FechaHasta = null) : IRequest<RegistroPesadasResultDto>;

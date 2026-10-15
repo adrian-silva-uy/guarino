@@ -23,13 +23,15 @@ public class GetLotesVolcadosQueryHandler : IRequestHandler<GetLotesVolcadosQuer
         {
         try
             {
-            // Consulta LINQ segura y tipada 
+            // Filtro por rango de fechas (opcional): si no se pasan fechas, se devuelve el histórico completo.
             var query = _context.LotesEmboquille
                 .Include(le => le.Lote)
                     .ThenInclude(l => l.Variedad)
                 .Include(le => le.Lote)
                     .ThenInclude(l => l.Productor)
-                .Where(le => !le.Lote.IsDeleted)
+                .Where(le => !le.Lote.IsDeleted
+                    && (!request.FechaDesde.HasValue || le.FechaProduccion.Date >= request.FechaDesde.Value.Date)
+                    && (!request.FechaHasta.HasValue || le.FechaProduccion.Date <= request.FechaHasta.Value.Date))
                 .GroupBy(le => new
                     {
                     le.Lote.Id,
@@ -54,7 +56,14 @@ public class GetLotesVolcadosQueryHandler : IRequestHandler<GetLotesVolcadosQuer
             var result = await query.ToListAsync(cancellationToken);
 
             if (result.Count == 0)
-                return new LotesVolcadosResultDto(GetDummyData(), EsDummy: true);
+                {
+                // Los datos de ejemplo solo corresponden si la tabla está vacía (BD sin datos reales).
+                // Un rango de fechas sin resultados NO es dato demo: se devuelve vacío para que
+                // la página informe "sin registros para el rango".
+                var hayDatosReales = await _context.LotesEmboquille.AsNoTracking().AnyAsync(cancellationToken);
+                if (!hayDatosReales)
+                    return new LotesVolcadosResultDto(GetDummyData(), EsDummy: true);
+                }
 
             return new LotesVolcadosResultDto(result, EsDummy: false);
             }
