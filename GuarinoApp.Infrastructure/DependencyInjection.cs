@@ -81,6 +81,14 @@ namespace GuarinoApp.Infrastructure
             services.AddScoped<IAIService, FallbackAIService>();
             services.AddHostedService<OllamaStartupService>();
 
+            // Auto-reparación silenciosa de la IA local: si la generación falla con
+            // 5xx (proceso "colgado") o el proceso deja de responder, lo reinicia,
+            // verifica con una generación de prueba y avisa por correo a
+            // Notificaciones:EmailAdmin con lo ocurrido y la solución. Mientras
+            // tanto los usuarios quedan cubiertos por la IA web / planes
+            // predefinidos. Configuración: Ollama:Sanacion.
+            services.AddHostedService<OllamaRecuperacionService>();
+
             // Caché de resultados IA: en picos (~20 usuarios) la misma consulta
             // repetida por varias cargas de página se contesta una sola vez y el
             // resto sale del caché al instante (ahorra cupo del plan gratuito y

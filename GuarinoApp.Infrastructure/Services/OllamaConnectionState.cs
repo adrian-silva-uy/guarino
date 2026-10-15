@@ -15,4 +15,14 @@ public class OllamaConnectionState
 
     /// <summary>True solo si Ollama respondió Y el modelo configurado está descargado.</summary>
     public bool IsReady => IsConnected && IsModelReady;
+
+    /// <summary>Fecha/hora (UTC) del último fallo REAL de generación reportado por
+    /// OllamaAIService (HTTP 5xx, red, excepción). Lo consume
+    /// OllamaRecuperacionService para verificar y reparar el servicio; nulo = sin
+    /// fallos desde el arranque.</summary>
+    public DateTime? UltimoFalloEn { get; set; }
+
+    /// <summary>Motivo del último fallo de generación (ej. "HTTP 500",
+    /// "HttpRequestException").</summary>
+    public string? UltimoFalloMotivo { get; set; }
     }

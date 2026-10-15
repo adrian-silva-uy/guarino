@@ -366,6 +366,11 @@ public class OllamaAIService : IAIService
             _logger.LogWarning("Ollama respondió con error al generar ({Motivo}).", motivo);
 
         _connectionState.IsModelReady = false;
+
+        // Sella el fallo para que OllamaRecuperacionService lo verifique y, si se
+        // confirma (HTTP 5xx persistente o sin conexión), repare el servicio solo.
+        _connectionState.UltimoFalloEn = DateTime.UtcNow;
+        _connectionState.UltimoFalloMotivo = motivo;
         }
 
     private async Task<string> ObtenerResumenProyeccionZafraAsync()
@@ -1689,44 +1694,13 @@ public class OllamaAIService : IAIService
         // Solo marcamos el modelo como no listo si es un fallo real del servidor (HTTP error, network down).
         // Un timeout o una respuesta vacía no significa que el modelo esté roto, solo que esa petición falló.
         if (esFalloDeServidor)
+            {
             _connectionState.IsModelReady = false;
-        }
 
-    // ==========================================
-    // DTOs para la respuesta de IA de Clima
-    // ==========================================
-    public class ClimateAiResponse
-        {
-        public ResumenImpactoDto ResumenImpacto { get; set; } = new ResumenImpactoDto();
-        public List<PlanMitigacionItemDto> PlanMitigacion { get; set; } = new List<PlanMitigacionItemDto>();
-        }
-
-    public class ResumenImpactoDto
-        {
-        public int KilosPerdidosTotales { get; set; }
-        public decimal PorcentajePerdidaTotal { get; set; }
-        public string TipoEventoMasFrecuente { get; set; } = string.Empty;
-        public string Observaciones { get; set; } = string.Empty;
-        }
-
-    public class PlanMitigacionItemDto
-        {
-        public string Texto { get; set; } = string.Empty;
-        public string Categoria { get; set; } = string.Empty;
-        public string Origen { get; set; } = string.Empty;
-        public string Impacto { get; set; } = string.Empty;
-        public string Riesgo { get; set; } = string.Empty;
-        }
-
-    public class OllamaChatResponse
-        {
-        [JsonPropertyName("message")]
-        public OllamaMessage? Message { get; set; }
-        }
-
-    public class OllamaMessage
-        {
-        [JsonPropertyName("content")]
-        public string? Content { get; set; }
+            // Sella el fallo para que OllamaRecuperacionService lo verifique y, si
+            // se confirma (HTTP 5xx persistente o sin conexión), repare solo.
+            _connectionState.UltimoFalloEn = DateTime.UtcNow;
+            _connectionState.UltimoFalloMotivo = motivo;
+            }
         }
     }
