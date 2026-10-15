@@ -7,5 +7,6 @@ internal enum Diagnostico
     ErrorDeGeneracion,  // 5xx: el API responde pero la generación falla ("colgado").
     SinConexion,        // conexión rechazada/sin host: proceso caído.
     ErrorDeClientes,    // 4xx: falta el modelo o hay un problema de configuración (NO se reinicia).
+    ModeloAusente,      // 404: el modelo configurado no está en el servidor (se descarga, NO se reinicia).
     Indeciso            // la verificación no pudo responder a tiempo (NO se reinicia).
     }

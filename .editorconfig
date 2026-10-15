@@ -8,3 +8,22 @@ insert_final_newline = true
 [*.{cs}]
 csharp_indent_braces = true
 csharp_prefer_braces = true:silent
+
+# ============================================================================
+# Política de análisis estático (se evalúa EN EL BUILD: EnforceCodeStyleInBuild
+# y AnalysisLevel están en Directory.Build.props; el IDE local y cualquier CI
+# ven lo mismo y una regla en "error" FALLA la compilación).
+#
+# Para escalar la política: agregar una línea por regla, p. ej.
+#   dotnet_diagnostic.CA1812.severity = warning
+# (catálogo: https://learn.microsoft.com/dotnet/fundamentals/code-analysis/overview)
+# ============================================================================
+[*.{cs}]
+# CA1034 (Clean Architecture): un tipo NO puede declararse dentro de otro —
+# 1 archivo = 1 tipo. Política fijada tras el barrido de 2026-10 (18 tipos
+# anidados extraídos). Si aparece uno nuevo, el build FALLA a propósito:
+# crear el archivo propio (internal si es solo de implementación) y listo.
+dotnet_diagnostic.CA1034.severity = error
+
+# IDE0005: usings innecesarios en warnings (visibles en build y CI; no cortan).
+dotnet_diagnostic.IDE0005.severity = warning

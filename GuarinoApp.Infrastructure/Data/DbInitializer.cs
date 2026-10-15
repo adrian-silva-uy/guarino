@@ -1,11 +1,10 @@
-using System.Data;
+﻿using System.Data;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using GuarinoApp.Domain.Entities;
 using GuarinoApp.Domain.Enums;
 using GuarinoApp.Infrastructure.Services.Auth;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace GuarinoApp.Infrastructure.Data
     {

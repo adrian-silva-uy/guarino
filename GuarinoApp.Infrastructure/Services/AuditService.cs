@@ -1,6 +1,4 @@
-using GuarinoApp.Application.Common.Interfaces;
-using GuarinoApp.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
+﻿using GuarinoApp.Application.Common.Interfaces;
 
 namespace GuarinoApp.Infrastructure.Services;
 

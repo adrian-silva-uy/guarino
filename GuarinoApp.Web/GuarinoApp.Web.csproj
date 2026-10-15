@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <NoWarn>CS9057</NoWarn>
+    <NoWarn>$(NoWarn);CS9057;CS1591</NoWarn>
     <OutputType>WinExe</OutputType>
     <UserSecretsId>90bd5e0a-4b47-4451-afda-58b7a1f3d262</UserSecretsId>
   </PropertyGroup>

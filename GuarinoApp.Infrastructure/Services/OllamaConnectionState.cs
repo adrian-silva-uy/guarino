@@ -13,6 +13,11 @@ public class OllamaConnectionState
     public bool IsConnected { get; set; }
     public bool IsModelReady { get; set; }
 
+    /// <summary>Modelo cuya descarga/verificación refleja IsModelReady. Permite
+    /// detectar un cambio de Ollama:Model en caliente (appsettings o variable de
+    /// entorno) y bajar/verificar el nuevo sin reiniciar el sitio.</summary>
+    public string? ModeloVerificado { get; set; }
+
     /// <summary>True solo si Ollama respondió Y el modelo configurado está descargado.</summary>
     public bool IsReady => IsConnected && IsModelReady;
 

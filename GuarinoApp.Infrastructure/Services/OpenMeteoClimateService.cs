@@ -1,5 +1,4 @@
-using System.Globalization;
-using System.Net.Http.Json;
+﻿using System.Globalization;
 using System.Text.Json;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Settings;
@@ -8,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
-using Polly.CircuitBreaker;
 
 namespace GuarinoApp.Infrastructure.Services
     {

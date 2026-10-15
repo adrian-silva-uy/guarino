@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace GuarinoApp.Infrastructure.Data
     {
     /// <summary>
-    /// DbContext de la aplicación. Contiene DbSet<> para las entidades del dominio
+    /// DbContext de la aplicación. Contiene los DbSet de las entidades del dominio
     /// y el mapeo keyless necesario para reportes (RITMOCALIBRADORA).
     /// </summary>
     public class ApplicationDbContext : DbContext, IApplicationDbContext

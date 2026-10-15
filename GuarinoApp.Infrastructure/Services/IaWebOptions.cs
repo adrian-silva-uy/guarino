@@ -36,19 +36,13 @@ namespace GuarinoApp.Infrastructure.Services
         public int ConsultasWebSimultaneas { get; set; } = 4;
 
         /// <summary>
-        /// Ventana que se le concede a la ruta local (Ollama) para responder antes
-        /// de consumir la respuesta web, que ya está corriendo en paralelo desde
-        /// el primer segundo. Solo aplica con la web habilitada; sin ella, la
-        /// ruta local conserva su presupuesto histórico completo.
-        /// </summary>
-        [Range(10, 600)]
-        /// <summary>
         /// Segundos que la ruta local tiene para responder cuando la web está
         /// habilitada. Con 90 s el usuario esperaba una respuesta local lenta
         /// aunque la web ya estuviera lista en 1-3 s; con 12 s la local solo
         /// gana cuando responde rápido (modelo tibio, prompt corto) y el pico
         /// de usuarios se responde por la vía web o por la caché de resultados.
         /// </summary>
+        [Range(10, 600)]
         public int EsperaLocalSegundos { get; set; } = 12;
         }
     }

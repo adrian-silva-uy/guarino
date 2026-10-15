@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <NoWarn>NU1903;CS9057;CS8613;CS8603</NoWarn>
+    <NoWarn>$(NoWarn);NU1903;CS9057;CS8613;CS8603;CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Services\EfDashboardDataService.cs" />

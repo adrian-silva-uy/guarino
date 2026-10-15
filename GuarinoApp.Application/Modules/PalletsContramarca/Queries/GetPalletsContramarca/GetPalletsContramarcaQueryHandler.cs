@@ -1,7 +1,5 @@
-using GuarinoApp.Application.Common.Interfaces;
-using GuarinoApp.Application.Modules.Lugares.Queries.GetLugares;
+﻿using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.PalletsContramarca.Dtos;
-using GuarinoApp.Domain.Entities;
 using GuarinoApp.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;

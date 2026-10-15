@@ -11,7 +11,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using MudBlazor.Services;
 using System.Globalization;
-using System.Threading.RateLimiting;
 
 CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 

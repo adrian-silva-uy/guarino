@@ -166,6 +166,7 @@ public class OllamaRecuperacionService : BackgroundService
                     _falloProcesado = _connectionState.UltimoFalloEn;
                     _connectionState.IsConnected = true;
                     _connectionState.IsModelReady = true;
+                    _connectionState.ModeloVerificado = opciones.Model;
                     _logger.LogInformation(
                         "Auto-reparación IA local: la generación de prueba resultó OK ({Detalle}); no hizo falta reiniciar nada.",
                         verificacion.Detalle);
@@ -190,6 +191,21 @@ public class OllamaRecuperacionService : BackgroundService
                     _connectionState.IsConnected = true;
                     _logger.LogWarning(
                         "Auto-reparación IA local: la generación de prueba devolvió {Detalle}; es un error de cliente (no del proceso) y NO se reinicia. El arranque existente se encarga (p. ej. descarga del modelo).",
+                        verificacion.Detalle);
+                    return;
+
+                case Diagnostico.ModeloAusente:
+                    // 404: el modelo configurado no existe en el servidor (p. ej.
+                    // se cambió Ollama:Model por una versión nueva). NO se reinicia
+                    // el proceso: se baja IsModelReady para que OllamaStartupService
+                    // verifique y descargue el nuevo modelo en el próximo chequeo.
+                    LimpiarEstadoDeIncidente();
+                    _falloProcesado = _connectionState.UltimoFalloEn;
+                    _connectionState.IsConnected = true;
+                    _connectionState.IsModelReady = false;
+                    _connectionState.ModeloVerificado = null;
+                    _logger.LogWarning(
+                        "Auto-reparación IA local: el modelo configurado no está instalado en el servidor ({Detalle}); el arranque lo descarga automáticamente. NO se reinicia el proceso.",
                         verificacion.Detalle);
                     return;
 
@@ -278,6 +294,7 @@ public class OllamaRecuperacionService : BackgroundService
             _falloProcesado = _connectionState.UltimoFalloEn;
             _connectionState.IsConnected = true;
             _connectionState.IsModelReady = true;
+            _connectionState.ModeloVerificado = opciones.Model;
 
             _logger.LogInformation(
                 "Auto-reparación IA local: REPARADA — {Detalle}. La IA local volvió a estar disponible sin intervención del usuario.",
@@ -464,7 +481,7 @@ public class OllamaRecuperacionService : BackgroundService
             cts.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(opciones.Sanacion.TimeoutVerificacionSegundos, 10, 300)));
             ultimo = await VerificarGeneracionAsync(opciones, cts.Token);
 
-            if (ultimo.Diagnostico is Diagnostico.Ok or Diagnostico.ErrorDeClientes)
+            if (ultimo.Diagnostico is Diagnostico.Ok or Diagnostico.ErrorDeClientes or Diagnostico.ModeloAusente)
                 return ultimo;
             }
 
@@ -498,6 +515,8 @@ public class OllamaRecuperacionService : BackgroundService
 
             if (respuesta.IsSuccessStatusCode)
                 return new(Diagnostico.Ok, $"HTTP {codigo}");
+            if (codigo == 404)
+                return new(Diagnostico.ModeloAusente, "HTTP 404: el modelo configurado no está en el servidor");
             if (codigo >= 500)
                 return new(Diagnostico.ErrorDeGeneracion, $"HTTP {codigo}");
             return new(Diagnostico.ErrorDeClientes, $"HTTP {codigo}");

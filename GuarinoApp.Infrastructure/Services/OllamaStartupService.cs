@@ -113,6 +113,21 @@ public class OllamaStartupService : BackgroundService
 
                 _connectionState.IsConnected = true;
 
+                // Si el modelo configurado cambió en caliente (appsettings o
+                // variable de entorno, ej. "llama3.2:1b" → una versión nueva),
+                // se baja de "listo" hasta verificar/descargar el nuevo. El
+                // modelo viejo queda en el servidor por si hay que volver.
+                var modeloAnterior = _connectionState.ModeloVerificado;
+                if (_connectionState.IsModelReady &&
+                    !string.Equals(modeloAnterior, options.Model, StringComparison.Ordinal))
+                    {
+                    _logger.LogInformation(
+                        "Ollama:Model cambió ({Anterior} → {Nuevo}): se verifica o descarga el nuevo modelo. El anterior permanece instalado por si hay que volver.",
+                        modeloAnterior, options.Model);
+                    _connectionState.IsModelReady = false;
+                    _connectionState.ModeloVerificado = null;
+                    }
+
                 if (!_connectionState.IsModelReady)
                     await AsegurarModeloDescargadoAsync(client, options.Model, ct);
                 }
@@ -210,6 +225,7 @@ public class OllamaStartupService : BackgroundService
                 {
                 _logger.LogInformation("Modelo '{Model}' ya está descargado. Todo listo.", model);
                 _connectionState.IsModelReady = true;
+                _connectionState.ModeloVerificado = model;
                 return;
                 }
 
@@ -239,10 +255,12 @@ public class OllamaStartupService : BackgroundService
 
             _logger.LogInformation("Modelo '{Model}' descargado correctamente. La IA generativa ya está lista para usarse.", model);
             _connectionState.IsModelReady = true;
+            _connectionState.ModeloVerificado = model;
             }
         catch (Exception ex)
             {
             _connectionState.IsModelReady = false;
+            _connectionState.ModeloVerificado = null;
             _logger.LogError(ex,
                 "Error al verificar/descargar el modelo '{Model}'. Puede descargarse manualmente en el servidor con: ollama pull {Model}. " +
                 "Se reintentará automáticamente en {Cooldown} minutos.",
