@@ -89,6 +89,21 @@ namespace GuarinoApp.Infrastructure
             // predefinidos. Configuración: Ollama:Sanacion.
             services.AddHostedService<OllamaRecuperacionService>();
 
+            // Auto-reparación silenciosa de la BASE DE DATOS: verifica la
+            // conexión cada BaseDatos:Sanacion:IntervaloSegundos y, solo si el
+            // destino es local, libera memoria (modelos IA residentes), levanta
+            // la instancia por instancia (sqllocaldb / sc) y avisa por correo UNA
+            // vez por incidente a Notificaciones:EmailAdmin. Mismo contrato que
+            // la sanación de Ollama. Configuración: BaseDatos:Sanacion.
+            // Singleton + IHostedService para que Program.cs pueda llamar
+            // SanearArranqueAsync en el arranque de Development.
+            services.AddOptions<BaseDatosOptions>()
+                .Bind(configuration.GetSection(BaseDatosOptions.SectionName))
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+            services.AddSingleton<BaseDatosRecuperacionService>();
+            services.AddHostedService(sp => sp.GetRequiredService<BaseDatosRecuperacionService>());
+
             // Caché de resultados IA: en picos (~20 usuarios) la misma consulta
             // repetida por varias cargas de página se contesta una sola vez y el
             // resto sale del caché al instante (ahorra cupo del plan gratuito y

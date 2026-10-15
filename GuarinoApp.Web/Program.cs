@@ -289,9 +289,34 @@ else
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
-    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    context.Database.Migrate();
-    DbInitializer.Initialize(context, notifOpciones.EmailAdmin);
+    ApplicationDbContext? context = null;
+
+    // Si la base no está disponible (instancia LocalDB detenida/colgada o la
+    // máquina sin memoria — fallo real observado), el sanador de BD deja la
+    // instancia local en condiciones (libera memoria / sqllocaldb start) y se
+    // reintenta hasta 4 veces antes de rendirse, en vez de morir al primer
+    // intento. Con la app arriba, el ciclo del propio sanador se encarga de los
+    // reintentos y los correos de aviso.
+    var sanadorBD = app.Services.GetRequiredService<BaseDatosRecuperacionService>();
+    for (var intento = 1; intento <= 4; intento++)
+    {
+        context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        try
+        {
+            context.Database.Migrate();
+            break;
+        }
+        catch (Exception ex) when (intento < 4)
+        {
+            logger.LogWarning(ex,
+                "Migrate() falló (intento {Intento}/4); se intenta sanar la base de datos local antes de reintentar...",
+                intento);
+            await sanadorBD.SanearArranqueAsync(CancellationToken.None);
+            await Task.Delay(TimeSpan.FromSeconds(10));
+        }
+    }
+
+    DbInitializer.Initialize(context!, notifOpciones.EmailAdmin);
 }
 
 app.Run();
