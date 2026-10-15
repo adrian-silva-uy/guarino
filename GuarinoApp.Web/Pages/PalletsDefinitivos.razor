@@ -42,6 +42,13 @@
 
 <MudDivider Class="mb-4" />
 
+@if (_esDummy)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+        ⚠️ Datos de ejemplo — no hay pallets reales en el rango de fechas seleccionado. Ajustá las fechas para ver los pallets cargados.
+    </MudAlert>
+}
+
 <MudTable T="PalletDefinitivoDto"
           Items="_pallets"
           Loading="_isLoading"
@@ -99,7 +106,7 @@
 
         <MudTd DataLabel="Estado">
             <MudChip T="string"
-                     Color="Color.Success"
+                     Color="@ColorEstado(row.Estado)"
                      Size="Size.Small"
                      Variant="Variant.Text">
                 @row.Estado
@@ -116,10 +123,15 @@
     </RowTemplate>
 
     <NoRecordsContent>
-        <MudText>No se encontraron pallets en el rango seleccionado.</MudText>
+        <MudText>No se encontraron pallets en el rango seleccionado. Ajustá las fechas para ampliar la búsqueda.</MudText>
     </NoRecordsContent>
 
 </MudTable>
+
+<DataSourceFooter EsDummy="@_esDummy"
+                  Origen="@(_esDummy ? "Datos de ejemplo (sin pallets reales en el rango seleccionado)" : "Base de datos DTrace (Pallets Definitivos)")"
+                  FechaActualizacion="@DateTime.Now"
+                  TotalRegistros="@_pallets.Count" />
 
 @* <button class="btn btn-primary" @onclick="SendPalletEmail">Enviar email con PDF</button> *@
 
@@ -147,11 +159,24 @@
     private DateTime? _fechaDesde = DateTime.Now.AddDays(-30);
     private DateTime? _fechaHasta = DateTime.Now;
     private bool _isLoading;
+    private bool _esDummy;
     private List<PalletDefinitivoDto> _pallets = new();
 
     private string StatusMessage = string.Empty;
     private string StatusClass = string.Empty;
     private string CreatedPdfPath = string.Empty;
+
+    // Color del chip de Estado: acompaña a la etiqueta legible para que se
+    // lea de un vistazo (Despachado = verde, En Frío = azul, etc.).
+    private static Color ColorEstado(string? estado) => estado switch
+    {
+        "Despachado" => Color.Success,
+        "En Frío" => Color.Info,
+        "Pre Frío" => Color.Warning,
+        "Rearmado" => Color.Primary,
+        "Bajado" => Color.Default,
+        _ => Color.Default
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -167,16 +192,30 @@
             var desde = _fechaDesde ?? DateTime.Now.AddDays(-30);
             var hasta = _fechaHasta ?? DateTime.Now;
 
-            var query = new GetPalletsDefinitivosQuery(desde, hasta);
+            // Rango invertido: no se consulta y se limpia la tabla, en vez de
+            // mostrar filas de ejemplo como si fueran del rango pedido.
+            if (desde > hasta)
+            {
+                _pallets = new();
+                _esDummy = false;
+                Snackbar.Add("La fecha \"Desde\" no puede ser posterior a la \"Hasta\".", Severity.Warning);
+                return;
+            }
 
-            _pallets = await Mediator.Send(query);
+            var query = new GetPalletsDefinitivosQuery(desde, hasta);
+            var resultado = await Mediator.Send(query);
+
+            _pallets = resultado.Pallets;
+            _esDummy = resultado.EsDummy;
         }
         catch (Exception ex)
         {
+            // El detalle técnico queda en consola; al usuario se le dice lo
+            // justo, sin exponer detalles internos.
             Console.WriteLine($"Error cargando pallets definitivos: {ex}");
 
             Snackbar.Add(
-                $"Error al cargar los pallets: {ex.Message}",
+                "No se pudieron cargar los pallets definitivos. Intentá nuevamente.",
                 Severity.Error);
         }
         finally

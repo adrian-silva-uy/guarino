@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace GuarinoApp.Application.Modules.PalletsDefinitivos.Queries.GetPalletsDefinitivos;
 
-public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefinitivosQuery, List<PalletDefinitivoDto>>
+public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefinitivosQuery, PalletsDefinitivosResultDto>
     {
     private readonly IApplicationDbContext _context;
     private readonly ILogger<GetPalletsDefinitivosQueryHandler> _logger;
@@ -20,7 +20,7 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
         _logger = logger;
         }
 
-    public async Task<List<PalletDefinitivoDto>> Handle(GetPalletsDefinitivosQuery request, CancellationToken cancellationToken)
+    public async Task<PalletsDefinitivosResultDto> Handle(GetPalletsDefinitivosQuery request, CancellationToken cancellationToken)
         {
         try
             {
@@ -28,7 +28,7 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
             if (request.FechaDesde > request.FechaHasta)
                 {
                 _logger.LogWarning("Fecha 'Desde' ({FechaDesde}) es mayor que 'Hasta' ({FechaHasta}). Retornando datos dummy.", request.FechaDesde, request.FechaHasta);
-                return GetDummyData();
+                return new PalletsDefinitivosResultDto(GetDummyData(), EsDummy: true);
                 }
 
             var fechaDesde = request.FechaDesde.Date;
@@ -75,20 +75,22 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
                 .ToListAsync(cancellationToken);
 
             // Si no hay datos en el rango, retornamos datos dummy para pruebas
+            // — y se lo decimos a la página vía EsDummy, para que avise al
+            // usuario en vez de mostrar filas de ejemplo como si fueran reales.
             if (result.Count == 0)
                 {
                 _logger.LogInformation("No se encontraron pallets definitivos en el rango de fechas. Retornando datos dummy.");
-                return GetDummyData();
+                return new PalletsDefinitivosResultDto(GetDummyData(), EsDummy: true);
                 }
 
             _logger.LogInformation("Se encontraron {Count} pallets definitivos.", result.Count);
-            return result;
+            return new PalletsDefinitivosResultDto(result, EsDummy: false);
             }
         catch (Exception ex)
             {
             _logger.LogError(ex, "Error crítico al obtener pallets definitivos para el rango {Desde} - {Hasta}", request.FechaDesde, request.FechaHasta);
             // En caso de error, retornamos datos dummy para que la UI no falle completamente
-            return GetDummyData();
+            return new PalletsDefinitivosResultDto(GetDummyData(), EsDummy: true);
             }
         }
 
@@ -106,7 +108,7 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
             Marca = "Sunkist",
             Cliente = "Supermercados del Grupo",
             Variedad = "Valencia Late", // Naranja de mesa
-            Estado = "D",
+            Estado = EstadoPallet.Despachado.ToDisplayName(),
             Productor = "AgroCítricos del Sur",
             TipoPallet = "Definitivo",
             FormaEmbalado = "Red",
@@ -137,7 +139,7 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
             Marca = "Del Monte",
             Cliente = "Exportadora Global",
             Variedad = "Navel Late", // Naranja de mesa
-            Estado = "F",
+            Estado = EstadoPallet.EnFrio.ToDisplayName(),
             Productor = "Inversiones Cítricas",
             TipoPallet = "Definitivo",
             FormaEmbalado = "Plastico",
@@ -168,7 +170,7 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
             Marca = "Nanak",
             Cliente = "Mercado Central",
             Variedad = "Lima Vicuña", // Lima
-            Estado = "D",
+            Estado = EstadoPallet.Despachado.ToDisplayName(),
             Productor = "Citrico del Norte",
             TipoPallet = "Definitivo",
             FormaEmbalado = "Red",
@@ -199,7 +201,7 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
             Marca = "El Dorado",
             Cliente = "Jugos y Derivados S.A.",
             Variedad = "Valencia", // Naranja para jugo
-            Estado = "F",
+            Estado = EstadoPallet.EnFrio.ToDisplayName(),
             Productor = "Cítricos del Valle",
             TipoPallet = "Definitivo",
             FormaEmbalado = "Plastico",
