@@ -97,3 +97,14 @@ a, .btn-link {
 @media print {
     .no-print { display: none !important; }
 }
+
+/* Tooltip (MudBlazor MudTooltip): los textos explicativos del "Origen" en el
+   Plan de Mitigación (Calculado / Checklist) son largos; sin esto se renderizan
+   en UNA sola línea gigante que se sale de la pantalla. Se limita el ancho para
+   que salte a varias líneas y quepa junto al chip en cualquier ventana.
+   (!important: MudBlazor.min.css carga después de este archivo.) */
+.mud-tooltip {
+    white-space: normal !important;
+    max-width: 340px !important;
+    line-height: 1.45 !important;
+}

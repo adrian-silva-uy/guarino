@@ -245,9 +245,12 @@
                                 <MudCard Outlined="true">
                                     <MudCardContent>
                                         <MudText Typo="Typo.body2">@plan.Texto</MudText>
-                                        <MudText Typo="Typo.caption" Class="mt-2">
-                                            <strong>@plan.Categoria</strong> · @plan.Origen
-                                        </MudText>
+                                        <div class="d-flex align-center mt-2 flex-wrap">
+                                            <MudText Typo="Typo.caption"><strong>@plan.Categoria</strong></MudText>
+                                            <MudTooltip Text="@TextoOrigen(plan.Origen)" Placement="Placement.Top" Arrow="true">
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@ColorOrigen(plan.Origen)" Class="ms-2">@plan.Origen</MudChip>
+                                            </MudTooltip>
+                                        </div>
                                     </MudCardContent>
                                 </MudCard>
                             </div>
@@ -377,6 +380,22 @@
         "Alta" => Color.Warning,
         _ => Color.Default
     };
+
+    /// <summary>Color del chip de origen de cada acción: verde para lo calculado
+    /// con datos reales, neutro para la recomendación estándar.</summary>
+    private static Color ColorOrigen(string? origen) =>
+        string.Equals(origen, "Calculado", StringComparison.OrdinalIgnoreCase) ? Color.Success : Color.Default;
+
+    /// <summary>Explicación del origen de cada acción, en lenguaje que entienda
+    /// el usuario final (sin tecnicismos internos).</summary>
+    private static string TextoOrigen(string? origen)
+    {
+        if (string.Equals(origen, "Calculado", StringComparison.OrdinalIgnoreCase))
+            return "La acción está respaldada por tus datos reales: se calculó a partir de un patrón de tu propia información (historial de eventos climáticos, kilos perdidos, costos). Es una recomendación anclada en lo que pasó en tu operación.";
+        if (string.Equals(origen, "Checklist", StringComparison.OrdinalIgnoreCase))
+            return "Recomendación operativa estándar (buena práctica o sentido común agronómico) sin un dato numérico real detrás: es conocimiento general de la materia, no algo calculado con tus cifras.";
+        return "Origen de la recomendación.";
+    }
 
     public async ValueTask DisposeAsync()
     {
