@@ -44,6 +44,7 @@ namespace GuarinoApp.Infrastructure.Data
         public DbSet<LogEntry> LogEntries => Set<LogEntry>();
         public DbSet<AppUser> Users => Set<AppUser>();
         public DbSet<Role> Roles => Set<Role>();
+        public DbSet<Contacto> Contactos => Set<Contacto>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
             {
@@ -228,6 +229,22 @@ namespace GuarinoApp.Infrastructure.Data
                 entity.Property(r => r.Name).IsRequired().HasMaxLength(50);
                 entity.Property(r => r.IsActive).IsRequired();
                 entity.HasIndex(r => r.Name).IsUnique();
+            });
+
+            // --- Contactos comerciales (leads de ferias y compradores) ---
+            modelBuilder.Entity<Contacto>(entity =>
+            {
+                entity.ToTable("Contactos");
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Nombre).IsRequired().HasMaxLength(150);
+                entity.Property(c => c.Empresa).IsRequired().HasMaxLength(200);
+                entity.Property(c => c.Pais).HasMaxLength(100);
+                entity.Property(c => c.Email).HasMaxLength(200);
+                entity.Property(c => c.Telefono).HasMaxLength(50);
+                entity.Property(c => c.Interes).HasMaxLength(300);
+                entity.Property(c => c.Notas).HasMaxLength(2000);
+                entity.Property(c => c.Estado).IsRequired().HasMaxLength(50);
+                entity.HasIndex(c => c.Estado);
             });
 
             // --- Entidad keyless ---

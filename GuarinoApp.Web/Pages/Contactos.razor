@@ -1,0 +1,272 @@
+@page "/contactos"
+@attribute [Authorize(Roles = "Admin, Gerencia")]
+@using MediatR
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Web
+@using GuarinoApp.Application.Common.Interfaces
+@using GuarinoApp.Application.Modules.Contactos.Dtos
+@using GuarinoApp.Application.Modules.Contactos.Queries.GetContactos
+@using GuarinoApp.Application.Modules.Contactos.Commands.CrearContacto
+@using GuarinoApp.Application.Modules.Contactos.Commands.ActualizarContacto
+@using GuarinoApp.Application.Modules.Contactos.Commands.EliminarContacto
+@using GuarinoApp.Domain.Entities
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IExportService ExportService
+@inject IJSRuntime JS
+
+<MudText Typo="Typo.h4">Contactos</MudText>
+<MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+    Leads y contactos comerciales: ferias, compradores y proveedores.
+</MudText>
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" md="5">
+            <MudTextField @bind-Value="_busqueda"
+                          Label="Buscar (nombre, empresa o país)"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          @onkeydown="OnBusquedaKeyDown" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="string" @bind-Value="_estado" Label="Estado" Variant="Variant.Outlined" Clearable="true">
+                @foreach (var estado in ContactoEstados.Todos)
+                {
+                    <MudSelectItem Value="@(estado)">@estado</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" md="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                       Disabled="_loading" OnClick="BuscarAsync"
+                       StartIcon="@Icons.Material.Filled.FilterList">Buscar</MudButton>
+        </MudItem>
+        <MudItem xs="6" md="2">
+            <MudButton Variant="Variant.Outlined" FullWidth="true"
+                       Disabled="_loading" OnClick="LimpiarFiltrosAsync">Limpiar</MudButton>
+        </MudItem>
+        <MudItem xs="12" Class="d-flex justify-flex-end flex-wrap gap-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       Disabled="_loading || !_cargado" OnClick="ExportarCsv"
+                       StartIcon="@Icons.Material.Filled.Download">Exportar CSV</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       OnClick="NuevoAsync"
+                       StartIcon="@Icons.Material.Filled.PersonAdd">Nuevo contacto</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="my-2" />
+}
+
+<MudTable T="ContactoDto" Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+    <HeaderContent>
+        <MudTh>Nombre</MudTh>
+        <MudTh>Empresa</MudTh>
+        <MudTh>País</MudTh>
+        <MudTh>Correo</MudTh>
+        <MudTh>Teléfono</MudTh>
+        <MudTh>Qué le interesó</MudTh>
+        <MudTh>Estado</MudTh>
+        <MudTh>Alta</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate Context="row">
+        <MudTd DataLabel="Nombre">@row.Nombre</MudTd>
+        <MudTd DataLabel="Empresa">@row.Empresa</MudTd>
+        <MudTd DataLabel="País">@row.Pais</MudTd>
+        <MudTd DataLabel="Correo">@row.Email</MudTd>
+        <MudTd DataLabel="Teléfono">@row.Telefono</MudTd>
+        <MudTd DataLabel="Qué le interesó">@row.Interes</MudTd>
+        <MudTd DataLabel="Estado">
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@ColorEstado(row.Estado)">
+                @row.Estado
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Alta">@row.FechaAlta.ToLocalTime().ToString("dd/MM/yy")</MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                           Title="Editar" OnClick="@(() => EditarAsync(row))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                           Title="Eliminar" OnClick="@(() => EliminarAsync(row))" />
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        @if (_cargado && !_loading)
+        {
+            <MudText Typo="Typo.body2">No se encontraron contactos.</MudText>
+        }
+    </NoRecordsContent>
+</MudTable>
+
+@if (_cargado && !_loading)
+{
+    <MudText Typo="Typo.caption" Class="mt-2 mud-text-secondary">
+        @(_data.Count) contacto(s) — datos registrados por Admin y Gerencia; cada alta y edición queda en Auditoría.
+    </MudText>
+}
+
+@code {
+    private List<ContactoDto> _data = new();
+    private bool _loading;
+    private bool _cargado;
+    private string? _busqueda;
+    private string? _estado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            _data = await Mediator.Send(new GetContactosQuery(_busqueda, _estado));
+            _cargado = true;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"No se pudieron cargar los contactos: {ex.Message}",
+                Severity.Error, config => config.VisibleStateDuration = 8000);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task BuscarAsync()
+    {
+        await CargarAsync();
+    }
+
+    private async Task LimpiarFiltrosAsync()
+    {
+        _busqueda = null;
+        _estado = null;
+        await CargarAsync();
+    }
+
+    private async Task OnBusquedaKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await CargarAsync();
+        }
+    }
+
+    private async Task NuevoAsync()
+    {
+        var dialog = await DialogService.ShowAsync<ContactoDialog>("Nuevo contacto");
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not ContactoDialog.Modelo modelo)
+        {
+            return;
+        }
+
+        var respuesta = await Mediator.Send(new CrearContactoCommand(
+            modelo.Nombre, modelo.Empresa, modelo.Pais, modelo.Email,
+            modelo.Telefono, modelo.Interes, modelo.Notas, modelo.Estado));
+
+        if (respuesta.Success)
+        {
+            Snackbar.Add("Contacto agregado.", Severity.Success);
+            await CargarAsync();
+        }
+        else
+        {
+            Snackbar.Add(respuesta.Error ?? "No se pudo agregar el contacto.",
+                Severity.Error, config => config.VisibleStateDuration = 8000);
+        }
+    }
+
+    private async Task EditarAsync(ContactoDto contacto)
+    {
+        var parameters = new DialogParameters<ContactoDialog>
+        {
+            { dialog => dialog.Contacto, contacto }
+        };
+        var dialog = await DialogService.ShowAsync<ContactoDialog>($"Editar: {contacto.Nombre}", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not ContactoDialog.Modelo modelo)
+        {
+            return;
+        }
+
+        var respuesta = await Mediator.Send(new ActualizarContactoCommand(
+            contacto.Id,
+            modelo.Nombre, modelo.Empresa, modelo.Pais, modelo.Email,
+            modelo.Telefono, modelo.Interes, modelo.Notas, modelo.Estado));
+
+        if (respuesta.Success)
+        {
+            Snackbar.Add("Contacto actualizado.", Severity.Success);
+            await CargarAsync();
+        }
+        else
+        {
+            Snackbar.Add(respuesta.Error ?? "No se pudo actualizar el contacto.",
+                Severity.Error, config => config.VisibleStateDuration = 8000);
+        }
+    }
+
+    private async Task EliminarAsync(ContactoDto contacto)
+    {
+        var confirmado = await DialogService.ShowMessageBox(
+            "Eliminar contacto",
+            $"¿Eliminar a {contacto.Nombre} ({contacto.Empresa})? Se da de baja; el historial se conserva.",
+            yesText: "Eliminar",
+            cancelText: "Cancelar");
+
+        if (confirmado != true)
+        {
+            return;
+        }
+
+        var respuesta = await Mediator.Send(new EliminarContactoCommand(contacto.Id));
+        if (respuesta.Success)
+        {
+            Snackbar.Add("Contacto eliminado.", Severity.Success);
+            await CargarAsync();
+        }
+        else
+        {
+            Snackbar.Add(respuesta.Error ?? "No se pudo eliminar el contacto.",
+                Severity.Error, config => config.VisibleStateDuration = 8000);
+        }
+    }
+
+    private async Task ExportarCsv()
+    {
+        if (!_data.Any())
+        {
+            Snackbar.Add("No hay datos para exportar.", Severity.Warning);
+            return;
+        }
+
+        var fileName = $"Contactos_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+        await JS.InvokeVoidAsync("downloadFileFromText", fileName, ExportService.ExportToCsv(_data), "text/csv");
+        Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+    }
+
+    private static Color ColorEstado(string estado)
+        => estado switch
+        {
+            ContactoEstados.Nuevo => Color.Info,
+            ContactoEstados.EnSeguimiento => Color.Warning,
+            ContactoEstados.Cerrado => Color.Success,
+            ContactoEstados.Descartado => Color.Default,
+            _ => Color.Default
+        };
+}

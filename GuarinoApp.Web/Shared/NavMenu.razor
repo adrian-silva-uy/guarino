@@ -83,6 +83,17 @@
 
     <MudDivider Class="my-2" />
 
+    @* COMERCIAL - Contactos/leads: datos de dirección comercial, solo
+       Admin y Gerencia (ver ADR-002). *@
+    <AuthorizeView Roles="Admin, Gerencia">
+        <Authorized>
+            <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Secondary">📇 COMERCIAL</MudText>
+            <MudNavLink Href="/contactos" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Contacts" IconColor="Color.Secondary">Contactos</MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+
+    <MudDivider Class="my-2" />
+
     @* ADMINISTRACIÓN - Contaduría para Admin, Gerencia y Contador;
        Usuarios y Auditoría solo para Admin y Gerencia. *@
     <AuthorizeView Roles="Admin, Gerencia, Contador">

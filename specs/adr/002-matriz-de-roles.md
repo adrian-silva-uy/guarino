@@ -23,6 +23,7 @@ altos, por lo que su acceso es amplio en lo operativo).
 | Contaduría (datos financieros) | ✅ | ✅ | ✅ | — |
 | Facturación (página sin entrada de menú) | ✅ | ✅ | ✅ | — |
 | Usuarios, Auditoría, Panel Gerencial | ✅ | ✅ | — | — |
+| Contactos (leads de ferias y compradores) | ✅ | ✅ | — | — |
 
 ## Consecuencias
 

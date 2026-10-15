@@ -1,0 +1,183 @@
+@using MudBlazor
+@using System.Net.Mail
+@using GuarinoApp.Application.Modules.Contactos.Dtos
+@using GuarinoApp.Domain.Entities
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="Nombre"
+                              Label="Nombre *"
+                              Variant="Variant.Outlined"
+                              Immediate="true"
+                              Validation="@(new Func<string, string>(ValidarNombre))" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="Empresa"
+                              Label="Empresa *"
+                              Variant="Variant.Outlined"
+                              Immediate="true"
+                              Validation="@(new Func<string, string>(ValidarEmpresa))" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="Pais"
+                              Label="País"
+                              Variant="Variant.Outlined"
+                              Immediate="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="Email"
+                              Label="Correo"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Email"
+                              Immediate="true"
+                              HelperText="Para enviarle reportes."
+                              Validation="@(new Func<string, string>(ValidarEmail))" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="Telefono"
+                              Label="Teléfono"
+                              Variant="Variant.Outlined"
+                              Immediate="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="string" @bind-Value="Estado" Label="Estado" Variant="Variant.Outlined">
+                    @foreach (var estado in ContactoEstados.Todos)
+                    {
+                        <MudSelectItem Value="@(estado)">@estado</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="Interes"
+                              Label="Qué le interesó"
+                              Variant="Variant.Outlined"
+                              Immediate="true"
+                              HelperText="Variedades, volúmenes, mercado..." />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="Notas"
+                              Label="Notas"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              Immediate="true" />
+            </MudItem>
+        </MudGrid>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-2">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Guardar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Nulo = alta; con valores = edición.</summary>
+    [Parameter] public ContactoDto? Contacto { get; set; }
+
+    /// <summary>Datos del formulario que la página recibe al cerrar el diálogo.</summary>
+    public class Modelo
+        {
+        public string Nombre { get; set; } = string.Empty;
+        public string Empresa { get; set; } = string.Empty;
+        public string? Pais { get; set; }
+        public string? Email { get; set; }
+        public string? Telefono { get; set; }
+        public string? Interes { get; set; }
+        public string? Notas { get; set; }
+        public string Estado { get; set; } = ContactoEstados.Nuevo;
+        }
+
+    private string Nombre = string.Empty;
+    private string Empresa = string.Empty;
+    private string? Pais;
+    private string? Email;
+    private string? Telefono;
+    private string? Interes;
+    private string? Notas;
+    private string Estado = ContactoEstados.Nuevo;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        if (Contacto is null)
+        {
+            return;
+        }
+
+        Nombre = Contacto.Nombre;
+        Empresa = Contacto.Empresa;
+        Pais = Contacto.Pais;
+        Email = Contacto.Email;
+        Telefono = Contacto.Telefono;
+        Interes = Contacto.Interes;
+        Notas = Contacto.Notas;
+        Estado = Contacto.Estado;
+    }
+
+    private string ValidarNombre(string valor)
+        => string.IsNullOrWhiteSpace(valor) ? "Obligatorio" : string.Empty;
+
+    private string ValidarEmpresa(string valor)
+        => string.IsNullOrWhiteSpace(valor) ? "Obligatorio" : string.Empty;
+
+    /// <summary>Vacío es válido (sin correo); lo demás debe tener formato.</summary>
+    private string ValidarEmail(string valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            _ = new MailAddress(valor.Trim());
+            return string.Empty;
+        }
+        catch (FormatException)
+        {
+            return "Correo inválido";
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Submit()
+    {
+        // Igual que EditUserEmailDialog: si algo falta, no se cierra y se
+        // muestra el motivo (los campos marcan su propio error al tocarlos).
+        if (string.IsNullOrWhiteSpace(Nombre) || string.IsNullOrWhiteSpace(Empresa))
+        {
+            _error = "Completá el nombre y la empresa (campos obligatorios).";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(Email) && !string.IsNullOrEmpty(ValidarEmail(Email)))
+        {
+            _error = "El correo no tiene un formato válido.";
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(new Modelo
+        {
+            Nombre = Nombre.Trim(),
+            Empresa = Empresa.Trim(),
+            Pais = string.IsNullOrWhiteSpace(Pais) ? null : Pais.Trim(),
+            Email = string.IsNullOrWhiteSpace(Email) ? null : Email.Trim(),
+            Telefono = string.IsNullOrWhiteSpace(Telefono) ? null : Telefono.Trim(),
+            Interes = string.IsNullOrWhiteSpace(Interes) ? null : Interes.Trim(),
+            Notas = string.IsNullOrWhiteSpace(Notas) ? null : Notas.Trim(),
+            Estado = Estado
+        }));
+    }
+}

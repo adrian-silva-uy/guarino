@@ -31,6 +31,7 @@ namespace GuarinoApp.Application.Common.Interfaces
         DbSet<LogEntry> LogEntries { get; }
         DbSet<AppUser> Users { get; }
         DbSet<Role> Roles { get; }
+        DbSet<Contacto> Contactos { get; }
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
         }
     }
