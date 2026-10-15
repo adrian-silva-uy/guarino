@@ -13,6 +13,16 @@
     <MudCardContent>
         <MudGrid>
             <MudItem xs="12" sm="4">
+                <MudSelect T="int?" Label="Año" Value="_anio" ValueChanged="OnAnioChanged" Dense="true"
+                           Variant="Variant.Outlined" Style="max-width: 180px;" Disabled="@_loading">
+                    <MudSelectItem T="int?" Value="@((int?)null)">Todos los años</MudSelectItem>
+                    @foreach (var a in _anios)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)a)">@a</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
                     @(_loading ? "Cargando..." : "Actualizar")
                 </MudButton>
@@ -37,7 +47,7 @@
                 </RowTemplate>
             </MudTable>
 
-            <DataSourceFooter EsDummy="true" Origen="Base de datos DTrace" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
+            <DataSourceFooter EsDummy="@_esDummy" Origen="@(_esDummy ? "Datos de ejemplo" : "Base de datos DTrace")" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
         }
         else if (!_loading && _cargado)
         {
@@ -48,8 +58,17 @@
 
 @code {
     private List<ResumenLiquidacionDto> _data = new();
+    private List<int> _anios = new();
+    private int? _anio;
+    private bool _esDummy = false;
     private bool _loading = false;
     private bool _cargado = false;
+
+    private async Task OnAnioChanged(int? anio)
+    {
+        _anio = anio;
+        await LoadData();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -62,7 +81,10 @@
         _cargado = false;
         try
         {
-            _data = await Mediator.Send(new GetResumenLiquidacionesQuery());
+            var resultado = await Mediator.Send(new GetResumenLiquidacionesQuery(_anio));
+            _data = resultado.Liquidaciones;
+            _anios = resultado.Anios;
+            _esDummy = resultado.EsDummy;
         }
         catch (Exception ex)
         {

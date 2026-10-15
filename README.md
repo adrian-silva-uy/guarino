@@ -5,6 +5,11 @@ Aplicación **Blazor Server** de gestión citrícola con Clean Architecture (`Do
 ## Resumen de cambios aplicados
 
 ### Recientes (2026)
+- **`/resumenliquidaciones` y `/liquidacionesquinta`: selector de Año** (pedido del usuario tras el análisis de cobertura de filtros — sus datos vienen agregados por año desde 2023):
+  - **Filtro server-side por año opcional** en ambos handlers: el query carga los **años disponibles** (DISTINCT de `FechaIngreso`, descendente) y filtra el agregado por el año elegido; **"Todos los años"** = histórico completo. Cambia al elegir y con ACTUALIZAR.
+  - **`ResumenLiquidacionesResultDto` / `LiquidacionesQuintaResultDto`** (años + `EsDummy`): el pie de tabla ahora es honesto — "Base de datos DTrace" con datos reales, "Datos de ejemplo" solo si la tabla está vacía (antes mostraba ambos a la vez); un año sin resultados muestra la alerta "No se encontraron registros" en vez de filas ficticias.
+  - **Skill del Asistente IA actualizado** (`ResumenLiquidacionesSkill`) para el nuevo tipo de resultado (el chat sigue respondiendo "liquidaciones" igual).
+  - Verificado en vivo: Resumen 70 filas → 3 con 2023 → 70 con "Todos"; Quinta 119 → 53 con 2025 → 119; opciones 2023-2026 + "Todos los años"; 0 errores de consola.
 - **`/registropesadas` y `/lotesvolcados`: rango de fechas + exportaciones como el resto de la app** (pedido del usuario — "cargan datos desde 2023"):
   - **Filtro server-side por Fecha Desde/Hasta** en ambos handlers (`Where` sobre `FechaProduccion`, opcional: sin fechas = histórico completo). La página arranca con el rango por defecto de **últimos 3 meses** (mismo criterio que el resto de la app) y los pickers llevan ✕ para limpiar cada límite y ver el histórico completo (60 filas en dev).
   - **Exportaciones completas** (PDF/Excel/CSV/correo vía `ReportMailRouter` con copia al admin): mismos patrones, nombres de archivo (`Registro_Pesadas_*` / `Lotes_Volcados_*`) y snackbars que Fruta a Volcar.

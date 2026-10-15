@@ -4,7 +4,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace GuarinoApp.Application.Modules.LiquidacionesQuinta.Queries.GetLiquidacionesQuinta;
-public class GetLiquidacionesQuintaQueryHandler : IRequestHandler<GetLiquidacionesQuintaQuery, List<LiquidacionQuintaDto>>
+public class GetLiquidacionesQuintaQueryHandler : IRequestHandler<GetLiquidacionesQuintaQuery, LiquidacionesQuintaResultDto>
     {
     private readonly IApplicationDbContext _context;
 
@@ -13,14 +13,24 @@ public class GetLiquidacionesQuintaQueryHandler : IRequestHandler<GetLiquidacion
         _context = context;
         }
 
-    public async Task<List<LiquidacionQuintaDto>> Handle(GetLiquidacionesQuintaQuery request, CancellationToken cancellationToken)
+    public async Task<LiquidacionesQuintaResultDto> Handle(GetLiquidacionesQuintaQuery request, CancellationToken cancellationToken)
         {
         try
             {
-            var result = await _context.Lotes
+            // Años disponibles para el selector (sin filtro de año).
+            var anios = await _context.Lotes
                 .AsNoTracking()
                 .Where(l => !l.IsDeleted && l.FechaIngreso.HasValue)
-                .GroupBy(l => new { Quinta = l.Quinta.Nombre, Productor = l.Productor.Nombre, Variedad = l.Variedad.Nombre, Año = l.FechaIngreso.HasValue ? l.FechaIngreso.Value.Year : 0 })
+                .Select(l => l.FechaIngreso!.Value.Year)
+                .Distinct()
+                .OrderByDescending(a => a)
+                .ToListAsync(cancellationToken);
+
+            var result = await _context.Lotes
+                .AsNoTracking()
+                .Where(l => !l.IsDeleted && l.FechaIngreso.HasValue
+                    && (!request.Anio.HasValue || l.FechaIngreso.Value.Year == request.Anio.Value))
+                .GroupBy(l => new { Quinta = l.Quinta.Nombre, Productor = l.Productor.Nombre, Variedad = l.Variedad.Nombre, Año = l.FechaIngreso.Value.Year })
                 .Select(g => new LiquidacionQuintaDto
                     {
                     Quinta = g.Key.Quinta,
@@ -33,14 +43,27 @@ public class GetLiquidacionesQuintaQueryHandler : IRequestHandler<GetLiquidacion
                 .ToListAsync(cancellationToken);
 
             if (result == null || !result.Any())
-                return GetDummyData();
-            return result;
+                {
+                // Datos de ejemplo solo si la tabla está vacía; un año sin resultados no es dato demo.
+                var hayDatosReales = await _context.Lotes.AsNoTracking().AnyAsync(l => !l.IsDeleted, cancellationToken);
+                if (!hayDatosReales)
+                    {
+                    var dummy = GetDummyData();
+                    return new LiquidacionesQuintaResultDto(dummy, AniosDe(dummy), EsDummy: true);
+                    }
+                }
+
+            return new LiquidacionesQuintaResultDto(result, anios, EsDummy: false);
             }
         catch
             {
-            return GetDummyData();
+            var dummy = GetDummyData();
+            return new LiquidacionesQuintaResultDto(dummy, AniosDe(dummy), EsDummy: true);
             }
         }
+
+    private static List<int> AniosDe(List<LiquidacionQuintaDto> data)
+        => data.Select(d => d.Año).Distinct().OrderByDescending(a => a).ToList();
 
     private List<LiquidacionQuintaDto> GetDummyData()
         {

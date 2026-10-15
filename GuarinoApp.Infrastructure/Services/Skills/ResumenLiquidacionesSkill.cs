@@ -28,7 +28,8 @@ public sealed class ResumenLiquidacionesSkill : ISkill
 
     public async Task<SkillOutput> ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        var liquidaciones = await _mediator.Send(new GetResumenLiquidacionesQuery(), cancellationToken);
+        var resultado = await _mediator.Send(new GetResumenLiquidacionesQuery(), cancellationToken);
+        var liquidaciones = resultado?.Liquidaciones ?? [];
 
         if (liquidaciones == null || liquidaciones.Count == 0)
             return SkillOutput.Error("No hay liquidaciones registradas en el sistema.");

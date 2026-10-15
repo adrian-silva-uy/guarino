@@ -2,4 +2,4 @@
 using MediatR;
 
 namespace GuarinoApp.Application.Modules.LiquidacionesQuinta.Queries.GetLiquidacionesQuinta;
-public record GetLiquidacionesQuintaQuery() : IRequest<List<LiquidacionQuintaDto>>;
+public record GetLiquidacionesQuintaQuery(int? Anio = null) : IRequest<LiquidacionesQuintaResultDto>;
