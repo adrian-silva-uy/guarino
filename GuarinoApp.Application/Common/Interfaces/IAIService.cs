@@ -37,6 +37,14 @@ public interface IAIService
     /// conservan entonces su análisis local determinista.
     /// </summary>
     Task<ModuloInsightDto> GetAnalisisDeModuloAsync(string clavePrompt, string contextoJson);
+
+    /// <summary>
+    /// Plan de mitigación de riesgo climático en JSON estricto, generado con IA a
+    /// partir del historial de eventos ya serializado. Devuelve cadena vacía cuando
+    /// ninguna ruta de IA respondió o el plan no llegó parseable, para que el módulo
+    /// climático aplique su respaldo explícito "sin IA".
+    /// </summary>
+    Task<string> GetClimateRiskStrategyAsync(string inputJson, CancellationToken cancellationToken);
     }
 
 public class ChatMessage

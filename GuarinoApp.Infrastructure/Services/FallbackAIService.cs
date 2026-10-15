@@ -80,6 +80,30 @@ public class FallbackAIService : IAIService
         }
 
     /// <summary>
+    /// Plan climático: delega en la ruta dedicada de OllamaAIService, que arma el
+    /// prompt ClimateRiskStrategy, corre la carrera local ↔ web y devuelve vacío si
+    /// nadie respondió con JSON utilizable. Solo se cachean las respuestas IA
+    /// (el vacío, que significa "sin IA", nunca entra a caché).
+    /// </summary>
+    public async Task<string> GetClimateRiskStrategyAsync(string inputJson, CancellationToken cancellationToken)
+        {
+        var clave = AiResultCache.Clave("clima-plan", inputJson);
+        if (_cache.TryGet<string>(clave, out var cacheada) && !string.IsNullOrEmpty(cacheada))
+            {
+            _logger.LogInformation("Plan climático: respuesta IA reutilizada desde caché (mismo historial de eventos).");
+            return cacheada;
+            }
+
+        var respuesta = await _ollamaService.GetClimateRiskStrategyAsync(inputJson, cancellationToken);
+        if (!string.IsNullOrEmpty(respuesta))
+            {
+            _cache.Set(clave, respuesta);
+            }
+
+        return respuesta;
+        }
+
+    /// <summary>
     /// Respuesta analítica SIN IA: rutea la consulta por temas, usa primero los datos
     /// reales consultados (habilidades del sistema y fuentes externas en vivo) y arma
     /// hasta 5 puntos "Diagnóstico -> Acción -> Impacto" anclados en la telemetría del

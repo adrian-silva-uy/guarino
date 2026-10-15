@@ -146,7 +146,15 @@ namespace GuarinoApp.Infrastructure.Services
                         if (status == 429)
                             _logger.LogWarning("Servicio web de IA: límite de uso del plan gratuito (429). Se continúa por la ruta local.");
                         else
-                            _logger.LogWarning("Servicio web de IA respondió {Status}; se continúa por la ruta local.", status);
+                            {
+                            // El tamaño del cuerpo explica rechazos como el 413
+                            // (payload too large): diagnostica prompts que crecieron
+                            // demasiado sin exponer su contenido ni la clave.
+                            var caracteresCuerpo = JsonSerializer.Serialize(cuerpo).Length;
+                            _logger.LogWarning(
+                                "Servicio web de IA respondió {Status} (cuerpo de {Caracteres} caracteres); se continúa por la ruta local.",
+                                status, caracteresCuerpo);
+                            }
                         return null;
                         }
 

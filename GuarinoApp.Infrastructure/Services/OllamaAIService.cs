@@ -1551,7 +1551,7 @@ public class OllamaAIService : IAIService
         if (!IsAvailable)
             {
             _logger.LogWarning("Servicio Ollama no disponible para estrategia climática.");
-            return GetFallbackResponse(inputJson); // Fallback si no hay IA
+            return string.Empty; // sin IA: el módulo aplica su respaldo marcado "sin IA"
             }
 
         try
@@ -1563,8 +1563,8 @@ public class OllamaAIService : IAIService
             var template = await LoadPromptTemplateAsync("ClimateRiskStrategy", string.Empty);
             if (string.IsNullOrWhiteSpace(template))
                 {
-                _logger.LogWarning("No se encontró la plantilla ClimateRiskStrategy.txt. Usando fallback.");
-                return GetFallbackResponse(inputJson);
+                _logger.LogWarning("No se encontró la plantilla ClimateRiskStrategy.txt. Sin plan IA.");
+                return string.Empty;
                 }
 
             // 2. Inyectar valores de configuración en el prompt
@@ -1594,8 +1594,13 @@ public class OllamaAIService : IAIService
             messages.Add(new { role = "user", content = "Genera el plan de mitigación en JSON estricto." });
 
             // OPTIMIZACIÓN CRÍTICA:
-            // - num_predict: limita tokens de salida para evitar timeout en generación infinita
-            // - num_ctx: aumenta contexto para no truncar el prompt
+            // - num_ctx: acotado a 4096 (16384 provoca HTTP 500 en Ollama en esta
+            //   máquina): este prompt puede excederlo y la ruta local responder
+            //   sobre un prompt incompleto — por eso la carrera prioriza la vía
+            //   web, que recibe el prompt completo y es la que resuelve.
+            // - num_predict: el plan (4 a 8 acciones con impacto y riesgo) puede
+            //   superar los 600 tokens y quedar como JSON truncado; se acota igual
+            //   para que la generación no se dispare.
             // - keep_alive: evita que Ollama descargue el modelo entre peticiones
             var requestObj = new
                 {
@@ -1605,7 +1610,7 @@ public class OllamaAIService : IAIService
                 options = new
                     {
                     num_ctx = Math.Max(options.NumCtx ?? 2048, 4096),
-                    num_predict = 600,
+                    num_predict = 1024,
                     temperature = options.Temperature ?? 0.2,
                     top_k = options.TopK ?? 40,
                     top_p = options.TopP ?? 0.9
@@ -1613,17 +1618,16 @@ public class OllamaAIService : IAIService
                 keep_alive = string.IsNullOrWhiteSpace(options.KeepAlive) ? "30m" : options.KeepAlive
                 };
 
-            // Carrera local ↔ web con el MISMO prompt armado; si ninguna responde,
-            // se conserva la respuesta de respaldo local de siempre.
+            // Carrera local ↔ web con el MISMO prompt armado; solo cuenta contenido
+            // JSON utilizable (la prosa del modelo pequeño no debe ganarle a una
+            // respuesta web válida) y, si nadie responde, vacío = "sin IA".
             var contenido = await EnviarEnParaleloAsync(requestObj, messages, modoJson: true,
                 presupuestoLocal: null, diagnostico: "GetClimateRiskStrategyAsync",
-                cancellationToken: cancellationToken);
+                contenidoUtil: EsJsonUtilizable, cancellationToken: cancellationToken);
 
+            // Devolvemos el JSON limpio para que ClimateRiskService lo valide.
             var rawContent = StripJsonFences(contenido ?? string.Empty);
-            if (string.IsNullOrWhiteSpace(rawContent))
-                return GetFallbackResponse(inputJson);
-
-            return rawContent; // Devolvemos el JSON limpio para que la UI o el servicio lo parsee
+            return EsJsonUtilizable(rawContent) ? rawContent : string.Empty;
             }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
@@ -1631,13 +1635,13 @@ public class OllamaAIService : IAIService
             // No marcamos IsModelReady = false para no apagar toda la IA.
             _logger.LogError(ex, "Timeout de Ollama en GetClimateRiskStrategyAsync tras esperar el tiempo configurado.");
             MarcarFalloDeGeneracion("Timeout", esFalloDeServidor: false);
-            return GetFallbackResponse(inputJson);
+            return string.Empty;
             }
         catch (Exception ex)
             {
             _logger.LogError(ex, "Error inesperado en GetClimateRiskStrategyAsync");
             MarcarFalloDeGeneracion(ex.GetType().Name, esFalloDeServidor: true);
-            return GetFallbackResponse(inputJson);
+            return string.Empty;
             }
         }
 
@@ -1653,29 +1657,25 @@ public class OllamaAIService : IAIService
         return cleaned;
         }
 
-    // ==========================================
-    // MÉTODO: Fallback para cuando la IA falla
-    // ==========================================
-    private static string GetFallbackResponse(string inputJson)
+    /// <summary>
+    /// ¿El contenido devuelto es JSON parseable? Un modelo pequeño a veces devuelve
+    /// prosa o JSON truncado: eso NO debe ganarle a una respuesta web válida en la
+    /// carrera local ↔ web, ni llegar a ClimateRiskService como si fuera el plan.
+    /// </summary>
+    private static bool EsJsonUtilizable(string contenido)
         {
-        // Devolver un JSON válido pero genérico si la IA falla
-        return JsonSerializer.Serialize(new
+        if (string.IsNullOrWhiteSpace(contenido))
+            return false;
+
+        try
             {
-            resumenImpacto = new
-                {
-                kilosPerdidosTotales = 0,
-                porcentajePerdidaTotal = "N/D",
-                tipoEventoMasFrecuente = "N/D",
-                observaciones = "El servicio de IA no respondió o tardó demasiado. Se generó un plan genérico basado en datos disponibles."
-                },
-            planMitigacion = new[]
+            using var _ = JsonDocument.Parse(StripJsonFences(contenido));
+            return true;
+            }
+        catch (JsonException)
             {
-            new { texto = "Revisar manualmente los eventos climáticos registrados y ajustar umbrales de detección.", categoria = "AjustePlaneacion", origen = "Checklist", impacto = "Asegurar precisión de datos", riesgo = "Bajo" },
-            new { texto = "Considerar seguros agrícolas para cubrir pérdidas por eventos climáticos extremos.", categoria = "SeguroAgricola", origen = "Checklist", impacto = "Protección financiera", riesgo = "Costo de prima" },
-            new { texto = "Mantener sistemas de riego antiheladas en alerta permanente durante invierno.", categoria = "Prevencion", origen = "Checklist", impacto = "Reducción de daño por heladas", riesgo = "Costo operativo" },
-            new { texto = "Evaluar la diversificación de zonas de cultivo para mitigar riesgo regional.", categoria = "Diversificacion", origen = "Checklist", impacto = "Reducción de exposición", riesgo = "Inversión inicial" }
-        }
-            }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, PropertyNameCaseInsensitive = true });
+            return false;
+            }
         }
 
     // ==========================================
