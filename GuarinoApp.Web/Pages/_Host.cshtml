@@ -92,6 +92,42 @@
             anchorElement.remove();
             URL.revokeObjectURL(url);
         };
+
+        // Diálogo nativo "Guardar como..." (File System Access API) para que el
+        // usuario elija dónde guardar el archivo. Requiere Chromium + contexto
+        // seguro (HTTPS o localhost); en el resto de navegadores/contextos cae
+        // a la descarga automática (carpeta de descargas del navegador).
+        // Devuelve: "guardado" | "cancelado" | "descargado".
+        window.saveAsFromBase64 = async function (fileName, base64, mimeType) {
+            const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+            if (window.showSaveFilePicker) {
+                try {
+                    const ext = fileName.lastIndexOf('.') >= 0 ? fileName.slice(fileName.lastIndexOf('.')) : '';
+                    const mime = mimeType || 'application/octet-stream';
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: fileName,
+                        types: ext ? [{ accept: { [mime]: [ext] } }] : undefined
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(bytes);
+                    await writable.close();
+                    return 'guardado';
+                } catch (err) {
+                    if (err && err.name === 'AbortError') return 'cancelado';
+                    // Otro error (p.ej. sin gesto de usuario): sigue la descarga automática.
+                }
+            }
+            const blob = new Blob([bytes], { type: mimeType || 'application/octet-stream' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            return 'descargado';
+        };
     </script>
 
 </body>
