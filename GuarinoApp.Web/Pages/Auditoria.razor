@@ -162,6 +162,10 @@
         {
             _usuarios = await Mediator.Send(new GetUsersQuery());
         }
+        catch (ObjectDisposedException)
+        {
+            // Circuito cerrado durante la carga del filtro (ver nota en ServerReload).
+        }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error al cargar usuarios para el filtro de auditoría");
@@ -199,6 +203,18 @@
             {
                 Items = result.Items,
                 TotalItems = result.TotalCount
+            };
+        }
+        catch (ObjectDisposedException)
+        {
+            // El circuito se cerró (navegación o cierre de pestaña) con la carga
+            // en vuelo: el scope ya está dispuesto, no hay nada que mostrar ni
+            // registrar. No es un error de la aplicación — antes generaba ruido
+            // en el log y el reporte diario por correo al administrador.
+            return new TableData<LogDto>
+            {
+                Items = Array.Empty<LogDto>(),
+                TotalItems = 0
             };
         }
         catch (Exception ex)

@@ -26,9 +26,19 @@ public class GetLogsQueryHandler : IRequestHandler<GetLogsQuery, PagedResult<Log
 
     public async Task<PagedResult<LogDto>> Handle(GetLogsQuery request, CancellationToken cancellationToken)
     {
+        // Orden por Id DESC (no por Timestamp): el Id es identity y correlaciona
+        // con el orden de inserción, por lo que el listado sigue siendo el más
+        // reciente primero. La diferencia es CRÍTICA en el plan de SQL Server:
+        // ORDER BY Timestamp obligaba a un operador Sort que pedía un memory
+        // grant; en SQL Server Express, cuando el SO señala baja memoria
+        // (process_physical_memory_low), el broker encola ese grant ~25 segundos
+        // y la carga de Auditoría quedaba trabada ese rato (RESOURCE_SEMAPHORE
+        // de25s, CPU=0 — diagnosticado con la query exacta en sqlcmd).
+        // Con Id DESC el plan es barrido del índice clustered al revés: sin
+        // Sort, sin grant, ~0ms con cualquier presión de memoria del equipo.
         var query = _context.LogEntries
             .AsNoTracking()
-            .OrderByDescending(l => l.Timestamp)
+            .OrderByDescending(l => l.Id)
             .AsQueryable();
 
         if (request.FechaDesde.HasValue)

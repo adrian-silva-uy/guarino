@@ -1,21 +1,25 @@
 ﻿using GuarinoApp.Application.Common.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GuarinoApp.Infrastructure.Services;
 
 /// <summary>
 /// Implementación del servicio de auditoría.
 /// Registra acciones de usuarios en el log de auditoría.
+/// Usa un scope propio por registro: se invoca desde handlers (que ya corren
+/// dentro de la puerta de serialización) y también desde páginas, así que con
+/// el DbContext del circuito compartido podía solaparse y perderse la entrada.
 /// </summary>
 public class AuditService : IAuditService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ICurrentUserService _currentUser;
 
     public AuditService(
-        IApplicationDbContext context,
+        IServiceScopeFactory scopeFactory,
         ICurrentUserService currentUser)
     {
-        _context = context;
+        _scopeFactory = scopeFactory;
         _currentUser = currentUser;
     }
 
@@ -39,8 +43,10 @@ public class AuditService : IAuditService
                 CreatedBy = _currentUser.UserName
             };
 
-            _context.LogEntries.Add(logEntry);
-            await _context.SaveChangesAsync();
+            using var scope = _scopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+            context.LogEntries.Add(logEntry);
+            await context.SaveChangesAsync();
         }
         catch
         {

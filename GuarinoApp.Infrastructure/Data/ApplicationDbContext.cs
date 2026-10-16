@@ -309,6 +309,17 @@ namespace GuarinoApp.Infrastructure.Data
                       .HasForeignKey(e => e.ProductorId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
+
+            // Auditoría: la tabla se consulta paginada y ordenada por fecha
+            // descendente. SIN índice en Timestamp, el OFFSET/FETCH obligaba a un
+            // SORT que pedía memory grant al motor (wait RESOURCE_SEMAPHORE) y
+            // podía colgar la carga de Auditoría ~20s en LocalDB. Cubre las
+            // columnas del listado para que el plan sea barrido de índice puro,
+            // sin operador de orden ni grant.
+            modelBuilder.Entity<LogEntry>(entity =>
+                {
+                entity.HasIndex(e => e.Timestamp).IsDescending();
+                });
             }
         }
     }

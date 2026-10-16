@@ -300,18 +300,18 @@ public class OllamaAIService : IAIService
                     }
                 catch (OperationCanceledException)
                     {
-                    _logger.LogWarning("{Diag}: la ruta local superó {Segundos}s (intento {Intento}/{Intentos}); se consume la vía web o el cálculo local.", diagnostico, limite.TotalSeconds, intento, maxIntentos);
+                    LogAvisoRutaLocal("{Diag}: la ruta local superó {Segundos}s (intento {Intento}/{Intentos}); se consume la vía web o el cálculo local.", diagnostico, limite.TotalSeconds, intento, maxIntentos);
                     return string.Empty;
                     }
                 catch (HttpRequestException ex)
                     {
-                    _logger.LogWarning("{Diag}: la ruta local no responde ({Error}); se consume la vía web o el cálculo local.", diagnostico, ex.GetType().Name);
+                    LogAvisoRutaLocal("{Diag}: la ruta local no responde ({Error}); se consume la vía web o el cálculo local.", diagnostico, ex.GetType().Name);
                     return string.Empty;
                     }
 
                 if (!response.IsSuccessStatusCode)
                     {
-                    _logger.LogWarning("{Diag}: la ruta local devolvió {Status} (intento {Intento}/{Intentos}).", diagnostico, response.StatusCode, intento, maxIntentos);
+                    LogAvisoRutaLocal("{Diag}: la ruta local devolvió {Status} (intento {Intento}/{Intentos}).", diagnostico, response.StatusCode, intento, maxIntentos);
                     MarcarFalloDeGeneracion($"HTTP {(int)response.StatusCode}");
                     if (intento < maxIntentos)
                         {
@@ -331,7 +331,7 @@ public class OllamaAIService : IAIService
                     }
                 catch (Exception ex)
                     {
-                    _logger.LogWarning(ex, "{Diag}: no se pudo parsear el sobre de respuesta de la ruta local.", diagnostico);
+                    LogAvisoRutaLocal(ex, "{Diag}: no se pudo parsear el sobre de respuesta de la ruta local.", diagnostico);
                     return string.Empty;
                     }
 
@@ -340,7 +340,7 @@ public class OllamaAIService : IAIService
 
                 if (intento < maxIntentos)
                     {
-                    _logger.LogWarning("{Diag}: la ruta local respondió sin contenido (intento {Intento}/{Intentos}); se reintenta.", diagnostico, intento, maxIntentos);
+                    LogAvisoRutaLocal("{Diag}: la ruta local respondió sin contenido (intento {Intento}/{Intentos}); se reintenta.", diagnostico, intento, maxIntentos);
                     await Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
                     }
                 }
@@ -351,7 +351,7 @@ public class OllamaAIService : IAIService
             {
             // El presupuesto local venció (p. ej. durante la espera entre
             // intentos): se rinde la ruta local y se consume la vía web.
-            _logger.LogWarning("{Diag}: la ruta local superó {Segundos}s en total; se consume la vía web o el cálculo local.", diagnostico, limite.TotalSeconds);
+            LogAvisoRutaLocal("{Diag}: la ruta local superó {Segundos}s en total; se consume la vía web o el cálculo local.", diagnostico, limite.TotalSeconds);
             return string.Empty;
             }
         finally
@@ -360,10 +360,35 @@ public class OllamaAIService : IAIService
             }
         }
 
+    /// <summary>
+    /// Aviso de la ruta local de IA. Con la vía web habilitada, un tropiezo
+    /// local (HTTP 5xx, timeout, modelo que no pudo cargarse por falta de RAM
+    /// en el equipo) es rutinario: la carrera local↔web ya respondió al usuario
+    /// con la vía web y no hay degradación visible, así que va a Information
+    /// para no llenar el reporte diario del admin con warnings no accionables.
+    /// Sin vía web el tropiezo sí degrada la respuesta → Warning.
+    /// </summary>
+    private void LogAvisoRutaLocal(string mensaje, params object?[] args)
+        {
+        if (_web.Habilitada)
+            _logger.LogInformation(mensaje, args);
+        else
+            _logger.LogWarning(mensaje, args);
+        }
+
+    /// <summary>Igual que <see cref="LogAvisoRutaLocal(string, object?[])"/>, con la excepción adjunta.</summary>
+    private void LogAvisoRutaLocal(Exception ex, string mensaje, params object?[] args)
+        {
+        if (_web.Habilitada)
+            _logger.LogInformation(ex, mensaje, args);
+        else
+            _logger.LogWarning(ex, mensaje, args);
+        }
+
     private void MarcarFalloDeGeneracion(string motivo)
         {
         if (_connectionState.IsModelReady)
-            _logger.LogWarning("Ollama respondió con error al generar ({Motivo}).", motivo);
+            LogAvisoRutaLocal("Ollama respondió con error al generar ({Motivo}).", motivo);
 
         _connectionState.IsModelReady = false;
 
@@ -1556,7 +1581,7 @@ public class OllamaAIService : IAIService
     private void MarcarFalloDeGeneracion(string motivo, bool esFalloDeServidor = true)
         {
         if (_connectionState.IsModelReady)
-            _logger.LogWarning("Ollama respondió con error al generar ({Motivo}).", motivo);
+            LogAvisoRutaLocal("Ollama respondió con error al generar ({Motivo}).", motivo);
 
         // Solo marcamos el modelo como no listo si es un fallo real del servidor (HTTP error, network down).
         // Un timeout o una respuesta vacía no significa que el modelo esté roto, solo que esa petición falló.

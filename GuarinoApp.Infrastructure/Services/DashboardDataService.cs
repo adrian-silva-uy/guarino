@@ -1,16 +1,26 @@
 using GuarinoApp.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GuarinoApp.Infrastructure.Services
     {
     public class DashboardDataService : IDashboardDataService
         {
-        private readonly IApplicationDbContext _context;
+        // Scope propio por operación: este servicio lo consumen las páginas Y los
+        // flujos de IA en segundo plano (OllamaAIService/FallbackAIService siguen
+        // corriendo cuando el usuario ya navegó de pantalla). Con el DbContext
+        // escopado del circuito compartido esas llamadas chocaban con las cargas
+        // de la nueva página ("A second operation was started on this context
+        // instance"). Con un scope por llamada cada operación usa su propia
+        // instancia y no puede colisionar con nadie.
+        private readonly IServiceScopeFactory _scopeFactory;
 
-        public DashboardDataService(IApplicationDbContext context) => _context = context;
+        public DashboardDataService(IServiceScopeFactory scopeFactory) => _scopeFactory = scopeFactory;
 
         public async Task<Dictionary<string, int>> GetStockByVarietyAsync(DateTime? referenceDate = null)
             {
+            using var scope = _scopeFactory.CreateScope();
+            var _context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
             var fecha = referenceDate ?? DateTime.Now;
             var ultimaFecha = await _context.StocksVariedad
                 .Where(x => x.Fecha <= fecha)
@@ -29,6 +39,8 @@ namespace GuarinoApp.Infrastructure.Services
 
         public async Task<List<MonthlyVolcado>> GetMonthlyVolcadosAsync(DateTime from, DateTime to)
             {
+            using var scope = _scopeFactory.CreateScope();
+            var _context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
             var fechaInicio = from.Date;
             var fechaFinExclusiva = to.Date.AddDays(1);
             var data = await _context.VolcadosHistoricos
@@ -56,6 +68,8 @@ namespace GuarinoApp.Infrastructure.Services
 
         public async Task<int> GetPalletsWithoutClientAsync(DateTime? referenceDate = null)
             {
+            using var scope = _scopeFactory.CreateScope();
+            var _context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
             var fechaFinExclusiva = (referenceDate ?? DateTime.Now).Date.AddDays(1);
             return await _context.Pallets
                 .Where(p =>
@@ -67,6 +81,8 @@ namespace GuarinoApp.Infrastructure.Services
 
         public async Task<decimal> GetProjectedGrowthAsync(DateTime from, DateTime to)
             {
+            using var scope = _scopeFactory.CreateScope();
+            var _context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
             var fechaInicio = from.Date;
             var fechaFinExclusiva = to.Date.AddDays(1);
             var duracion = fechaFinExclusiva - fechaInicio;
@@ -91,6 +107,8 @@ namespace GuarinoApp.Infrastructure.Services
 
         public async Task<List<VolcadoDetalle>> GetVolcadosDetailAsync(DateTime from, DateTime to, int top = 10)
             {
+            using var scope = _scopeFactory.CreateScope();
+            var _context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
             var fechaInicio = from.Date;
             var fechaFinExclusiva = to.Date.AddDays(1);
             return await _context.VolcadosHistoricos
@@ -115,13 +133,21 @@ namespace GuarinoApp.Infrastructure.Services
             }
 
         public async Task<DateTime?> GetLastStockDateAsync()
-            => await _context.StocksVariedad.OrderByDescending(x => x.Fecha).Select(x => (DateTime?)x.Fecha).FirstOrDefaultAsync();
+            {
+            using var scope = _scopeFactory.CreateScope();
+            var _context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+            return await _context.StocksVariedad.OrderByDescending(x => x.Fecha).Select(x => (DateTime?)x.Fecha).FirstOrDefaultAsync();
+            }
 
         public async Task<DateTime?> GetLastStockDateAsync(DateTime referenceDate)
-            => await _context.StocksVariedad
+            {
+            using var scope = _scopeFactory.CreateScope();
+            var _context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+            return await _context.StocksVariedad
                 .Where(x => x.Fecha <= referenceDate)
                 .OrderByDescending(x => x.Fecha)
                 .Select(x => (DateTime?)x.Fecha)
                 .FirstOrDefaultAsync();
+            }
         }
     }

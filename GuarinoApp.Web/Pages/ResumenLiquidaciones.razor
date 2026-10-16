@@ -153,8 +153,9 @@
         if (!await EnsureDataForExportAsync()) return;
         try
         {
-            var bytes = System.Text.Encoding.UTF8.GetBytes(ExportService.ExportToCsv(_data));
-            await DescargaHelper.DescargarAsync(JS, Snackbar, bytes, $"Resumen_Liquidaciones_{DateTime.Now:yyyyMMdd_HHmmss}.csv", "text/csv");
+            // DescargarTextoAsync antepone el BOM UTF-8: sin él, Excel en Windows
+            // lee "Año"/"Agrícola" como "A?o". Igual que el resto de las páginas.
+            await DescargaHelper.DescargarTextoAsync(JS, Snackbar, ExportService.ExportToCsv(_data), $"Resumen_Liquidaciones_{DateTime.Now:yyyyMMdd_HHmmss}.csv", "text/csv");
         }
         catch (Exception ex)
         {

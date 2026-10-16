@@ -111,6 +111,10 @@
         window.saveAsFromBase64 = async function (fileName, base64, mimeType) {
             const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
             const mime = mimeType || 'application/octet-stream';
+            // Clave MIME sin parámetros para el picker: showSaveFilePicker rechaza
+            // claves con ';' (p. ej. "text/csv;charset=utf-8;") con TypeError y el
+            // diálogo "Guardar como" nunca se ofrecía en esas páginas.
+            const mimeBase = mime.split(';')[0].trim();
             const ext = fileName.lastIndexOf('.') >= 0 ? fileName.slice(fileName.lastIndexOf('.')) : '';
             const ahora = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -142,7 +146,7 @@
                 try {
                     handle = await window.showSaveFilePicker({
                         suggestedName: fileName,
-                        types: ext ? [{ accept: { [mime]: [ext] } }] : undefined
+                        types: ext ? [{ accept: { [mimeBase]: [ext] } }] : undefined
                     });
                     await pedirPermiso();
                     return await escribir();

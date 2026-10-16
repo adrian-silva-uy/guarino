@@ -20,6 +20,16 @@ public static class DependencyInjection
             typeof(IPipelineBehavior<,>),
             typeof(InputSanitizationBehavior<,>));
 
+        // Serialización por circuito de los requests MediatR: el DbContext es
+        // escopado por circuito y dos cargas simultáneas provocaban
+        // "A second operation was started on this context instance"
+        // (Auditoría en 0 registros durante la prueba de fuego). Scoped = una
+        // puerta por circuito; entre usuarios no hay bloqueo.
+        services.AddScoped<PuertaSerializacionDbContext>();
+        services.AddTransient(
+            typeof(IPipelineBehavior<,>),
+            typeof(SerializacionDbContextBehavior<,>));
+
         return services;
         }
     }

@@ -153,8 +153,9 @@
         if (!await EnsureDataForExportAsync()) return;
         try
         {
-            var bytes = System.Text.Encoding.UTF8.GetBytes(ExportService.ExportToCsv(_data));
-            await DescargaHelper.DescargarAsync(JS, Snackbar, bytes, $"Liquidaciones_Quinta_{DateTime.Now:yyyyMMdd_HHmmss}.csv", "text/csv");
+            // DescargarTextoAsync antepone el BOM UTF-8: sin él, Excel en Windows
+            // lee los acentos/ñ como "A?o". Igual que el resto de las páginas.
+            await DescargaHelper.DescargarTextoAsync(JS, Snackbar, ExportService.ExportToCsv(_data), $"Liquidaciones_Quinta_{DateTime.Now:yyyyMMdd_HHmmss}.csv", "text/csv");
         }
         catch (Exception ex)
         {

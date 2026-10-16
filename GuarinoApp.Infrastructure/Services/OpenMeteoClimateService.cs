@@ -4,6 +4,7 @@ using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Settings;
 using GuarinoApp.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
@@ -27,7 +28,7 @@ namespace GuarinoApp.Infrastructure.Services
         private static readonly SemaphoreSlim _scanLock = new(1, 1);
 
         private readonly HttpClient _httpClient;
-        private readonly IApplicationDbContext _context;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<OpenMeteoClimateService> _logger;
         private readonly ClimateRiskSettings _settings;
         private readonly IAsyncPolicy<HttpResponseMessage> _retryPolicy;
@@ -35,12 +36,12 @@ namespace GuarinoApp.Infrastructure.Services
 
         public OpenMeteoClimateService(
             HttpClient httpClient,
-            IApplicationDbContext context,
+            IServiceScopeFactory scopeFactory,
             ILogger<OpenMeteoClimateService> logger,
             IOptions<ClimateRiskSettings> settings)
             {
             _httpClient = httpClient;
-            _context = context;
+            _scopeFactory = scopeFactory;
             _logger = logger;
             _settings = settings.Value;
 
@@ -102,6 +103,12 @@ namespace GuarinoApp.Infrastructure.Services
 
         private async Task EjecutarEscaneoAsync(CancellationToken cancellationToken)
             {
+            // Scope propio: el escaneo dura minutos (HTTP con reintentos) y corre
+            // tanto desde el hosted service como desde la página (vía command);
+            // con el DbContext del circuito compartido chocaban las cargas en vuelo.
+            using var scope = _scopeFactory.CreateScope();
+            var _context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+
             var thresholds = _settings.Thresholds;
             var impacto = _settings.ImpactEstimates;
 
@@ -197,6 +204,11 @@ namespace GuarinoApp.Infrastructure.Services
             List<EventoClimatico> eventos,
             CancellationToken cancellationToken)
             {
+            // Lectura AsNoTracking independiente: scope propio (no comparte el
+            // DbContext del escaneo ni el del circuito que lo disparó).
+            using var scope = _scopeFactory.CreateScope();
+            var _context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+
             var loteIds = eventos.Select(e => e.LoteId).Distinct().ToList();
             var kilosPorLote = await _context.Lotes
                 .AsNoTracking()

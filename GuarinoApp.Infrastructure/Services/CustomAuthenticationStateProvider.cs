@@ -4,6 +4,7 @@ using GuarinoApp.Application.Settings;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 using System.Security.Claims;
@@ -31,16 +32,16 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider, IA
 
     private readonly ICurrentUserState _state;
     private readonly IAuthTokenService _tokenService;
-    private readonly IApplicationDbContext _dbContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IJSRuntime _jsRuntime;
     private readonly AuthSettings _authSettings;
     private readonly SecuritySettings _securitySettings;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public CustomAuthenticationStateProvider(
         ICurrentUserState state,
         IAuthTokenService tokenService,
-        IApplicationDbContext dbContext,
+        IServiceScopeFactory scopeFactory,
         IHttpContextAccessor httpContextAccessor,
         IJSRuntime jsRuntime,
         IOptions<AuthSettings> authSettings,
@@ -48,7 +49,7 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider, IA
     {
         _state = state;
         _tokenService = tokenService;
-        _dbContext = dbContext;
+        _scopeFactory = scopeFactory;
         _httpContextAccessor = httpContextAccessor;
         _jsRuntime = jsRuntime;
         _authSettings = authSettings.Value;
@@ -190,7 +191,11 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider, IA
             // - el rol vigente se toma de la BD (los cambios de rol y la
             //   desactivación surten efecto en el próximo inicio de sesión
             //   de la página, sin esperar a que venza el token).
-            var user = await _dbContext.Users
+            // Scope propio: esta resolución corre al iniciar el circuito y no
+            // debe compartir el DbContext con las primeras cargas de la página.
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+            var user = await db.Users
                 .Include(u => u.Role)
                 .FirstOrDefaultAsync(u => u.UserName == payload.UserName && !u.IsDeleted);
 

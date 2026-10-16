@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common.Behaviors;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.ClimateRisk.Dtos;
 using GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccionZafra;
@@ -12,8 +13,11 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Commands
     /// Nunca devuelve una lista vacía: si la IA no está disponible o responde algo no interpretable,
     /// devuelve una recomendación general clara y explícitamente marcada como "sin IA".
     /// </summary>
+    /// Exento de la puerta de serialización: espera hasta30s de respuesta de IA
+    /// (no debe frenar las cargas del circuito) y su consulta anidada MediatR se
+    /// encola sola. Sus datos los resuelve cada servicio con scope propio.
     public record GenerarPlanMitigacionCommand(List<EventoClimaticoDto> HistorialEventos)
-        : IRequest<List<MitigacionPlanDto>>;
+        : IRequest<List<MitigacionPlanDto>>, IRequestExentoPuertaDb;
 
     public class GenerarPlanMitigacionCommandHandler
         : IRequestHandler<GenerarPlanMitigacionCommand, List<MitigacionPlanDto>>
