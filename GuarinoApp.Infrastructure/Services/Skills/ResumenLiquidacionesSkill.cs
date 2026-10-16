@@ -20,6 +20,11 @@ public sealed class ResumenLiquidacionesSkill : ISkill
     public string Description =>
         "Resumen de liquidaciones: total a pagar, kilos y bins por productor y variedad.";
 
+    public IReadOnlyCollection<string> Ejemplos => new[]
+        {
+        "Resumen de liquidaciones: ¿qué se le debe a los productores?"
+        };
+
     public IReadOnlyCollection<string> Keywords => new[]
     {
         "liquidacion", "liquidaciones", "quinta", "quintas",

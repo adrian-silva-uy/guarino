@@ -33,6 +33,13 @@ public interface ISkill
     string Description { get; }
 
     /// <summary>
+    /// Ejemplos de uso clickeables en el panel del Asistente (se cargan en la
+    /// caja de edición para que el usuario los modifique antes de enviarlos).
+    /// Vacío por defecto: las skills sin ejemplos no se muestran en el panel.
+    /// </summary>
+    IReadOnlyCollection<string> Ejemplos => Array.Empty<string>();
+
+    /// <summary>
     /// Palabras clave (en minúsculas y sin acentos) para el enrutamiento
     /// por intención. Se comparan como palabras completas.
     /// </summary>

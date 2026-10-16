@@ -59,6 +59,8 @@ public class OllamaAIService : IAIService
         "- Pallets sin cliente asignado: {PalletsWithoutClient}\n" +
         "- Proyección de la próxima zafra: {ProyeccionZafra}\n\n" +
         "INSTRUCCIONES:\n" +
+        "INTENCIÓN PRIMERO: si el usuario solo saluda, hace una prueba técnica o charla sin pedir análisis (ej. \"hola\", \"hola prueba\"),\n" +
+        "respondé con un saludo breve y ejemplos de consultas posibles; NO entregues diagnósticos ni datos de la empresa.\n" +
         "Responde de forma DIRECTA, inteligente, analítica y estratégica a la consulta específica del usuario.\n" +
         "Si el usuario solicita recomendaciones o estrategias (ej. impacto operativo, conservación en cámaras, logística de empaque),\n" +
         "proporciona un análisis ejecutivo concreto del sector citrícola incorporando los datos reales disponibles cuando corresponda.\n" +

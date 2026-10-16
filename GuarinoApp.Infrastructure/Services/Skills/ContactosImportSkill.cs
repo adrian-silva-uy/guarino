@@ -39,6 +39,11 @@ public sealed class ContactosImportSkill : ISkillConEntrada
         "Importa contactos nuevos desde texto pegado (CSV o chat de WhatsApp/correo): " +
         "parsea, valida y los da de alta en Contactos. No sirve para consultar la lista de contactos.";
 
+    public IReadOnlyCollection<string> Ejemplos => new[]
+        {
+        "Importar contactos: "
+        };
+
     public IReadOnlyCollection<string> Keywords => new[]
         {
         "importar contactos", "importar contacto", "importa contactos", "importa contacto",

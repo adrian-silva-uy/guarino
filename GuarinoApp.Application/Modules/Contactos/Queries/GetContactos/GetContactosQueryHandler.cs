@@ -1,5 +1,6 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Contactos.Dtos;
+using GuarinoApp.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -28,11 +29,26 @@ public class GetContactosQueryHandler : IRequestHandler<GetContactosQuery, List<
 
             if (!string.IsNullOrWhiteSpace(request.Busqueda))
                 {
+                // Tope de longitud para el texto libre de búsqueda (defensa en
+                // profundidad junto al InputSanitizationBehavior central).
                 var texto = request.Busqueda.Trim();
+                if (texto.Length > 100)
+                    texto = texto[..100];
+                // EF Core LINQ → SQL parametrizado (LIKE con parámetro), nunca SQL
+                // concatenado: un texto con comillas, -- o ; no puede alterar la consulta.
                 query = query.Where(c =>
                     c.Nombre.Contains(texto) ||
                     c.Empresa.Contains(texto) ||
                     (c.Pais != null && c.Pais.Contains(texto)));
+                }
+
+            if (!string.IsNullOrWhiteSpace(request.Estado))
+                {
+                // Allowlist: solo los estados conocidos; cualquier otro valor
+                // (texto libre inyectado en el select) se ignora.
+                var estado = request.Estado.Trim();
+                if (Array.IndexOf(ContactoEstados.Todos, estado) >= 0)
+                    query = query.Where(c => c.Estado == estado);
                 }
 
             return await query

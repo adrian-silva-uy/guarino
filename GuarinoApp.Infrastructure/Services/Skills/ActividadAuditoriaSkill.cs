@@ -21,6 +21,11 @@ public sealed class ActividadAuditoriaSkill : ISkill
     public string Description =>
         "Últimos registros de actividad del sistema: usuario, acción, módulo y fecha/hora.";
 
+    public IReadOnlyCollection<string> Ejemplos => new[]
+        {
+        "¿Quién hizo qué en el sistema últimamente?"
+        };
+
     public IReadOnlyCollection<string> Keywords => new[]
     {
         "auditoria", "actividad", "log", "historial",

@@ -49,6 +49,17 @@ public class FallbackAIService : IAIService
 
     public async Task<string> ChatAsync(string prompt, List<ChatMessage> history)
         {
+        // Saludos y pruebas técnicas sin consulta concreta ("hola",
+        // "hola prueba", "buenos días"): respuesta cordial determinista y
+        // SIN datos de negocio. Va antes de la ruta IA para que ni el modelo
+        // ni el fallback con puntos de stock devuelvan información que el
+        // usuario no pidió (bug: "hola prueba" devolvía diagnósticos).
+        if (EsSaludoSinConsulta(prompt))
+            {
+            _logger.LogInformation("Chat: saludo/prueba detectada, respuesta cordial sin datos de negocio.");
+            return SaludoCordial();
+            }
+
         // Misma consulta repetida en el período pico (p. ej. el chip de
         // sugerencia que varios usuarios tocan a la vez): respuesta IA al
         // instante sin volver a consumir cupo.
@@ -78,6 +89,68 @@ public class FallbackAIService : IAIService
 
         return await BuildFallbackChatResponseAsync(prompt);
         }
+
+    /// <summary>
+    /// Vocabulario de saludos/pruebas: TODAS las palabras del mensaje (normalizado
+    /// a minúsculas y sin acentos; dígitos y puntuación se ignoran) deben pertenecer
+    /// a esta lista para que se lo trate como saludo. Cualquier palabra fuera del
+    /// vocabulario ("stock", "¿cuántos?", "liquidaciones"...) hace que la consulta
+    /// siga la ruta normal.
+    /// </summary>
+    private static readonly HashSet<string> PalabrasDeSaludo = new(StringComparer.Ordinal)
+        {
+        "hola", "holas", "hello", "hi", "hey", "buenas", "buenos", "dia", "dias",
+        "tardes", "noches", "tal", "como", "estas", "esta", "todo", "bien",
+        "prueba", "probar", "probando", "test", "testeando", "chau", "adios",
+        "gracias", "grax", "che", "epa", "ok", "okay", "listo", "saludos",
+        "que", "y", "a", "por", "fav", "favor", "xfa", "pasando"
+        };
+
+    /// <summary>true si el mensaje es solo un saludo / prueba técnica / charla
+    /// social sin pedir nada concreto (ej. "hola", "hola prueba", "buenos días").</summary>
+    private static bool EsSaludoSinConsulta(string? prompt)
+        {
+        if (string.IsNullOrWhiteSpace(prompt) || prompt.Length > 60)
+            return false;
+
+        var normalizado = NormalizarSinAcentos(prompt);
+        var palabras = normalizado
+            .Split(new[] { ' ', '\t', '\r', '\n', ',', ';', '.', ':', '!', '?', '¿', '¡', '(', ')', '"', '\'' },
+                   StringSplitOptions.RemoveEmptyEntries);
+        if (palabras.Length == 0 || palabras.Length > 8)
+            return false;
+
+        return palabras.All(p => PalabrasDeSaludo.Contains(p));
+        }
+
+    /// <summary>Minúsculas + sin diacríticos (á→a, ñ→n) + sin dígitos:
+    /// "Buenos días" → "buenos dias"; "prueba123" → "prueba".</summary>
+    private static string NormalizarSinAcentos(string texto)
+        {
+        var minusculas = texto.ToLowerInvariant();
+        var descompuesto = minusculas.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(descompuesto.Length);
+        foreach (var c in descompuesto)
+            {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.NonSpacingMark)
+                continue;
+            if (char.IsDigit(c))
+                continue;
+            sb.Append(c);
+            }
+        return sb.ToString().Normalize(NormalizationForm.FormC);
+        }
+
+    /// <summary>Respuesta cordial determinista para saludos: ofrece capacidades
+    /// (sin volcar métricas ni diagnósticos de negocio).</summary>
+    private static string SaludoCordial() =>
+        "¡Hola! 👋 Soy el asistente de Guarino y estoy para ayudarte con consultas del sistema.\n\n" +
+        "Podés pedirme, por ejemplo:\n" +
+        "- Stock actual y pallets sin cliente\n" +
+        "- Proyección de la próxima zafra y estrategia\n" +
+        "- Resumen de liquidaciones o datos financieros\n" +
+        "- Importar contactos desde una lista o CSV\n\n" +
+        "Escribí tu consulta y la respondo con los datos del sistema.";
 
     /// <summary>
     /// Plan climático: delega en la ruta dedicada de OllamaAIService, que arma el

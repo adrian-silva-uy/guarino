@@ -98,26 +98,87 @@
         // seguro (HTTPS o localhost); en el resto de navegadores/contextos cae
         // a la descarga automática (carpeta de descargas del navegador).
         // Devuelve: "guardado" | "cancelado" | "descargado".
+        // Robustez (archivos de 0 bytes):
+        //  - write() recibe un Blob con MIME explícito (no un Uint8Array crudo).
+        //  - Si el picker/createWritable()/write() falla, se aborta el writable
+        //    (descarta el temporal) y SE SIGUE con la descarga automática: nunca
+        //    queda un archivo vacío a medias.
+        //  - AbortError "instantáneo" (<700 ms) = el diálogo ni siquiera se
+        //    mostró (ventana minimizada / sin gesto): NO es cancelación del
+        //    usuario → se descarga igual en vez de informar "cancelado".
+        //  - revokeObjectURL diferido: revocar en el mismo tick puede cancelar
+        //    la descarga en curso en Chromium.
         window.saveAsFromBase64 = async function (fileName, base64, mimeType) {
             const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-            if (window.showSaveFilePicker) {
+            const mime = mimeType || 'application/octet-stream';
+            const ext = fileName.lastIndexOf('.') >= 0 ? fileName.slice(fileName.lastIndexOf('.')) : '';
+            const ahora = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+            // Si el diálogo "Guardar como" ya falló al ESCRIBIR en esta sesión
+            // (Chromium crea el archivo destino de0bytes y después createWritable
+            // puede ser rechazado por el contexto), no se vuelve a ofrecer ese
+            // diálogo: se descarga directo a la carpeta de descargas del navegador
+            // para no dejar archivos vacíos en la carpeta que eligió el usuario.
+            if (window.showSaveFilePicker && !sessionStorage.getItem('guarino_save_picker_bloqueado')) {
+                const t0 = ahora();
+                let handle = null;
+                let writable = null;
+                const pedirPermiso = async () => {
+                    // Algunos contextos exigen pedir el permiso de escritura
+                    // explícitamente después de elegir el archivo.
+                    if (handle && handle.requestPermission) {
+                        try { await handle.requestPermission({ mode: 'readwrite' }); }
+                        catch (_) { /* el estado ya queda reflejado en createWritable */ }
+                    }
+                };
+                const escribir = async () => {
+                    writable = await handle.createWritable();
+                    await writable.write(new Blob([bytes], { type: mime }));
+                    await writable.close();
+                    writable = null;
+                    sessionStorage.removeItem('guarino_save_picker_bloqueado');
+                    return 'guardado';
+                };
                 try {
-                    const ext = fileName.lastIndexOf('.') >= 0 ? fileName.slice(fileName.lastIndexOf('.')) : '';
-                    const mime = mimeType || 'application/octet-stream';
-                    const handle = await window.showSaveFilePicker({
+                    handle = await window.showSaveFilePicker({
                         suggestedName: fileName,
                         types: ext ? [{ accept: { [mime]: [ext] } }] : undefined
                     });
-                    const writable = await handle.createWritable();
-                    await writable.write(bytes);
-                    await writable.close();
-                    return 'guardado';
+                    await pedirPermiso();
+                    return await escribir();
                 } catch (err) {
-                    if (err && err.name === 'AbortError') return 'cancelado';
-                    // Otro error (p.ej. sin gesto de usuario): sigue la descarga automática.
+                    const ms = Math.round(ahora() - t0);
+                    const esAbort = !!(err && err.name === 'AbortError');
+                    // Cierra/aborta el writable sin commitear para no dejar parciales.
+                    if (writable) {
+                        try { await writable.abort(); } catch (_) { /* ya cerrado */ }
+                        writable = null;
+                    }
+                    // Cancelación real del usuario: el diálogo se mostró y él lo cerró.
+                    if (esAbort && ms >= 700) return 'cancelado';
+
+                    // Escritura bloqueada por el contexto (NotAllowedError o
+                    // SecurityError): pide permiso y reintenta UNA vez.
+                    if (handle && err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
+                        try {
+                            await pedirPermiso();
+                            return await escribir();
+                        } catch (err2) {
+                            console.warn('[saveAsFromBase64]', fileName,
+                                '→ reintento de escritura falló (' + (err2 && err2.name) + ': ' +
+                                (err2 && err2.message) + ').');
+                        }
+                        // Persistente en esta pestaña: no repetir el diálogo (litter de0 bytes).
+                        sessionStorage.setItem('guarino_save_picker_bloqueado', String(Date.now()));
+                    }
+                    console.warn('[saveAsFromBase64]', fileName,
+                        '→ picker path falló (' + (err && err.name) + ': ' + (err && err.message) +
+                        ') tras ' + ms + ' ms; se usa descarga automática.');
+                    // Cualquier otro error: cae a la descarga automática de abajo.
                 }
             }
-            const blob = new Blob([bytes], { type: mimeType || 'application/octet-stream' });
+
+            const blob = new Blob([bytes], { type: mime });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -125,7 +186,10 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+            // Diferido para no cortar la descarga que recién se disparó.
+            setTimeout(function () {
+                try { window.URL.revokeObjectURL(url); } catch (_) { /* ok */ }
+            }, 60000);
             return 'descargado';
         };
     </script>

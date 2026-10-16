@@ -14,6 +14,8 @@
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject Microsoft.Extensions.Logging.ILogger<IAChat> Logger
+@inject GuarinoApp.Application.Common.Interfaces.IAuditService AuditService
+@inject GuarinoApp.Application.Common.Interfaces.ISkillRegistry SkillRegistry
 @implements IDisposable
 
 <PageTitle>Asistente IA</PageTitle>
@@ -296,11 +298,32 @@
                             </MudListItem>
                         }
                     </MudList>
-                    <MudText Typo="Typo.caption" Color="Color.Tertiary">@(_sugerencias.Count == 1 ? "1 sugerencia" : _sugerencias.Count + " sugerencias") — selecciona una para iniciar la conversación</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">@(_sugerencias.Count == 1 ? "1 sugerencia" : _sugerencias.Count + " sugerencias") — seleccioná una para ponerla en la caja y editarla antes de enviar</MudText>
                 }
                 else
                 {
                     <MudText Typo="Typo.body2" Color="Color.Tertiary">No hay sugerencias activas.</MudText>
+                }
+
+                <!-- Acciones rápidas: ejemplos clickeables de las skills del sistema.
+                     El click SOLO carga el texto en la caja de edición (el usuario lo
+                     modifica y lo envía); al enviarlo, SkillRegistry lo ejecuta y lo
+                     registra en Auditoría del Sistema. -->
+                @if (AccionesRapidas().Any())
+                {
+                    <MudText Typo="Typo.body2" Class="mt-3">⚡ Acciones rápidas</MudText>
+                    <MudList Dense="true">
+                        @foreach (var accion in AccionesRapidas())
+                        {
+                            <MudListItem Class="cursor-pointer suggestion-item" OnClick="@(() => CargarAccionRapida(accion))">
+                                <div class="d-flex align-start" style="gap:6px;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Bolt" Size="Size.Small" Style="color:var(--mud-palette-secondary);margin-top:2px;" />
+                                    <MudText Typo="Typo.body2" Class="suggestion-text">@accion</MudText>
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">— click para cargarla en la caja y editarla; cada acción ejecutada queda en Auditoría</MudText>
                 }
 
                 <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@ActualizarSugerencias" FullWidth="true" Class="mt-2"
@@ -511,6 +534,19 @@
         _isLoading = true;
         StateHasChanged();
 
+        // Toda consulta al Asistente queda registrada en Auditoría del Sistema
+        // (además de la entrada específica que agrega SkillRegistry cuando la
+        // consulta ejecuta una habilidad del sistema).
+        try
+        {
+            var recorte = userMsg.Length > 200 ? userMsg[..200] + "…" : userMsg;
+            await AuditService.LogAsync("Consulta IA", "Asistente IA", $"Consulta al Asistente: \"{recorte}\"");
+        }
+        catch (Exception exAudit)
+        {
+            Logger.LogWarning(exAudit, "No se pudo registrar la consulta en Auditoría");
+        }
+
         try
         {
             var history = _messages.Take(_messages.Count - 1).ToList();
@@ -660,9 +696,22 @@
         Snackbar.Add("Sugerencias recalculadas", Severity.Success);
     }
 
-    private async Task CargarSugerencia(BusinessSuggestionDto sugerencia)
+    private void CargarSugerencia(BusinessSuggestionDto sugerencia)
     {
+        // Solo carga la sugerencia en la caja de edición (sin enviarla): el
+        // usuario puede modificarla antes de que el Asistente la responda.
         _currentInput = sugerencia.Text ?? string.Empty;
-        await SendMessage();
+    }
+
+    /// <summary>Acciones rápidas: ejemplos clickeables de las skills del sistema
+    /// (importar contactos, datos financieros, proyección de zafra, ...). Carga el
+    /// texto en la caja para editarlo; al enviarlo, SkillRegistry ejecuta la skill
+    /// y la registra en Auditoría.</summary>
+    private IEnumerable<string> AccionesRapidas() =>
+        SkillRegistry.Skills.SelectMany(s => s.Ejemplos);
+
+    private void CargarAccionRapida(string texto)
+    {
+        _currentInput = texto;
     }
 }

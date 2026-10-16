@@ -37,7 +37,9 @@
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     @* Allowlist: se elige entre los usuarios existentes de la
-                       app, no texto libre. "Todos los usuarios" = filtro vacío. *@
+                       app, no texto libre. Sentinel "__todos__" = filtro vacío:
+                       con value vacío ("") MudBlazor no izaba el label y el
+                       texto "Todos los usuarios" quedaba solapado con "Usuario". *@
                     <MudSelect T="string"
                                @bind-Value="_userName"
                                Label="Usuario"
@@ -45,7 +47,7 @@
                                Margin="Margin.Dense"
                                Dense="true"
                                Clearable="true">
-                        <MudSelectItem Value="@string.Empty">Todos los usuarios</MudSelectItem>
+                        <MudSelectItem Value="@TodosUsuarios">Todos los usuarios</MudSelectItem>
                         @foreach (var u in _usuarios)
                         {
                             <MudSelectItem Value="@u.UserName">@u.UserName</MudSelectItem>
@@ -67,84 +69,93 @@
         </MudCardContent>
     </MudCard>
 
-    <!-- Tabla de Logs -->
-    @if (_loading)
-    {
-        <div class="d-flex justify-content-center py-5">
-            <MudProgressCircular Color="Color.Primary" Size="Size.Large" />
-        </div>
-    }
-    else if (_logs == null || !_logs.Items.Any())
-    {
-        <MudAlert Severity="Severity.Info">No se encontraron registros con los filtros seleccionados.</MudAlert>
-    }
-    else
-    {
-        <MudCard Elevation="1">
-            <MudCardContent>
-                <MudText Typo="Typo.h6" GutterBottom="true">
-                    Registros (@_logs.TotalCount total)
-                </MudText>
-                <MudTable Items="@_logs.Items" Hover="true" Dense="true" Striped="true" Breakpoint="Breakpoint.Sm">
-                    <HeaderContent>
-                        <MudTh>Fecha/Hora</MudTh>
-                        <MudTh>Usuario</MudTh>
-                        <MudTh>Rol</MudTh>
-                        <MudTh>Acción</MudTh>
-                        <MudTh>Módulo</MudTh>
-                        <MudTh>Descripción</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="Fecha/Hora">@context.Timestamp.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
-                        <MudTd DataLabel="Usuario">
-                            <MudText Typo="Typo.body2" Class="fw-bold">@context.UserName</MudText>
-                        </MudTd>
-                        <MudTd DataLabel="Rol">
-                            <MudChip Size="Size.Small" Color="@GetRoleColor(context.Role)">@context.Role</MudChip>
-                        </MudTd>
-                        <MudTd DataLabel="Acción">
-                            <MudChip Size="Size.Small" Color="@GetActionColor(context.Action)">@context.Action</MudChip>
-                        </MudTd>
-                        <MudTd DataLabel="Módulo">@context.Module</MudTd>
-                        <MudTd DataLabel="Descripción">
-                            <MudText Typo="Typo.body2">@context.Description</MudText>
-                        </MudTd>
-                    </RowTemplate>
-                </MudTable>
-
-                <!-- Paginación -->
-                @if (_logs.TotalPages > 1)
-                {
-                    <div class="d-flex justify-content-center mt-4">
-                        <MudPagination Total="_logs.TotalPages" SelectedPage="_page" SelectedPageChanged="OnPageChanged" />
+    <!-- Tabla de Logs (paginación server-side con el mismo pie que el resto de la app) -->
+    <MudCard Elevation="1">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" GutterBottom="true">
+                Registros (@_total total)
+            </MudText>
+            <MudTable @ref="_table"
+                      T="LogDto"
+                      ServerData="@ServerReload"
+                      Hover="true"
+                      Dense="true"
+                      Striped="true"
+                      Breakpoint="Breakpoint.Sm"
+                      RowsPerPage="25">
+                <HeaderContent>
+                    <MudTh>Fecha/Hora</MudTh>
+                    <MudTh>Usuario</MudTh>
+                    <MudTh>Rol</MudTh>
+                    <MudTh>Acción</MudTh>
+                    <MudTh>Módulo</MudTh>
+                    <MudTh>Descripción</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Fecha/Hora">@context.Timestamp.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                    <MudTd DataLabel="Usuario">
+                        <MudText Typo="Typo.body2" Class="fw-bold">@context.UserName</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Rol">
+                        <MudChip Size="Size.Small" Color="@GetRoleColor(context.Role)">@context.Role</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Acción">
+                        <MudChip Size="Size.Small" Color="@GetActionColor(context.Action)">@context.Action</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Módulo">@context.Module</MudTd>
+                    <MudTd DataLabel="Descripción">
+                        <MudText Typo="Typo.body2">@context.Description</MudText>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudAlert Severity="Severity.Info">No se encontraron registros con los filtros seleccionados.</MudAlert>
+                </NoRecordsContent>
+                <LoadingContent>
+                    <div class="d-flex justify-content-center py-4">
+                        <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
                     </div>
-                }
-            </MudCardContent>
-        </MudCard>
-    }
+                </LoadingContent>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }"
+                                   RowsPerPageString="Filas por página:"
+                                   InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+                </PagerContent>
+            </MudTable>
+        </MudCardContent>
+    </MudCard>
 </div>
 
 @code {
-    private bool _loading = false;
-    private PagedResult<LogDto>? _logs;
-    private int _page = 1;
-    private const int PageSize = 50;
+    private MudTable<LogDto>? _table;
+    private int _total = 0;
+    private bool _usuariosCargados;
+    private bool _reintentoHecho;
 
     private DateTime? _fechaDesde = null;
     private DateTime? _fechaHasta = null;
-    private string _userName = string.Empty;
+
+    /// <summary>Sentinel del filtro "Todos los usuarios". No se usa string.Empty
+    /// porque MudBlazor no izaba el label con valor vacío y el texto del ítem
+    /// quedaba solapado con el label "Usuario".</summary>
+    private const string TodosUsuarios = "__todos__";
+    private string _userName = TodosUsuarios;
     private string? _action = null;
     private List<AppUserDto> _usuarios = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
-        await CargarUsuarios();
-        await CargarLogs();
+        // Los usuarios del filtro NO se cargan acá: al primer await Blazor hace
+        // el primer render y MudTable dispara ServerReload en paralelo, y las dos
+        // queries corrían a la vez sobre el MISMO DbContext escopado ("A second
+        // operation was started on this context instance"). Se cargan serializados
+        // al final de la primera ServerReload (ver flag _usuariosCargados).
+        return Task.CompletedTask;
     }
 
     /// <summary>Carga los usuarios existentes para el filtro desplegable
     /// (si falla, el filtro queda sin opciones pero la auditoría sigue
-    /// funcionando).</summary>
+    /// funcionando). Debe correr DESPUÉS de que termine la query de la tabla
+    /// para no solaparse en el DbContext escopado.</summary>
     private async Task CargarUsuarios()
     {
         try
@@ -157,35 +168,70 @@
         }
     }
 
-    private async Task CargarLogs()
+    /// <summary>Carga server-side pageada: MudTable le pasa página y tamaño de
+    /// página (MudTablePager del resto de la app) y el handler consulta con
+    /// Skip/Take. Devuelve también el total para el pie "Mostrando X–Y de Z".</summary>
+    private async Task<TableData<LogDto>> ServerReload(TableState state)
     {
-        _loading = true;
-        StateHasChanged();
-
         try
         {
             var query = new GetLogsQuery(
                 FechaDesde: _fechaDesde,
                 FechaHasta: _fechaHasta,
-                UserName: _userName,
+                UserName: EsFiltroTodosUsuarios() ? null : _userName,
                 Action: _action,
-                Page: _page,
-                PageSize: PageSize
+                Page: state.Page + 1,
+                PageSize: state.PageSize
             );
 
-            _logs = await Mediator.Send(query);
+            var result = await Mediator.Send(query);
+            _total = result.TotalCount;
+            if (!_usuariosCargados)
+            {
+                // Serializado con la query de la tabla (mismo DbContext escopado:
+                // acá la anterior YA terminó).
+                _usuariosCargados = true;
+                await CargarUsuarios();
+            }
+            _reintentoHecho = false;
+            StateHasChanged();
+            return new TableData<LogDto>
+            {
+                Items = result.Items,
+                TotalItems = result.TotalCount
+            };
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error al cargar logs de auditoría");
             Snackbar.Add("Error al cargar los registros", Severity.Error);
-        }
-        finally
-        {
-            _loading = false;
+            _total = 0;
+            if (!_usuariosCargados)
+            {
+                _usuariosCargados = true;
+                await CargarUsuarios();
+            }
             StateHasChanged();
+            // Un solo reintento automático ante una carrera transitoria de DbContext.
+            if (!_reintentoHecho)
+            {
+                _reintentoHecho = true;
+                _ = InvokeAsync(async () =>
+                {
+                    await Task.Delay(700);
+                    await CargarLogs();
+                });
+            }
+            return new TableData<LogDto>
+            {
+                Items = Array.Empty<LogDto>(),
+                TotalItems = 0
+            };
         }
     }
+
+    private bool EsFiltroTodosUsuarios() =>
+        _userName is null || _userName == TodosUsuarios || string.IsNullOrWhiteSpace(_userName);
 
     private void OnFechaDesdeChanged(DateTime? date)
     {
@@ -197,19 +243,19 @@
         _fechaHasta = date;
     }
 
-    private async Task OnPageChanged(int page)
+    private async Task CargarLogs()
     {
-        _page = page;
-        await CargarLogs();
+        if (_table is not null)
+            await _table.ReloadServerData();
     }
 
-    private void LimpiarFiltros()
+    private async Task LimpiarFiltros()
     {
         _fechaDesde = null;
         _fechaHasta = null;
-        _userName = string.Empty;
+        _userName = TodosUsuarios;
         _action = null;
-        _page = 1;
+        await CargarLogs();
     }
 
     private static Color GetRoleColor(string? role) => role switch

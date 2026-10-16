@@ -25,13 +25,22 @@
 <MudPaper Class="pa-4 mb-4" Elevation="1">
     <MudGrid Spacing="2">
         <MudItem xs="12" md="5">
-            <MudTextField @bind-Value="_busqueda"
-                          Label="Buscar (nombre, empresa o país)"
-                          Variant="Variant.Outlined"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Search"
-                          Immediate="true"
-                          @onkeydown="OnBusquedaKeyDown" />
+            @* Autocompletado con valores reales de la tabla (nombre, empresa y
+               país). Escribe texto libre y sugiere de lo existente; la búsqueda
+               server-side sigue saneada y parametrizada. *@
+            <MudAutocomplete T="string"
+                             @ref="_refBusqueda"
+                             @bind-Value="_busqueda"
+                             TextChanged="@((string? t) => _busqueda = t)"
+                             CoerceValue="true"
+                             Label="Buscar (nombre, empresa o país)"
+                             Variant="Variant.Outlined"
+                             Adornment="Adornment.Start"
+                             AdornmentIcon="@Icons.Material.Filled.Search"
+                             Immediate="true"
+                             MaxHeight="300"
+                             SearchFunc="@BuscarSugerencias"
+                             @onkeydown="OnBusquedaKeyDown" />
         </MudItem>
         <MudItem xs="12" md="3">
             <MudSelect T="string" @bind-Value="_estado" Label="Estado" Variant="Variant.Outlined" Clearable="true">
@@ -118,6 +127,9 @@
 
 @code {
     private List<ContactoDto> _data = new();
+    /// <summary>Contactos sin filtrar: fuente de las sugerencias del autocompletado
+    /// (nombre, empresa y país de todo lo existente).</summary>
+    private List<ContactoDto> _todos = new();
     private bool _loading;
     private bool _cargado;
     private string? _busqueda;
@@ -135,6 +147,9 @@
 
         try
         {
+            // Los dos viajan por MediatR: reciben InputSanitizationBehavior y la
+            // consulta es EF parametrizada (sin SQL concatenado).
+            _todos = await Mediator.Send(new GetContactosQuery());
             _data = await Mediator.Send(new GetContactosQuery(_busqueda, _estado));
             _cargado = true;
         }
@@ -150,8 +165,23 @@
         }
     }
 
+    /// <summary>Referencia al autocompletado: su <c>Text</c> es el texto tal cual
+    /// quedó en la caja (aunque no se haya elegido una sugerencia).</summary>
+    private MudAutocomplete<string>? _refBusqueda;
+
+    /// <summary>Si el usuario tecleó texto sin elegir sugerencia, BUSCAR/Enter usan
+    /// lo que está escrito en la caja (el Value solo se actualiza al elegir ítem
+    /// o cuando el texto no coincide con ninguna sugerencia).</summary>
+    private void SincronizarBusquedaDesdeTexto()
+    {
+        var texto = _refBusqueda?.Text;
+        if (!string.IsNullOrWhiteSpace(texto))
+            _busqueda = texto.Trim();
+    }
+
     private async Task BuscarAsync()
     {
+        SincronizarBusquedaDesdeTexto();
         await CargarAsync();
     }
 
@@ -159,6 +189,8 @@
     {
         _busqueda = null;
         _estado = null;
+        if (_refBusqueda is not null)
+            await _refBusqueda.Clear();
         await CargarAsync();
     }
 
@@ -166,8 +198,44 @@
     {
         if (e.Key == "Enter")
         {
+            SincronizarBusquedaDesdeTexto();
             await CargarAsync();
         }
+    }
+
+    /// <summary>Sugerencias del autocompletado: valores únicos de nombre, empresa
+    /// y país de los contactos existentes, filtrados por lo tipeado (contiene, sin
+    /// distinguir mayúsculas ni acentos). No consulta la base: trabaja sobre la
+    /// lista ya cargada y muestra hasta 15 opciones.</summary>
+    private Task<IEnumerable<string>> BuscarSugerencias(string texto)
+    {
+        IEnumerable<string> sugerencias = _todos
+            .SelectMany(c => new[] { c.Nombre, c.Empresa, c.Pais })
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(v => v, StringComparer.CurrentCultureIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(texto))
+        {
+            var filtro = SinAcentos(texto.Trim());
+            sugerencias = sugerencias.Where(s => SinAcentos(s).Contains(filtro, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return Task.FromResult(sugerencias.Take(15));
+    }
+
+    /// <summary>Minúsculas sin diacríticos para comparar sugerencias ("Pérez" ~ "perez").</summary>
+    private static string SinAcentos(string texto)
+    {
+        var descompuesto = texto.ToLowerInvariant().Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new System.Text.StringBuilder(descompuesto.Length);
+        foreach (var c in descompuesto)
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
+                sb.Append(c);
+        }
+        return sb.ToString();
     }
 
     private async Task NuevoAsync()

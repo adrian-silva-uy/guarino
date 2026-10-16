@@ -20,6 +20,11 @@ public sealed class ProyeccionZafraSkill : ISkill
     public string Description =>
         "Detalle de la proyección de la próxima zafra: kilos, variación vs. año anterior, bins, camiones y horas de empaque estimadas.";
 
+    public IReadOnlyCollection<string> Ejemplos => new[]
+        {
+        "¿Cuánto proyecta la próxima zafra en kilos, bins y camiones?"
+        };
+
     public IReadOnlyCollection<string> Keywords => new[]
     {
         "zafra", "proxima zafra", "zafra siguiente", "proyeccion de zafra",

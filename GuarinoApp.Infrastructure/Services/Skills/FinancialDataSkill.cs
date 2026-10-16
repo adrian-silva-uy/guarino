@@ -20,6 +20,11 @@ public sealed class FinancialDataSkill : ISkill
     public string Description =>
         "Datos financieros vigentes: costo por kg, flujo de caja, margen bruto, costo de flete y capacidad instalada.";
 
+    public IReadOnlyCollection<string> Ejemplos => new[]
+        {
+        "¿Cómo viene el flujo de caja, el margen y el costo por kg?"
+        };
+
     public IReadOnlyCollection<string> Keywords => new[]
     {
         "costo", "costo por kg", "margen", "flujo de caja", "flete",
