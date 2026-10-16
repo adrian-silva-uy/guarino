@@ -5,6 +5,7 @@
 @using GuarinoApp.Application.Common.Interfaces
 @using GuarinoApp.Application.Modules.ResumenLiquidaciones.Queries.GetResumenLiquidaciones
 @using GuarinoApp.Application.Modules.ResumenLiquidaciones.Dtos
+@using GuarinoApp.Web.Helpers
 @inject IMediator Mediator
 @inject IExportService ExportService
 @inject IEmailService EmailService
@@ -123,7 +124,7 @@
         try
         {
             var bytes = await ExportService.ExportToPdfAsync(_data, "Resumen de Liquidaciones");
-            await DescargarConDialogoAsync(bytes, $"Resumen_Liquidaciones_{DateTime.Now:yyyyMMdd_HHmmss}.pdf", "application/pdf");
+            await DescargaHelper.DescargarAsync(JS, Snackbar, bytes, $"Resumen_Liquidaciones_{DateTime.Now:yyyyMMdd_HHmmss}.pdf", "application/pdf");
         }
         catch (Exception ex)
         {
@@ -138,7 +139,7 @@
         try
         {
             var bytes = await ExportService.ExportToExcelAsync(_data, "Resumen de Liquidaciones");
-            await DescargarConDialogoAsync(bytes, $"Resumen_Liquidaciones_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            await DescargaHelper.DescargarAsync(JS, Snackbar, bytes, $"Resumen_Liquidaciones_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         }
         catch (Exception ex)
         {
@@ -153,7 +154,7 @@
         try
         {
             var bytes = System.Text.Encoding.UTF8.GetBytes(ExportService.ExportToCsv(_data));
-            await DescargarConDialogoAsync(bytes, $"Resumen_Liquidaciones_{DateTime.Now:yyyyMMdd_HHmmss}.csv", "text/csv");
+            await DescargaHelper.DescargarAsync(JS, Snackbar, bytes, $"Resumen_Liquidaciones_{DateTime.Now:yyyyMMdd_HHmmss}.csv", "text/csv");
         }
         catch (Exception ex)
         {
@@ -199,19 +200,5 @@
         if (_data.Any()) return Task.FromResult(true);
         Snackbar.Add("No hay datos para exportar.", Severity.Warning);
         return Task.FromResult(false);
-    }
-
-    // Intenta el diálogo nativo "Guardar como..." (Chromium + HTTPS/localhost);
-    // si no está disponible, descarga a la carpeta de descargas del navegador.
-    private async Task DescargarConDialogoAsync(byte[] bytes, string fileName, string mimeType)
-    {
-        if (bytes == null || bytes.Length == 0) throw new InvalidOperationException("El archivo generado esta vacio.");
-        var resultado = await JS.InvokeAsync<string>("saveAsFromBase64", fileName, Convert.ToBase64String(bytes), mimeType);
-        Snackbar.Add(resultado switch
-        {
-            "guardado" => $"💾 {fileName} guardado donde elegiste.",
-            "cancelado" => $"Guardado de {fileName} cancelado.",
-            _ => $"Se descargó {fileName} a la carpeta de descargas del navegador."
-        }, resultado == "cancelado" ? Severity.Normal : Severity.Success);
     }
 }

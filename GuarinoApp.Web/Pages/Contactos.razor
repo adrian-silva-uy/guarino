@@ -10,6 +10,7 @@
 @using GuarinoApp.Application.Modules.Contactos.Commands.ActualizarContacto
 @using GuarinoApp.Application.Modules.Contactos.Commands.EliminarContacto
 @using GuarinoApp.Domain.Entities
+@using GuarinoApp.Web.Helpers
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -256,8 +257,7 @@
         }
 
         var fileName = $"Contactos_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-        await JS.InvokeVoidAsync("downloadFileFromText", fileName, ExportService.ExportToCsv(_data), "text/csv");
-        Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+        await DescargaHelper.DescargarTextoAsync(JS, Snackbar, ExportService.ExportToCsv(_data), fileName, "text/csv");
     }
 
     private static Color ColorEstado(string estado)

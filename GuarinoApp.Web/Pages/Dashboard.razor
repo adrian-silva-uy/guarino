@@ -4,6 +4,7 @@
 @using GuarinoApp.Application.Common.Interfaces
 @using GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccionZafra
 @using GuarinoApp.Web.Shared
+@using GuarinoApp.Web.Helpers
 @inject IExportService ExportService
 @inject IEmailService EmailService
 @inject IReportMailRouter ReportMailRouter
@@ -479,8 +480,7 @@
         {
             var data = _tableData.Select(t => new { t.Productor, t.Variedad, t.KgsVolcados, t.Bins, t.Zafra }).ToList();
             var bytes = await ExportService.ExportToExcelAsync(data, "Volcados");
-            await JSRuntime.InvokeVoidAsync("downloadFileFromByteArray", $"Volcados_{_fechaDesde:yyyyMMdd}_{_fechaHasta:yyyyMMdd}.xlsx", bytes);
-            Snackbar.Add("Excel descargado correctamente.", Severity.Success);
+            await DescargaHelper.DescargarAsync(JSRuntime, Snackbar, bytes, $"Volcados_{_fechaDesde:yyyyMMdd}_{_fechaHasta:yyyyMMdd}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         }
         catch (Exception ex)
         {
@@ -511,8 +511,7 @@
                 throw new InvalidOperationException("El generador devolvió un archivo vacío.");
 
             var fileName = $"Volcados_{_fechaDesde:yyyyMMdd}_{_fechaHasta:yyyyMMdd}.pdf";
-            await JSRuntime.InvokeVoidAsync("downloadFileFromByteArray", fileName, bytes, "application/pdf");
-            Snackbar.Add($"Se inició la descarga de {fileName}. Revisa la carpeta Descargas del navegador.", Severity.Success, config => config.VisibleStateDuration = 8000);
+            await DescargaHelper.DescargarAsync(JSRuntime, Snackbar, bytes, fileName, "application/pdf");
         }
         catch (Exception ex)
         {
@@ -532,8 +531,7 @@
         {
             var data = _tableData.Select(t => new { t.Productor, t.Variedad, t.KgsVolcados, t.Bins, t.Zafra }).ToList();
             var csv = ExportService.ExportToCsv(data);
-            await JSRuntime.InvokeVoidAsync("downloadFileFromText", $"Volcados_{_fechaDesde:yyyyMMdd}_{_fechaHasta:yyyyMMdd}.csv", csv, "text/csv");
-            Snackbar.Add("CSV descargado correctamente.", Severity.Success);
+            await DescargaHelper.DescargarTextoAsync(JSRuntime, Snackbar, csv, $"Volcados_{_fechaDesde:yyyyMMdd}_{_fechaHasta:yyyyMMdd}.csv", "text/csv");
         }
         catch (Exception ex)
         {

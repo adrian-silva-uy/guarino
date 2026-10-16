@@ -4,6 +4,7 @@
 @using GuarinoApp.Application.Common.Interfaces
 @using GuarinoApp.Application.Modules.LotesVolcados.Queries.GetLotesVolcados
 @using GuarinoApp.Application.Modules.LotesVolcados.Dtos
+@using GuarinoApp.Web.Helpers
 @inject IMediator Mediator
 @inject IExportService ExportService
 @inject IEmailService EmailService
@@ -34,7 +35,7 @@
 
         @if (_data.Any())
         {
-            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm" RowsPerPage="25">
                 <HeaderContent>
                     @foreach (var prop in typeof(LoteVolcadoDto).GetProperties())
                     {
@@ -48,6 +49,11 @@
                         <MudTd>@value</MudTd>
                     }
                 </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }"
+                                   RowsPerPageString="Filas por página:"
+                                   InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+                </PagerContent>
             </MudTable>
             <!-- refleja lo que devolvió el handler. -->
             <DataSourceFooter EsDummy="@_esDummy" Origen="@(_esDummy ? "Datos de ejemplo" : "Base de datos DTrace (LotesEmboquille)")" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
@@ -125,8 +131,7 @@
     {
         if (!await EnsureDataForExportAsync()) return;
         var fileName = $"Lotes_Volcados_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-        await JS.InvokeVoidAsync("downloadFileFromText", fileName, ExportService.ExportToCsv(_data), "text/csv");
-        Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+        await DescargaHelper.DescargarTextoAsync(JS, Snackbar, ExportService.ExportToCsv(_data), fileName, "text/csv");
     }
 
     private async Task ExportarEmail()
@@ -173,9 +178,7 @@
         try
         {
             var bytes = await createFile();
-            if (bytes.Length == 0) throw new InvalidOperationException("El archivo generado esta vacio.");
-            await JS.InvokeVoidAsync("downloadFileFromByteArray", fileName, bytes, mimeType);
-            Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+            await DescargaHelper.DescargarAsync(JS, Snackbar, bytes, fileName, mimeType);
         }
         catch (Exception ex)
         {

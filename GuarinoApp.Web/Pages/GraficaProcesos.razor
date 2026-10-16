@@ -6,6 +6,7 @@
 @using GuarinoApp.Application.Modules.GraficaProcesos.Queries.GetGraficaProcesos
 @using GuarinoApp.Application.Modules.GraficaProcesos.Dtos
 @using GuarinoApp.Web.Shared
+@using GuarinoApp.Web.Helpers
 @inject IMediator Mediator
 @inject IExportService ExportService
 @inject IJSRuntime JS
@@ -189,8 +190,7 @@
     {
         if (!EnsureDataForExport()) return;
         var fileName = $"Grafica_Procesos_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-        await JS.InvokeVoidAsync("downloadFileFromText", fileName, ExportService.ExportToCsv(_data), "text/csv");
-        Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+        await DescargaHelper.DescargarTextoAsync(JS, Snackbar, ExportService.ExportToCsv(_data), fileName, "text/csv");
     }
 
     private bool EnsureDataForExport()
@@ -205,9 +205,7 @@
         try
         {
             var bytes = await createFile();
-            if (bytes.Length == 0) throw new InvalidOperationException("El archivo generado está vacío.");
-            await JS.InvokeVoidAsync("downloadFileFromByteArray", fileName, bytes, mimeType);
-            Snackbar.Add($"Se inició la descarga de {fileName}.", Severity.Success);
+            await DescargaHelper.DescargarAsync(JS, Snackbar, bytes, fileName, mimeType);
         }
         catch (Exception ex)
         {

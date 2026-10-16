@@ -258,15 +258,12 @@
                     $"{p.PesoNeto}");
             }
 
-            await JS.InvokeVoidAsync(
-                "downloadFileFromText",
-                $"Pallets_Definitivos_{DateTime.Now:yyyyMMdd_HHmmss}.csv",
+            await DescargaHelper.DescargarTextoAsync(
+                JS,
+                Snackbar,
                 sb.ToString(),
+                $"Pallets_Definitivos_{DateTime.Now:yyyyMMdd_HHmmss}.csv",
                 "text/csv;charset=utf-8;");
-
-            Snackbar.Add(
-                "CSV exportado correctamente.",
-                Severity.Success);
         }
         catch (Exception ex)
         {
@@ -296,14 +293,12 @@
                 _pallets,
                 "PalletsDefinitivos");
 
-            await JS.InvokeVoidAsync(
-                "downloadFileFromByteArray",
+            await DescargaHelper.DescargarAsync(
+                JS,
+                Snackbar,
+                bytes,
                 $"Pallets_Definitivos_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx",
-                bytes);
-
-            Snackbar.Add(
-                "Excel exportado correctamente.",
-                Severity.Success);
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         }
         catch (Exception ex)
         {
@@ -343,15 +338,12 @@
                 fontSize: 6.5f,
                 columns: ColumnasPdf);
 
-            await JS.InvokeVoidAsync(
-                "downloadFileFromByteArray",
-                $"Pallets_Definitivos_{DateTime.Now:yyyyMMdd_HHmmss}.pdf",
+            await DescargaHelper.DescargarAsync(
+                JS,
+                Snackbar,
                 bytes,
+                $"Pallets_Definitivos_{DateTime.Now:yyyyMMdd_HHmmss}.pdf",
                 "application/pdf");
-
-            Snackbar.Add(
-                "PDF exportado correctamente.",
-                Severity.Success);
         }
         catch (Exception ex)
         {
