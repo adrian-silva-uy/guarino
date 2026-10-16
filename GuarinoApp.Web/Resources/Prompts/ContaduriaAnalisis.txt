@@ -29,6 +29,15 @@ Los títulos de `hallazgos` van limpios: solo la frase clave descriptiva ("Brech
 # INPUT (JSON de esta corrida, mismas cifras que ve el usuario en pantalla)
 {Contexto}
 
+El JSON puede traer además estas claves OPCIONALES (solo aparecen si hay datos cargados; si una no está, no la inventes):
+- `liquidaciones`: pagar a productores del año en USD, kg y bins.
+- `ejecutado`: kg volcados del año en curso (con su avance % sobre lo proyectado solo cuando el año de la zafra coincide — COPIALO TAL CUAL).
+- `stockPlaya`: kg en patio sin despachar ni volcar.
+- `palletsSinCliente`: cantidad de pallets y kg inmovilizados.
+- `estacionalidad`: meses pico y supuestos operativos de la zafra.
+- `escenarios`: impacto en caja de los escenarios Base / Pesimista (-20%) / Optimista (+20%).
+Usalos en `lectura`, `hallazgos` y `acciones` cuando aporten cifras propias de la empresa.
+
 # TAREA
 Generá un análisis financiero de alto nivel para el equipo de Contaduría con exactamente estos tres bloques de salida:
 

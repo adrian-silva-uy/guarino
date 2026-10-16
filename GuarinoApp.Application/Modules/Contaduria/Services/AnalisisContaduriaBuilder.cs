@@ -1,5 +1,6 @@
 using System.Text.Json;
 using GuarinoApp.Application.Common.Dtos;
+using GuarinoApp.Application.Common.Helpers;
 using GuarinoApp.Application.Modules.Contaduria.Dtos;
 using GuarinoApp.Application.Modules.Proyeccion.Dtos;
 
@@ -177,19 +178,25 @@ public static class AnalisisContaduriaBuilder
     /// <summary>
     /// Contexto JSON que se le entrega al motor de IA: exactamente las mismas cifras
     /// que la página muestra en pantalla, para que el análisis refinado no se contradiga
-    /// con los números del tablero.
+    /// con los números del tablero. Las secciones opcionales (liquidaciones, ejecutado,
+    /// stock, estacionalidad y escenarios) solo van si traen datos reales: si algo no
+    /// está, la regla del prompt es declararlo faltante — nunca inventarlo.
     /// </summary>
     public static string ConstruirContextoJson(
         FinancialDataDto? datos,
         FinancialKpiDto? kpi,
-        decimal volumenProyectadoKgs)
+        decimal volumenProyectadoKgs,
+        ZafraDto? proyectada = null,
+        ContextoOperativoContaduriaDto? operativo = null)
         {
-        var contexto = new
+        // Claves del nivel raíz escritas en camelCase a mano: el PropertyNamingPolicy
+        // no aplica a las claves de diccionario (solo a propiedades de objeto).
+        var contexto = new Dictionary<string, object?>
             {
-            fechaConsulta = DateTime.Today.ToString("yyyy-MM-dd"),
-            empresa = "Guarino (NORIDEL SA), Salto, Uruguay — cítricos frescos para exportación y mercado interno",
-            volumenProyectadoKgs,
-            datosFinancieros = datos == null ? null : new
+            ["fechaConsulta"] = DateTime.Today.ToString("yyyy-MM-dd"),
+            ["empresa"] = "Guarino (NORIDEL SA), Salto, Uruguay — cítricos frescos para exportación y mercado interno",
+            ["volumenProyectadoKgs"] = volumenProyectadoKgs,
+            ["datosFinancieros"] = datos == null ? null : new
                 {
                 costoPorKg = datos.CostoPorKg,
                 flujoCaja = datos.FlujoCaja,
@@ -199,7 +206,7 @@ public static class AnalisisContaduriaBuilder
                 fechaActualizacion = datos.FechaActualizacion.ToString("yyyy-MM-dd"),
                 observaciones = datos.Observaciones
                 },
-            kpis = kpi == null ? null : new
+            ["kpis"] = kpi == null ? null : new
                 {
                 capitalNecesario = kpi.CapitalNecesario,
                 brechaLiquidez = kpi.BrechaLiquidez,
@@ -211,6 +218,73 @@ public static class AnalisisContaduriaBuilder
                     : 0
                 }
             };
+
+        // --- Secciones opcionales con datos de otros módulos (solo si son reales) ---
+        if (operativo?.PagarAProductores is not null)
+            {
+            contexto["liquidaciones"] = new
+                {
+                anio = operativo.Anio,
+                pagarAProductores = operativo.PagarAProductores,
+                kgs = operativo.LiquidacionesKgs,
+                bins = operativo.LiquidacionesBins
+                };
+            }
+
+        if (operativo?.KgsVolcadosAnio is not null)
+            {
+            var ejecutado = new Dictionary<string, object?>
+                {
+                ["anio"] = operativo.Anio,
+                ["kgsVolcados"] = operativo.KgsVolcadosAnio
+                };
+
+            // Avance % solo si el año del ejercicio coincide con el de la zafra
+            // proyectada: comparar volcados de UN año contra la proyección de OTRO
+            // sería una cifra falsa. Cuando coincide, va precalculado para copiar.
+            if (proyectada is { EsDummy: false } && proyectada.Año == operativo.Anio
+                && volumenProyectadoKgs > 0)
+                {
+                ejecutado["avancePct"] = Math.Round(
+                    operativo.KgsVolcadosAnio.Value / volumenProyectadoKgs * 100, 1);
+                }
+
+            contexto["ejecutado"] = ejecutado;
+            }
+
+        if (operativo?.StockPlayaKg is not null)
+            {
+            contexto["stockPlaya"] = new { kg = operativo.StockPlayaKg };
+            }
+
+        if (operativo?.PalletsSinCliente is not null)
+            {
+            contexto["palletsSinCliente"] = new
+                {
+                cantidad = operativo.PalletsSinCliente,
+                kg = operativo.PalletsSinClienteKg
+                };
+            }
+
+        // La zafra dummy (datos de ejemplo de la página) no aporta estacionalidad real.
+        if (proyectada is { EsDummy: false } &&
+            (!string.IsNullOrWhiteSpace(proyectada.MesesPico) ||
+             !string.IsNullOrWhiteSpace(proyectada.SupuestosOperativos)))
+            {
+            contexto["estacionalidad"] = new
+                {
+                mesesPico = proyectada.MesesPico,
+                supuestosOperativos = proyectada.SupuestosOperativos,
+                estado = proyectada.Estado
+                };
+            }
+
+        if (datos != null && volumenProyectadoKgs > 0)
+            {
+            // Mismos escenarios Base/Pesimista/Optimista que muestra el tablero de
+            // Zafra (FinancialKpiCalculator es la fuente única de verdad).
+            contexto["escenarios"] = FinancialKpiCalculator.ConstruirEscenarios(volumenProyectadoKgs, datos);
+            }
 
         return JsonSerializer.Serialize(contexto, new JsonSerializerOptions
             {

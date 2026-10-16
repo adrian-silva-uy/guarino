@@ -9,6 +9,7 @@
 @using GuarinoApp.Application.Modules.Contaduria.Commands.UpdateFinancialData
 @using GuarinoApp.Application.Modules.Contaduria.Dtos
 @using GuarinoApp.Application.Modules.Contaduria.Services
+@using GuarinoApp.Application.Modules.Contaduria.Queries.GetContextoOperativo
 @using GuarinoApp.Application.Modules.Proyeccion.Dtos
 @using GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccionZafra
 @inject IMediator Mediator
@@ -30,8 +31,8 @@
         }
     </div>
 
+    @* Sin MudIcon propio: MudAlert ya dibuja su ícono de severidad (queda duplicado) *@
     <MudAlert Severity="Severity.Info" Class="mb-4">
-        <MudIcon Icon="@Icons.Material.Filled.Info" Class="me-2" />
         Estos datos alimentan los cálculos de <strong>Capital de Trabajo</strong>, <strong>Riesgo de Liquidez</strong> y <strong>CAPEX</strong> en el tablero de Proyección de Zafra.
     </MudAlert>
 
@@ -210,6 +211,63 @@
             </MudCard>
         }
 
+        @* ====== Datos operativos: se calculan solos desde otros módulos ====== *@
+        @if (_operativo is { HayDatos: true })
+        {
+            <MudCard Elevation="1" Class="mt-4">
+                <MudCardContent>
+                    <div class="d-flex flex-wrap justify-space-between align-center gap-2 mb-2">
+                        <MudText Typo="Typo.h6">📉 Datos operativos (automáticos)</MudText>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info">
+                            Se calculan desde Liquidaciones · Pesadas · Stock · Pallets
+                        </MudChip>
+                    </div>
+                    <MudGrid>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">A pagar a productores</MudText>
+                            <MudText Typo="Typo.h6" Class="fw-bold">
+                                @(_operativo.PagarAProductores is decimal pag ? $"${pag:N0}" : "—")
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                @(_operativo.LiquidacionesKgs is decimal lk
+                                    ? $"{lk:N0} kg · {_operativo.LiquidacionesBins:N0} bins · {_operativo.Anio}"
+                                    : $"sin liquidaciones en {_operativo.Anio}")
+                            </MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Avance de cosecha</MudText>
+                            <MudText Typo="Typo.h6" Class="fw-bold">
+                                @(_operativo.KgsVolcadosAnio is decimal kv ? $"{kv:N0} kg" : "—")
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                @(_operativo.KgsVolcadosAnio is decimal kv2
+                                    ? (_operativo.Anio == _proyectada?.Año && _volumenProyectado > 0
+                                        ? $"{kv2 / _volumenProyectado * 100:N1}% de los {_volumenProyectado:N0} kg proyectados"
+                                        : $"volcados en {_operativo.Anio} · zafra {_proyectada?.Año.ToString() ?? "—"}: {_volumenProyectado:N0} kg proyectados")
+                                    : "sin volcados en el año")
+                            </MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Stock en playa</MudText>
+                            <MudText Typo="Typo.h6" Class="fw-bold">
+                                @(_operativo.StockPlayaKg is decimal sp ? $"{sp:N0} kg" : "—")
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Fruta en patio sin despachar ni volcar</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Pallets sin cliente</MudText>
+                            <MudText Typo="Typo.h6" Class="fw-bold">
+                                @(_operativo.PalletsSinCliente is int ps ? $"{ps:N0}" : "—")
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                @(_operativo.PalletsSinClienteKg is decimal pk && pk > 0 ? $"{pk:N0} kg inmovilizados" : "con cliente asignado")
+                            </MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+        }
+
         @* ====== Análisis para Contaduría: local de inmediato, la IA refina en segundo plano ====== *@
         <MudCard Elevation="2" Class="mt-4">
             <MudCardContent>
@@ -289,6 +347,8 @@
     // KPIs de decisión + análisis (local de inmediato; la IA refina en segundo plano)
     private FinancialKpiDto? _kpi;
     private decimal _volumenProyectado;
+    private ZafraDto? _proyectada;
+    private ContextoOperativoContaduriaDto? _operativo;
     private ModuloInsightDto? _analisis;
     private bool _analizando;
     private bool _refinadoConIA;
@@ -396,6 +456,7 @@
         {
             var zafras = await Mediator.Send(new GetProyeccionZafraQuery());
             var proyectada = zafras?.FirstOrDefault(z => z.Estado == "Proyectado") ?? zafras?.FirstOrDefault();
+            _proyectada = proyectada;
             if (proyectada != null)
             {
                 _volumenProyectado = proyectada.TotalKgs;
@@ -413,11 +474,34 @@
             Logger.LogWarning(ex, "No se pudo cargar la proyección de zafra para los KPIs de Contaduría");
         }
 
+        await CargarContextoOperativoAsync();
+
         _analisis = AnalisisContaduriaBuilder.Construir(_data, _kpi, _volumenProyectado);
         _refinadoConIA = false;
 
         var token = ++_correlativoIA;
         _ = AnalizarConIAAsync(token);
+    }
+
+    /// <summary>
+    /// Carga los datos operativos automáticos (liquidaciones del año, avance de
+    /// cosecha, stock en playa y pallets sin cliente) desde sus tablas fuente.
+    /// Es enriquecimiento opcional: si falla, la página sigue funcionando sin ellos.
+    /// </summary>
+    private async Task CargarContextoOperativoAsync()
+    {
+        try
+        {
+            // Ejercicio en curso: liquidaciones y volcados del año actual son lo
+            // que al contador le interesa (la zafra proyectada del año siguiente
+            // aún no arrancó y daría "0 / sin datos" sin valor de gestión).
+            _operativo = await Mediator.Send(new GetContextoOperativoQuery(DateTime.Today.Year));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "No se pudo cargar el contexto operativo de Contaduría");
+            _operativo = null;
+        }
     }
 
     /// <summary>
@@ -433,7 +517,7 @@
             _analizando = true;
             await InvokeAsync(StateHasChanged);
 
-            var contexto = AnalisisContaduriaBuilder.ConstruirContextoJson(_data, _kpi, _volumenProyectado);
+            var contexto = AnalisisContaduriaBuilder.ConstruirContextoJson(_data, _kpi, _volumenProyectado, _proyectada, _operativo);
             var resultado = await AIService.GetAnalisisDeModuloAsync("ContaduriaAnalisis", contexto);
 
             if (resultado is { EsIA: true } &&
