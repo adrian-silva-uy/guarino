@@ -51,6 +51,9 @@
                        Disabled="_loading" OnClick="LimpiarFiltrosAsync">Limpiar</MudButton>
         </MudItem>
         <MudItem xs="12" Class="d-flex justify-flex-end flex-wrap gap-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Info"
+                       Disabled="_loading" OnClick="ImportarAsync"
+                       StartIcon="@Icons.Material.Filled.Upload">Importar</MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary"
                        Disabled="_loading || !_cargado" OnClick="ExportarCsv"
                        StartIcon="@Icons.Material.Filled.Download">Exportar CSV</MudButton>
@@ -258,6 +261,21 @@
 
         var fileName = $"Contactos_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
         await DescargaHelper.DescargarTextoAsync(JS, Snackbar, ExportService.ExportToCsv(_data), fileName, "text/csv");
+    }
+
+    /// <summary>
+    /// Abre el importador (CSV o texto pegado). Al cerrar con alta realizada,
+    /// recarga la lista.
+    /// </summary>
+    private async Task ImportarAsync()
+    {
+        var dialogRef = await DialogService.ShowAsync<ContactoImportDialog>("Importar contactos");
+        var result = await dialogRef.Result;
+
+        if (result is { Canceled: false, Data: true })
+        {
+            await CargarAsync();
+        }
     }
 
     private static Color ColorEstado(string estado)

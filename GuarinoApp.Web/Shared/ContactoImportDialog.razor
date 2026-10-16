@@ -1,0 +1,214 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using MediatR
+@using Microsoft.Extensions.Logging
+@using MudBlazor
+@using GuarinoApp.Application.Modules.Contactos
+@using GuarinoApp.Application.Modules.Contactos.Dtos
+@using GuarinoApp.Application.Modules.Contactos.Commands.ImportarContactos
+@inject IMediator Mediator
+@inject ILogger<ContactoImportDialog> Logger
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-2 mud-text-secondary">
+            Subí un CSV o pegá texto (chat de WhatsApp, firma de correo o lista simple).
+            Los contactos que ya existen se omiten solos y todos quedan con estado «Nuevo».
+        </MudText>
+
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Border="true">
+            <MudTabPanel Text="Subir archivo (CSV / .txt)">
+                <MudPaper Class="pa-3 mt-2" Outlined="true">
+                    <InputFile OnChange="OnArchivoSeleccionado" accept=".csv,.txt" />
+                    <MudText Typo="Typo.caption" Class="mt-2 mud-text-secondary">
+                        CSV con fila de encabezado (Nombre;Empresa;Correo;Teléfono) o la exportación
+                        .txt de un chat de WhatsApp.
+                    </MudText>
+                    @if (_nombreArchivo != null)
+                    {
+                        <MudText Typo="Typo.body2" Class="mt-1">📄 @_nombreArchivo</MudText>
+                    }
+                </MudPaper>
+            </MudTabPanel>
+            <MudTabPanel Text="Pegar texto">
+                <MudTextField @bind-Value="_texto"
+                              Label="Pegá acá el chat, la firma de un correo o la lista de contactos"
+                              Variant="Variant.Outlined"
+                              Lines="7"
+                              Class="mt-2"
+                              HelperText="Ej.: María López: +598 991 234 567 — Juan Pérez, juan@empresa.uy, +598 999 888 777" />
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2"
+                           StartIcon="@Icons.Material.Filled.Visibility"
+                           OnClick="PrevisualizarTexto"
+                           Disabled="@string.IsNullOrWhiteSpace(_texto)">
+                    Previsualizar
+                </MudButton>
+            </MudTabPanel>
+        </MudTabs>
+
+        @if (_error != null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+
+        @if (_filas.Any())
+        {
+            <MudText Typo="Typo.subtitle2" Class="mt-3">
+                @_filas.Count contacto(s) detectado(s) — revisá la lista antes de importar.
+            </MudText>
+            <MudTable Items="@_filas" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm"
+                      RowsPerPage="10" Height="240px" FixedHeader="true" Class="mt-1">
+                <HeaderContent>
+                    <MudTh>Nombre</MudTh>
+                    <MudTh>Empresa</MudTh>
+                    <MudTh>Correo</MudTh>
+                    <MudTh>Teléfono</MudTh>
+                </HeaderContent>
+                <RowTemplate Context="fila">
+                    <MudTd DataLabel="Nombre">@fila.Nombre</MudTd>
+                    <MudTd DataLabel="Empresa">@fila.Empresa</MudTd>
+                    <MudTd DataLabel="Correo">@fila.Email</MudTd>
+                    <MudTd DataLabel="Teléfono">@fila.Telefono</MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }"
+                                   RowsPerPageString="Filas por página:"
+                                   InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+                </PagerContent>
+            </MudTable>
+        }
+
+        @if (_resultado != null)
+        {
+            <MudAlert Severity="@(_resultado.Creados > 0 ? Severity.Success : Severity.Warning)"
+                      Dense="true" Class="mt-3">
+                ✅ @_resultado.Creados creado(s) · ⏭️ @_resultado.Duplicados duplicado(s) omitido(s) ·
+                ⚠️ @_resultado.Invalidos inválido(s)
+            </MudAlert>
+            @if (_resultado.Detalle.Any())
+            {
+                <MudText Typo="Typo.caption" Class="mt-1 mud-text-secondary">
+                    @string.Join(" · ", _resultado.Detalle.Take(5))
+                    @if (_resultado.Detalle.Count > 5)
+                    {
+                        <text>…</text>
+                    }
+                </MudText>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cerrar">Cerrar</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.FileDownload"
+                   Disabled="@(!_filas.Any() || _importando)"
+                   OnClick="ImportarAsync">
+            @(_importando ? "Importando..." : $"Importar {_filas.Count} contacto(s)")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = default!;
+
+    private List<ContactoImportarDto> _filas = new();
+    private string? _error;
+    private string? _nombreArchivo;
+    private string? _texto;
+    private string _origen = "Texto pegado";
+    private bool _importando;
+    private ImportarContactosResultDto? _resultado;
+
+    private async Task OnArchivoSeleccionado(InputFileChangeEventArgs e)
+    {
+        _resultado = null;
+        try
+        {
+            const int MaximoBytes = 2 * 1024 * 1024;
+            if (e.File.Size > MaximoBytes)
+            {
+                _error = "El archivo supera los 2 MB.";
+                return;
+            }
+
+            using var stream = e.File.OpenReadStream(maxAllowedSize: MaximoBytes);
+            using var reader = new StreamReader(stream);
+            var contenido = await reader.ReadToEndAsync();
+
+            _nombreArchivo = e.File.Name;
+            // La misma decisión de formato que el Asistente IA: encabezado con
+            // «Nombre» = CSV; si no, se trata como texto (chat/correo).
+            _origen = ContactoImportParser.PareceCsv(contenido) ? "CSV" : "Texto pegado";
+            Aplicar(ContactoImportParser.PareceCsv(contenido)
+                ? ContactoImportParser.ParseCsv(contenido)
+                : ContactoImportParser.ParseTexto(contenido));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error leyendo archivo de importación de contactos: {Archivo}", e.File.Name);
+            _error = $"No se pudo leer el archivo: {ex.Message}";
+        }
+    }
+
+    private void PrevisualizarTexto()
+    {
+        _resultado = null;
+        _nombreArchivo = null;
+        _origen = "Texto pegado";
+        var contenido = _texto ?? string.Empty;
+        Aplicar(ContactoImportParser.PareceCsv(contenido)
+            ? ContactoImportParser.ParseCsv(contenido)
+            : ContactoImportParser.ParseTexto(contenido));
+    }
+
+    private void Aplicar((List<ContactoImportarDto> Filas, string? Error) resultado)
+    {
+        if (resultado.Error != null)
+        {
+            _error = resultado.Error;
+            _filas = new List<ContactoImportarDto>();
+            return;
+        }
+
+        _error = null;
+        _filas = resultado.Filas;
+    }
+
+    private async Task ImportarAsync()
+    {
+        _importando = true;
+        StateHasChanged();
+        try
+        {
+            _resultado = await Mediator.Send(new ImportarContactosCommand(_filas.ToList(), _origen));
+            if (!_resultado.Success)
+            {
+                _error = _resultado.Error;
+                _resultado = null;
+                return;
+            }
+
+            _error = null;
+            // Ya importado: se limpia la previsualización para que el botón
+            // quede deshabilitado y no se repita la alta.
+            _filas = new List<ContactoImportarDto>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error importando {Cantidad} contactos (origen {Origen})", _filas.Count, _origen);
+            _error = $"No se pudo importar: {ex.Message}";
+        }
+        finally
+        {
+            _importando = false;
+        }
+    }
+
+    private void Cerrar()
+    {
+        // Si algo se creó, la pantalla de Contactos recarga la lista al cerrar.
+        if (_resultado is { Creados: > 0 })
+            MudDialog.Close(DialogResult.Ok(true));
+        else
+            MudDialog.Cancel();
+    }
+}

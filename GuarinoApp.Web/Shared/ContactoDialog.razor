@@ -49,6 +49,16 @@
                     }
                 </MudSelect>
             </MudItem>
+            @if (!string.IsNullOrEmpty(Contacto?.Origen))
+            {
+                <MudItem xs="12" md="6">
+                    <MudTextField Value="@Contacto!.Origen"
+                                  Label="Origen"
+                                  Variant="Variant.Outlined"
+                                  Disabled="true"
+                                  HelperText="De dónde vino este contacto (importación)." />
+                </MudItem>
+            }
             <MudItem xs="12">
                 <MudTextField @bind-Value="Interes"
                               Label="Qué le interesó"

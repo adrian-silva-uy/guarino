@@ -161,6 +161,10 @@ namespace GuarinoApp.Infrastructure
             services.AddScoped<ISkill, ProyeccionZafraSkill>();
             services.AddScoped<ISkill, ResumenLiquidacionesSkill>();
             services.AddScoped<ISkill, ActividadAuditoriaSkill>();
+            // Última a propósito: ante empate de keywords gana la registrada
+            // primero y esta skill (que además escribe en BD) no debe robarle
+            // intenciones a las de consulta.
+            services.AddScoped<ISkill, ContactosImportSkill>();
             services.AddScoped<ISkillRegistry, SkillRegistry>();
 
             // Registrar servicio de autorización

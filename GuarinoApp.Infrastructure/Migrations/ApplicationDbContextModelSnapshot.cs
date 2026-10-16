@@ -169,6 +169,10 @@ namespace GuarinoApp.Infrastructure.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<string>("Origen")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<string>("Pais")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");

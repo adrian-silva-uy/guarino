@@ -50,7 +50,8 @@ public class GetContactosQueryHandler : IRequestHandler<GetContactosQuery, List<
                     Estado = c.Estado,
                     FechaAlta = c.CreatedAt,
                     CreadoPor = c.CreatedBy,
-                    FechaModificacion = c.UpdatedAt
+                    FechaModificacion = c.UpdatedAt,
+                    Origen = c.Origen
                     })
                 .ToListAsync(cancellationToken);
             }

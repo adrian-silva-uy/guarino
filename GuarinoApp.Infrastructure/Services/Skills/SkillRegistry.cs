@@ -49,7 +49,11 @@ public sealed class SkillRegistry : ISkillRegistry
 
         try
         {
-            var output = await best.Skill.ExecuteAsync(cancellationToken);
+            // Las skills con entrada (p. ej. importar contactos) reciben el
+            // mensaje del usuario; las de consulta siguen siendo ciegas.
+            var output = best.Skill is ISkillConEntrada conEntrada
+                ? await conEntrada.ExecuteAsync(userMessage, cancellationToken)
+                : await best.Skill.ExecuteAsync(cancellationToken);
             await AuditAsync(best.Skill.Name, output.Success, output.Text);
             return new SkillMatch(best.Skill.Name, output.Success, output.Text);
         }

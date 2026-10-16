@@ -30,4 +30,10 @@ public class Contacto : BaseEntity
 
     public string? Notas { get; set; }
     public string Estado { get; set; } = ContactoEstados.Nuevo;
+
+    /// <summary>
+    /// De dónde vino el contacto: null = alta manual; "CSV", "WhatsApp",
+    /// "Asistente IA", etc. cuando llegó por importación masiva.
+    /// </summary>
+    public string? Origen { get; set; }
     }

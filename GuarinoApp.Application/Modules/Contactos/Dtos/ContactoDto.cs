@@ -15,4 +15,5 @@ public class ContactoDto
     public DateTime FechaAlta { get; set; }
     public string? CreadoPor { get; set; }
     public DateTime? FechaModificacion { get; set; }
+    public string? Origen { get; set; }
     }

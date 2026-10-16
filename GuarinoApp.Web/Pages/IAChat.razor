@@ -188,9 +188,10 @@
                     <MudItem xs="10">
                         <MudTextField @bind-Value="_currentInput"
                                       Immediate="true"
-                                      Label="Escribe tu consulta: stock, empaque, logística, tendencias..."
+                                      Label="Escribe tu consulta: stock, empaque, logística, tendencias... (Shift+Enter para salto de línea)"
                                       Variant="Variant.Outlined"
                                       T="string"
+                                      Lines="4"
                                       @onkeydown="@HandleKeyDown"
                                       For="@(() => _currentInput)" />
                     </MudItem>
@@ -492,7 +493,9 @@
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
-        if (e is not null && e.Key == "Enter")
+        // Enter envía; Shift+Enter hace salto de línea (el input es multi-línea
+        // para poder pegar listas, p. ej. la importación de contactos).
+        if (e is not null && e.Key == "Enter" && !e.ShiftKey)
         {
             await SendMessage();
         }

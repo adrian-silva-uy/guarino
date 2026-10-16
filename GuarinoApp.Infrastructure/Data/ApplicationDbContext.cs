@@ -244,6 +244,7 @@ namespace GuarinoApp.Infrastructure.Data
                 entity.Property(c => c.Interes).HasMaxLength(300);
                 entity.Property(c => c.Notas).HasMaxLength(2000);
                 entity.Property(c => c.Estado).IsRequired().HasMaxLength(50);
+                entity.Property(c => c.Origen).HasMaxLength(30);
                 entity.HasIndex(c => c.Estado);
             });
 
