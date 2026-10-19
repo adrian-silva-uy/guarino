@@ -1,25 +1,29 @@
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Contactos.Queries.GetContactos;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using System.Text;
 
 namespace GuarinoApp.Infrastructure.Services.Skills;
 
 /// <summary>
 /// Skill de Contactos: resumen real de la carilla de contactos/clientes —
-/// total, estados, países, intereses y las altas más recientes. Solo consulta
-/// (la importación desde el chat la resuelve ContactosImportSkill).
+/// total, estados, países, intereses y las altas más recientes; y de los
+/// productores registrados en la tabla Productores. Solo consulta (la
+/// importación desde el chat la resuelve ContactosImportSkill).
 /// </summary>
 public sealed class ContactosResumenSkill : ISkill
 {
     private readonly IMediator _mediator;
+    private readonly IApplicationDbContext _context;
 
-    public ContactosResumenSkill(IMediator mediator) => _mediator = mediator;
+    public ContactosResumenSkill(IMediator mediator, IApplicationDbContext context)
+        => (_mediator, _context) = (mediator, context);
 
     public string Name => "contactos_clientes";
 
     public string Description =>
-        "Resumen de contactos/clientes/productores cargados: total, estados, países, intereses y altas más recientes.";
+        "Resumen de contactos/clientes cargados (total, estados, países, intereses y altas recientes) y de los productores registrados.";
 
     public IReadOnlyCollection<string> Ejemplos => new[]
         {
@@ -36,11 +40,31 @@ public sealed class ContactosResumenSkill : ISkill
     {
         var contactos = await _mediator.Send(new GetContactosQuery(), cancellationToken);
 
-        if (contactos is not { Count: > 0 })
-            return SkillOutput.Ok("No hay contactos cargados todavía en el sistema.");
+        // Productores reales de la tabla Productores (los que aportan fruta):
+        // antes este dato no se consultaba y la IA respondía "sin métrica".
+        var productores = await _context.Productores
+            .AsNoTracking()
+            .Where(p => !p.IsDeleted)
+            .OrderBy(p => p.Nombre)
+            .Select(p => p.Nombre)
+            .ToListAsync(cancellationToken);
+
+        if ((contactos is not { Count: > 0 }) && productores.Count == 0)
+            return SkillOutput.Ok("No hay contactos ni productores cargados todavía en el sistema.");
 
         var sb = new StringBuilder();
-        sb.AppendLine($"Contactos cargados: {contactos.Count} en total.");
+
+        sb.AppendLine(productores.Count > 0
+            ? $"Productores registrados: {productores.Count} ({string.Join(", ", productores.Take(10))})."
+            : "Productores registrados: ninguno todavía.");
+
+        if (contactos is not { Count: > 0 })
+        {
+            sb.AppendLine("Contactos/clientes: ninguno cargado todavía.");
+            return SkillOutput.Ok(sb.ToString().TrimEnd());
+        }
+
+        sb.AppendLine($"Contactos/clientes cargados: {contactos.Count} en total.");
 
         sb.AppendLine("Por estado:");
         foreach (var grupo in contactos.GroupBy(c => string.IsNullOrWhiteSpace(c.Estado) ? "Sin estado" : c.Estado).OrderByDescending(g => g.Count()))

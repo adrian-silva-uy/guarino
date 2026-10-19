@@ -19,9 +19,11 @@
             <h2 class="fw-bold text-dark">📋 Auditoría del Sistema</h2>
             <p class="text-muted mb-0">Registro de actividad de usuarios - Quién, cuándo y qué hizo</p>
         </div>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CargarLogs" StartIcon="@Icons.Material.Filled.Refresh">
-            Actualizar
-        </MudButton>
+        <MudTooltip Text="Vuelve a leer los logs del servidor (muestra los últimos movimientos).">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CargarLogs" StartIcon="@Icons.Material.Filled.Refresh">
+                Actualizar
+            </MudButton>
+        </MudTooltip>
     </div>
 
     <!-- Filtros -->
@@ -30,10 +32,12 @@
             <MudText Typo="Typo.h6" GutterBottom="true">Filtros de Búsqueda</MudText>
             <MudGrid>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudDatePicker Label="Fecha Desde" Date="_fechaDesde" DateChanged="OnFechaDesdeChanged" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudDatePicker Label="Fecha Desde" Date="_fechaDesde" DateChanged="OnFechaDesdeChanged" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                   HelperText="Muestra logs desde esta fecha (inclusive)." />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudDatePicker Label="Fecha Hasta" Date="_fechaHasta" DateChanged="OnFechaHastaChanged" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudDatePicker Label="Fecha Hasta" Date="_fechaHasta" DateChanged="OnFechaHastaChanged" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                   HelperText="Muestra logs hasta esta fecha (inclusive)." />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     @* Allowlist: se elige entre los usuarios existentes de la
@@ -46,6 +50,7 @@
                                Variant="Variant.Outlined"
                                Margin="Margin.Dense"
                                Dense="true"
+                               HelperText="Quién ejecutó la acción (lista de usuarios)."
                                Clearable="true">
                         <MudSelectItem Value="@TodosUsuarios">Todos los usuarios</MudSelectItem>
                         @foreach (var u in _usuarios)
@@ -55,16 +60,21 @@
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudTextField @bind-Value="_action" Label="Acción" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudTextField @bind-Value="_action" Label="Acción" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  HelperText="Texto parcial: Create, Update, Delete, Login, Consulta, Importar..." />
                 </MudItem>
             </MudGrid>
             <div class="d-flex justify-content-end mt-3">
-                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="LimpiarFiltros" Class="me-2">
-                    Limpiar
-                </MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CargarLogs">
-                    Buscar
-                </MudButton>
+                <MudTooltip Text="Quita todos los filtros y muestra todos los logs.">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="LimpiarFiltros" Class="me-2">
+                        Limpiar
+                    </MudButton>
+                </MudTooltip>
+                <MudTooltip Text="Aplica los filtros elegidos (fechas, usuario y acción).">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CargarLogs">
+                        Buscar
+                    </MudButton>
+                </MudTooltip>
             </div>
         </MudCardContent>
     </MudCard>
