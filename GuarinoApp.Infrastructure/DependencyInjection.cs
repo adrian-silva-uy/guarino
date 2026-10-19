@@ -161,10 +161,21 @@ namespace GuarinoApp.Infrastructure
             services.AddScoped<ISkill, ProyeccionZafraSkill>();
             services.AddScoped<ISkill, ResumenLiquidacionesSkill>();
             services.AddScoped<ISkill, ActividadAuditoriaSkill>();
-            // Última a propósito: ante empate de keywords gana la registrada
-            // primero y esta skill (que además escribe en BD) no debe robarle
-            // intenciones a las de consulta.
+            // Ante empate de keywords gana la registrada primero y esta skill
+            // (que además escribe en BD) no debe robarle intenciones a las de
+            // consulta: por eso las skills de consulta operativa van después.
             services.AddScoped<ISkill, ContactosImportSkill>();
+            // Skills de consulta operativa diaria: stock por variedad, pesadas,
+            // volcados/lotes, contactos, pallets sin cliente, indicadores de
+            // gerencia y clima — respuestas del chat con datos reales de la
+            // planta (las de consulta jamás escriben en BD).
+            services.AddScoped<ISkill, StockPlantaSkill>();
+            services.AddScoped<ISkill, PesadasSkill>();
+            services.AddScoped<ISkill, VolcadosLotesSkill>();
+            services.AddScoped<ISkill, ContactosResumenSkill>();
+            services.AddScoped<ISkill, PalletsSkill>();
+            services.AddScoped<ISkill, IndicadoresGerenciaSkill>();
+            services.AddScoped<ISkill, ClimaRiesgoSkill>();
             services.AddScoped<ISkillRegistry, SkillRegistry>();
 
             // Registrar servicio de autorización
