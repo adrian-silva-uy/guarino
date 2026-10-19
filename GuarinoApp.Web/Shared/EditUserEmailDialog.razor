@@ -1,5 +1,6 @@
 @using MudBlazor
 @using System.Net.Mail
+@using GuarinoApp.Application.Common
 
 <MudDialog>
     <DialogContent>
@@ -13,6 +14,11 @@
                       Immediate="true"
                       HelperText="Vacío: los reportes van al administrador."
                       Validation="@(new Func<string, string>(ValidateEmail))" />
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-2">@_error</MudAlert>
+        }
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Cancelar</MudButton>
@@ -44,6 +50,8 @@
         }
     }
 
+    private string _error = string.Empty;
+
     private void Cancel()
     {
         MudDialog.Cancel();
@@ -51,10 +59,14 @@
 
     private void Submit()
     {
-        var error = ValidateEmail(Email);
-        if (string.IsNullOrEmpty(error))
+        // Sanitiza antes de validar: caracteres de control o saltos pegados
+        // no viajan hacia la BD (el correo vacío sigue permitido: lo quita).
+        Email = SanitizadorTexto.UnaLinea(Email, 254);
+
+        _error = ValidateEmail(Email);
+        if (string.IsNullOrEmpty(_error))
         {
-            MudDialog.Close(DialogResult.Ok((Email ?? string.Empty).Trim()));
+            MudDialog.Close(DialogResult.Ok(Email));
         }
     }
 }

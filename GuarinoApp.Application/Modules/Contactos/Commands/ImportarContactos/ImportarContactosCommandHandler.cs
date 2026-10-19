@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Contactos.Dtos;
 using GuarinoApp.Domain.Entities;
@@ -53,46 +54,61 @@ public class ImportarContactosCommandHandler : IRequestHandler<ImportarContactos
 
         foreach (var fila in request.Contactos)
             {
+            // Sanitiza ANTES de validar y deduplicar: lo que entra por texto
+            // pegado o CSV no debe traer controles, saltos raros ni pseudo-
+            // etiquetas HTML a la BD.
+            var nombre = SanitizadorTexto.UnaLinea(fila.Nombre, 500);
+            var empresa = SanitizadorTexto.UnaLinea(fila.Empresa, 500);
+            var pais = SanitizadorTexto.UnaLinea(fila.Pais, 300);
+            var emailFila = SanitizadorTexto.UnaLinea(fila.Email, 300);
+            var telefonoFila = SanitizadorTexto.UnaLinea(fila.Telefono, 300);
+            var interes = SanitizadorTexto.UnaLinea(fila.Interes, 500);
+            var notas = SanitizadorTexto.Multilinea(fila.Notas, 4000);
+
             var error = ContactoValidacion.Validar(
-                fila.Nombre, fila.Empresa, fila.Pais, fila.Email,
-                fila.Telefono, fila.Interes, fila.Notas, ContactoEstados.Nuevo);
+                nombre, empresa, pais, emailFila,
+                telefonoFila, interes, notas, ContactoEstados.Nuevo);
             if (error != null)
                 {
                 resultado.Invalidos++;
-                AgregarDetalle(resultado, $"«{NombreCorto(fila.Nombre)}»: {error}");
+                AgregarDetalle(resultado, $"«{NombreCorto(nombre)}»: {error}");
                 continue;
                 }
 
-            var email = string.IsNullOrWhiteSpace(fila.Email) ? null : fila.Email.Trim();
-            var telefono = string.IsNullOrWhiteSpace(fila.Telefono) ? null : fila.Telefono.Trim();
+            var email = string.IsNullOrWhiteSpace(emailFila) ? null : emailFila;
+            // E.164 antes de deduplicar y guardar: "+598 9912 3456",
+            // "00598…" y un "099 123 456" viejo en la BD son el mismo número.
+            var telefono = string.IsNullOrWhiteSpace(telefonoFila)
+                ? null : TelefonoE164.Normalizar(telefonoFila);
 
             var esDuplicado =
                 (email != null && emails.Contains(ClaveEmail(email))) ||
                 (telefono != null && telefonos.Contains(ClaveTelefono(telefono))) ||
-                nombresEmpresas.Contains(ClaveNombreEmpresa(fila.Nombre, fila.Empresa));
+                nombresEmpresas.Contains(ClaveNombreEmpresa(nombre, empresa));
 
             if (esDuplicado)
                 {
                 resultado.Duplicados++;
-                AgregarDetalle(resultado, $"«{NombreCorto(fila.Nombre)}»: ya existe en Contactos.");
+                AgregarDetalle(resultado, $"«{NombreCorto(nombre)}»: ya existe en Contactos.");
                 continue;
                 }
 
             if (email != null) emails.Add(ClaveEmail(email));
             if (telefono != null) telefonos.Add(ClaveTelefono(telefono));
-            nombresEmpresas.Add(ClaveNombreEmpresa(fila.Nombre, fila.Empresa));
+            nombresEmpresas.Add(ClaveNombreEmpresa(nombre, empresa));
 
             _context.Contactos.Add(new Contacto
                 {
-                Nombre = fila.Nombre.Trim(),
-                Empresa = fila.Empresa.Trim(),
-                Pais = string.IsNullOrWhiteSpace(fila.Pais) ? null : fila.Pais.Trim(),
+                Nombre = nombre,
+                Empresa = empresa,
+                Pais = string.IsNullOrWhiteSpace(pais) ? null : pais,
                 Email = email,
                 Telefono = telefono,
-                Interes = string.IsNullOrWhiteSpace(fila.Interes) ? null : fila.Interes.Trim(),
-                Notas = string.IsNullOrWhiteSpace(fila.Notas) ? null : fila.Notas.Trim(),
+                Interes = string.IsNullOrWhiteSpace(interes) ? null : interes,
+                Notas = string.IsNullOrWhiteSpace(notas) ? null : notas,
                 Estado = ContactoEstados.Nuevo,
-                Origen = string.IsNullOrWhiteSpace(request.Origen) ? null : request.Origen.Trim(),
+                Origen = string.IsNullOrWhiteSpace(request.Origen)
+                    ? null : SanitizadorTexto.UnaLinea(request.Origen, 100),
                 CreatedBy = _currentUser.UserName
                 });
             creados++;
@@ -122,10 +138,13 @@ public class ImportarContactosCommandHandler : IRequestHandler<ImportarContactos
     private static string ClaveEmail(string email)
         => email.Trim().ToLowerInvariant();
 
-    /// <summary>Clave de deduplicación por teléfono: solo dígitos (+598 991 12 345 = 59899112345).</summary>
+    /// <summary>Clave de deduplicación por teléfono: se canoniza a E.164 (si
+    /// se puede) y se comparan solo dígitos — así "+598 9912 3456", "00598…"
+    /// y un "099 123 456" viejo en la BD son el mismo teléfono.</summary>
     private static string ClaveTelefono(string telefono)
         {
-        var digitos = new string(telefono.Where(char.IsDigit).ToArray());
+        var canonico = TelefonoE164.Normalizar(telefono);
+        var digitos = new string(canonico.Where(char.IsDigit).ToArray());
         return digitos.Length >= 7 ? digitos : telefono.Trim().ToLowerInvariant();
         }
 

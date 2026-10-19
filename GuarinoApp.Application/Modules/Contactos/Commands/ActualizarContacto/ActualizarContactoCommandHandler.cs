@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Contactos.Dtos;
 using MediatR;
@@ -25,21 +26,34 @@ public class ActualizarContactoCommandHandler : IRequestHandler<ActualizarContac
         if (contacto == null)
             return ContactoResultDto.Fail("El contacto ya no existe.");
 
+        var nombreAnterior = contacto.Nombre;
+
+        // Misma receta que CrearContacto: sanitiza primero, después valida.
+        var nombre = SanitizadorTexto.UnaLinea(request.Nombre, 500);
+        var empresa = SanitizadorTexto.UnaLinea(request.Empresa, 500);
+        var pais = SanitizadorTexto.UnaLinea(request.Pais, 300);
+        var email = SanitizadorTexto.UnaLinea(request.Email, 300);
+        var telefono = SanitizadorTexto.UnaLinea(request.Telefono, 300);
+        var interes = SanitizadorTexto.UnaLinea(request.Interes, 500);
+        var notas = SanitizadorTexto.Multilinea(request.Notas, 4000);
+
         var error = ContactoValidacion.Validar(
-            request.Nombre, request.Empresa, request.Pais, request.Email,
-            request.Telefono, request.Interes, request.Notas, request.Estado);
+            nombre, empresa, pais, email,
+            telefono, interes, notas, request.Estado);
         if (error != null)
             return ContactoResultDto.Fail(error);
 
-        var nombreAnterior = contacto.Nombre;
+        // E.164: forma canónica al guardar (misma regla que el alta).
+        if (!string.IsNullOrWhiteSpace(telefono))
+            telefono = TelefonoE164.Normalizar(telefono);
 
-        contacto.Nombre = request.Nombre.Trim();
-        contacto.Empresa = request.Empresa.Trim();
-        contacto.Pais = string.IsNullOrWhiteSpace(request.Pais) ? null : request.Pais.Trim();
-        contacto.Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
-        contacto.Telefono = string.IsNullOrWhiteSpace(request.Telefono) ? null : request.Telefono.Trim();
-        contacto.Interes = string.IsNullOrWhiteSpace(request.Interes) ? null : request.Interes.Trim();
-        contacto.Notas = string.IsNullOrWhiteSpace(request.Notas) ? null : request.Notas.Trim();
+        contacto.Nombre = nombre;
+        contacto.Empresa = empresa;
+        contacto.Pais = string.IsNullOrWhiteSpace(pais) ? null : pais;
+        contacto.Email = string.IsNullOrWhiteSpace(email) ? null : email;
+        contacto.Telefono = string.IsNullOrWhiteSpace(telefono) ? null : telefono;
+        contacto.Interes = string.IsNullOrWhiteSpace(interes) ? null : interes;
+        contacto.Notas = string.IsNullOrWhiteSpace(notas) ? null : notas;
         contacto.Estado = request.Estado;
         contacto.UpdatedAt = DateTime.UtcNow;
         contacto.UpdatedBy = _currentUser.UserName;

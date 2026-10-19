@@ -178,9 +178,39 @@ namespace GuarinoApp.Infrastructure.Services
                 _ => valor?.ToString() ?? string.Empty
                 };
 
-        private static string Escape(string value) =>
-            value.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0
-                ? $"\"{value.Replace("\"", "\"\"")}\""
-                : value;
+        /// <summary>
+        /// Escapa una celda CSV y además neutraliza la inyección de fórmulas
+        /// (OWASP CSV Injection): un valor que empieza con =, +, -, @, tab o |
+        /// puede ejecutarse como fórmula al abrir el archivo en Excel/Calc.
+        /// Se antepone una comilla simple —Excel la oculta al abrir— salvo que
+        /// el valor sea un número puro, para no romper las columnas negativas
+        /// ("‑15,0" sigue saliendo como está).
+        /// </summary>
+        private static string Escape(string value)
+            {
+            var valor = ProtegerContraFormula(value);
+            return valor.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0
+                ? $"\"{valor.Replace("\"", "\"\"")}\""
+                : valor;
+            }
+
+        private static string ProtegerContraFormula(string value)
+            {
+            if (string.IsNullOrEmpty(value))
+                return value;
+
+            var primero = value[0];
+            if (primero is '=' or '@' or '\t' or '|')
+                return "'" + value;
+
+            if ((primero is '+' or '-') && !EsNumero(value))
+                return "'" + value;
+
+            return value;
+            }
+
+        private static bool EsNumero(string value) =>
+            decimal.TryParse(value, NumberStyles.Any, CultureInfo.CurrentCulture, out _) ||
+            decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out _);
         }
     }

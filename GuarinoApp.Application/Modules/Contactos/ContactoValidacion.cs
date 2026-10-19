@@ -28,6 +28,9 @@ public static class ContactoValidacion
         if (!string.IsNullOrWhiteSpace(email) && !EsEmailValido(email))
             return "El correo no tiene un formato válido.";
 
+        if (!string.IsNullOrWhiteSpace(telefono) && !ContactoImportParser.EsTelefono(telefono))
+            return "El teléfono no tiene un formato válido (8-15 dígitos; con + o 00 de país si se quiere; sin letras ni @).";
+
         if (telefono != null && telefono.Trim().Length > 50)
             return "El teléfono supera los 50 caracteres.";
 

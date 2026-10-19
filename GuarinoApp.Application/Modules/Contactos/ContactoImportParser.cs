@@ -407,18 +407,31 @@ public static class ContactoImportParser
             l.Contains("codigo de invitacion");
         }
 
-    /// <summary>¿La cadena tiene pinta de número de teléfono (8-15 dígitos, sin letras)?</summary>
-    private static bool EsTelefono(string valor)
+    /// <summary>¿La cadena tiene pinta de número de teléfono?
+    /// Acepta formatos internacionales: '+' inicial o salida 00 —
+    /// "+598 9912 3456", "0054 (11) 5555-1234", "+1-305-555-0199".
+    /// Reglas: 8-15 dígitos, el '+' solo al principio y después únicamente
+    /// dígitos, espacios, guiones, puntos, paréntesis o barras — sin letras
+    /// ni '@', así un correo u otro texto pegado acá nunca pasa.
+    /// Pública porque la reutilizan ContactoDialog y ContactoValidacion.</summary>
+    public static bool EsTelefono(string valor)
         {
         var v = valor.Trim();
-        if (v.Length < 8 || v.Length > 20)
+        if (v.Length < 8 || v.Length > 30)
+            return false;
+
+        // Prefijo de país: '+' solo al inicio (o una salida 00 …); lo que
+        // quede después es el número "neta", el que se cuenta.
+        if (v.StartsWith('+'))
+            v = v[1..].TrimStart();
+        else if (v.StartsWith("00", StringComparison.Ordinal))
+            v = v[2..].TrimStart();
+
+        if (v.Any(c => !(char.IsDigit(c) || char.IsWhiteSpace(c) || c is '-' or '(' or ')' or '.' or '/')))
             return false;
 
         var digitos = v.Count(char.IsDigit);
-        if (digitos < 8 || digitos > 15)
-            return false;
-
-        return v.All(c => char.IsDigit(c) || char.IsWhiteSpace(c) || c is '+' or '-' or '(' or ')' or '.' or '/');
+        return digitos >= 8 && digitos <= 15;
         }
 
     /// <summary>Primer teléfono válido del texto, sin pegarse a letras (evita "Pedido 12345678").</summary>

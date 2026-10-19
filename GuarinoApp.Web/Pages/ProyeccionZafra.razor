@@ -1070,14 +1070,17 @@
             : "Recomendación operativa estándar de industria (checklist) — no requiere un dato numérico específico para ser válida.";
 
         var mensaje = new System.Text.StringBuilder();
-        mensaje.Append($"<p>{sugerencia.Text}</p>");
-        mensaje.Append($"<p><b>Origen:</b> {origenTexto}</p>");
+        // El texto viene de la IA: se codifica cada valor interpuesto para que
+        // un HTML pegado (o una instrucción inyectada que el modelo devuelva
+        // como markup) no se interprete — solo vive el HTML interno nuestro.
+        mensaje.Append($"<p>{System.Net.WebUtility.HtmlEncode(sugerencia.Text)}</p>");
+        mensaje.Append($"<p><b>Origen:</b> {System.Net.WebUtility.HtmlEncode(origenTexto)}</p>");
 
         if (!string.IsNullOrWhiteSpace(sugerencia.Impacto))
-            mensaje.Append($"<p><b>Impacto estimado:</b> {sugerencia.Impacto}</p>");
+            mensaje.Append($"<p><b>Impacto estimado:</b> {System.Net.WebUtility.HtmlEncode(sugerencia.Impacto)}</p>");
 
         if (!string.IsNullOrWhiteSpace(sugerencia.Riesgo))
-            mensaje.Append($"<p><b>Riesgo / trade-off:</b> {sugerencia.Riesgo}</p>");
+            mensaje.Append($"<p><b>Riesgo / trade-off:</b> {System.Net.WebUtility.HtmlEncode(sugerencia.Riesgo)}</p>");
 
         await DialogService.ShowMessageBox(
             string.IsNullOrWhiteSpace(sugerencia.Categoria) ? "Detalle de la Sugerencia" : sugerencia.Categoria,
@@ -1100,14 +1103,14 @@
                 ? "Calculado a partir de datos reales del sistema."
                 : "Recomendación operativa estándar de industria (checklist).";
 
-            mensaje.Append($"<p><b>{(i + 1)}. {accion.Text}</b></p>");
-            mensaje.Append($"<p style=\"color:#666;\"><i>{origenTexto}</i>");
+            mensaje.Append($"<p><b>{(i + 1)}. {System.Net.WebUtility.HtmlEncode(accion.Text)}</b></p>");
+            mensaje.Append($"<p style=\"color:#666;\"><i>{System.Net.WebUtility.HtmlEncode(origenTexto)}</i>");
 
             if (!string.IsNullOrWhiteSpace(accion.Impacto))
-                mensaje.Append($"<br/><b>Impacto estimado:</b> {accion.Impacto}");
+                mensaje.Append($"<br/><b>Impacto estimado:</b> {System.Net.WebUtility.HtmlEncode(accion.Impacto)}");
 
             if (!string.IsNullOrWhiteSpace(accion.Riesgo))
-                mensaje.Append($"<br/><b>Riesgo / trade-off:</b> {accion.Riesgo}");
+                mensaje.Append($"<br/><b>Riesgo / trade-off:</b> {System.Net.WebUtility.HtmlEncode(accion.Riesgo)}");
 
             mensaje.Append("</p>");
             if (i < acciones.Count - 1)

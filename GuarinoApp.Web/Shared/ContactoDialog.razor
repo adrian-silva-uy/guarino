@@ -1,7 +1,10 @@
 @using MudBlazor
 @using System.Net.Mail
+@using GuarinoApp.Application.Common
+@using GuarinoApp.Application.Modules.Contactos
 @using GuarinoApp.Application.Modules.Contactos.Dtos
 @using GuarinoApp.Domain.Entities
+@using GuarinoApp.Web.Helpers
 
 <MudDialog>
     <DialogContent>
@@ -21,10 +24,24 @@
                               Validation="@(new Func<string, string>(ValidarEmpresa))" />
             </MudItem>
             <MudItem xs="12" md="6">
-                <MudTextField @bind-Value="Pais"
-                              Label="País"
-                              Variant="Variant.Outlined"
-                              Immediate="true" />
+                @* Autocompletado con los países del mundo (nombres en español);
+                   además se puede escribir texto libre (CoerceValue). *@
+                <MudAutocomplete T="string"
+                                 Value="@Pais"
+                                 ValueChanged="@((string? v) => Pais = v)"
+                                 TextChanged="@OnPaisTextoCambiado"
+                                 Label="País"
+                                 Variant="Variant.Outlined"
+                                 Immediate="true"
+                                 MaxItems="15"
+                                 MaxHeight="300"
+                                 HelperText="Lista cerrada: solo países que existen."
+                                 Validation="@(new Func<string?, string>(ValidarPais))"
+                                 SearchFunc="@Paises.Buscar" />
+                @if (!string.IsNullOrWhiteSpace(_avisoPais))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-n1">@_avisoPais</MudText>
+                }
             </MudItem>
             <MudItem xs="12" md="6">
                 <MudTextField @bind-Value="Email"
@@ -39,7 +56,9 @@
                 <MudTextField @bind-Value="Telefono"
                               Label="Teléfono"
                               Variant="Variant.Outlined"
-                              Immediate="true" />
+                              Immediate="true"
+                              HelperText="@TelefonoAyuda"
+                              Validation="@(new Func<string, string>(ValidarTelefono))" />
             </MudItem>
             <MudItem xs="12" md="6">
                 <MudSelect T="string" @bind-Value="Estado" Label="Estado" Variant="Variant.Outlined">
@@ -101,6 +120,7 @@
     private string? Notas;
     private string Estado = ContactoEstados.Nuevo;
     private string? _error;
+    private string? _avisoPais;
 
     protected override void OnInitialized()
     {
@@ -117,13 +137,73 @@
         Interes = Contacto.Interes;
         Notas = Contacto.Notas;
         Estado = Contacto.Estado;
+
+        // Edición de un contacto con país guardado antes de la lista cerrada:
+        // se avisa en rojo para que se elija uno válido.
+        OnPaisTextoCambiado(Pais);
     }
 
     private string ValidarNombre(string valor)
-        => string.IsNullOrWhiteSpace(valor) ? "Obligatorio" : string.Empty;
+        => string.IsNullOrWhiteSpace(valor) ? "Obligatorio"
+         : valor.Trim().Length > 150 ? "Máximo 150 caracteres"
+         : string.Empty;
 
     private string ValidarEmpresa(string valor)
-        => string.IsNullOrWhiteSpace(valor) ? "Obligatorio" : string.Empty;
+        => string.IsNullOrWhiteSpace(valor) ? "Obligatorio"
+         : valor.Trim().Length > 200 ? "Máximo 200 caracteres"
+         : string.Empty;
+
+    /// <summary>Opcional; si se escribe, hasta 100 caracteres.</summary>
+    private static string ValidarPais(string? valor)
+        => !string.IsNullOrWhiteSpace(valor) && valor.Trim().Length > 100
+            ? "Máximo 100 caracteres"
+            : string.Empty;
+
+    /// <summary>Ayuda contextual del teléfono: muestra el prefijo del PAÍS
+    /// elegido (E.164) y no siempre el uruguayo. Para Uruguay se explica que
+    /// el número local se convierte solo; para el resto, usar el prefijo.</summary>
+    private string TelefonoAyuda
+    {
+        get
+        {
+            var canon = Paises.Canonicalizar(Pais);
+            var codigo = Paises.CodigoMarcacion(canon);
+
+            if (canon == "Uruguay" && codigo != null)
+                return $"Uruguay: el número local se guarda en E.164 solo (ej.: 099 123 456 → {codigo}99123456).";
+
+            return codigo != null
+                ? $"{canon}: escribí el número con el prefijo {codigo} (ej.: {codigo}12345678); se guarda en E.164."
+                : "Se guarda en formato internacional E.164: usá el prefijo del país con + o 00 (ej.: +59899123456).";
+        }
+    }
+
+    /// <summary>El país es lista cerrada: mientras se tipea, el texto tipeado
+    /// ES el valor (si no, el blur del autocomplete lo descartaría); si no es
+    /// un país real se avisa en rojo y NO se deja guardar. Los alias se
+    /// canonicalizan al guardar ("Holanda" → "Países Bajos").</summary>
+    private void OnPaisTextoCambiado(string? texto)
+    {
+        Pais = texto;
+        _avisoPais = !string.IsNullOrWhiteSpace(texto) && !Paises.Existe(texto)
+            ? "No existe en la lista: elegí una opción."
+            : null;
+    }
+
+    /// <summary>Vacío es válido (sin teléfono); lo demás debe tener pinta de
+    /// número: 8-15 dígitos, con prefijo internacional si se quiere (+598,
+    /// 0054…). Un correo u otro texto pegado acá NO es válido.</summary>
+    private static string ValidarTelefono(string valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor))
+        {
+            return string.Empty;
+        }
+
+        return ContactoImportParser.EsTelefono(valor)
+            ? string.Empty
+            : "Número inválido: 8-15 dígitos; con + o 00 de país si querés; sin letras ni @";
+    }
 
     /// <summary>Vacío es válido (sin correo); lo demás debe tener formato.</summary>
     private string ValidarEmail(string valor)
@@ -151,29 +231,62 @@
 
     private void Submit()
     {
+        // Sanitiza ANTES de validar: caracteres de control, saltos no
+        // deseados y pseudoetiquetas HTML no viajan hacia la BD.
+        var nombre = SanitizadorTexto.UnaLinea(Nombre, 500);
+        var empresa = SanitizadorTexto.UnaLinea(Empresa, 500);
+        var pais = SanitizadorTexto.UnaLinea(Pais, 300);
+        var email = SanitizadorTexto.UnaLinea(Email, 300);
+        var telefono = SanitizadorTexto.UnaLinea(Telefono, 300);
+        var interes = SanitizadorTexto.UnaLinea(Interes, 500);
+        var notas = SanitizadorTexto.Multilinea(Notas, 4000);
+
         // Igual que EditUserEmailDialog: si algo falta, no se cierra y se
         // muestra el motivo (los campos marcan su propio error al tocarlos).
-        if (string.IsNullOrWhiteSpace(Nombre) || string.IsNullOrWhiteSpace(Empresa))
+        if (string.IsNullOrWhiteSpace(nombre) || string.IsNullOrWhiteSpace(empresa))
         {
             _error = "Completá el nombre y la empresa (campos obligatorios).";
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(Email) && !string.IsNullOrEmpty(ValidarEmail(Email)))
+        if (nombre.Trim().Length > 150 || empresa.Trim().Length > 200)
+        {
+            _error = "Revisá los largos: nombre hasta 150 y empresa hasta 200 caracteres.";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(email) && !string.IsNullOrEmpty(ValidarEmail(email)))
         {
             _error = "El correo no tiene un formato válido.";
             return;
         }
 
+        if (!string.IsNullOrWhiteSpace(telefono) && !ContactoImportParser.EsTelefono(telefono))
+        {
+            _error = "El teléfono no tiene un formato válido (8-15 dígitos; con + o 00 de país si querés; sin letras ni @).";
+            return;
+        }
+
+        // País lista cerrada: solo países reales (los alias se canonicalizan,
+        // p. ej. "Holanda" se guarda como "Países Bajos").
+        var paisCanon = Paises.Canonicalizar(pais);
+        if (!string.IsNullOrWhiteSpace(pais) && paisCanon == null)
+        {
+            _error = $"El país «{pais}» no existe en la lista: elegí una opción.";
+            return;
+        }
+
         MudDialog.Close(DialogResult.Ok(new ContactoDialogModelo
         {
-            Nombre = Nombre.Trim(),
-            Empresa = Empresa.Trim(),
-            Pais = string.IsNullOrWhiteSpace(Pais) ? null : Pais.Trim(),
-            Email = string.IsNullOrWhiteSpace(Email) ? null : Email.Trim(),
-            Telefono = string.IsNullOrWhiteSpace(Telefono) ? null : Telefono.Trim(),
-            Interes = string.IsNullOrWhiteSpace(Interes) ? null : Interes.Trim(),
-            Notas = string.IsNullOrWhiteSpace(Notas) ? null : Notas.Trim(),
+            Nombre = nombre,
+            Empresa = empresa,
+            Pais = paisCanon,
+            Email = string.IsNullOrWhiteSpace(email) ? null : email,
+            // E.164 (norma internacional): lo flexible es la entrada,
+            // lo que se guarda es "+<hasta 15 dígitos>".
+            Telefono = string.IsNullOrWhiteSpace(telefono) ? null : TelefonoE164.Normalizar(telefono),
+            Interes = string.IsNullOrWhiteSpace(interes) ? null : interes,
+            Notas = string.IsNullOrWhiteSpace(notas) ? null : notas,
             Estado = Estado
         }));
     }
