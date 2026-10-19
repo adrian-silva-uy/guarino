@@ -28,11 +28,14 @@
             @* Autocompletado con valores reales de la tabla (nombre, empresa y
                país). Escribe texto libre y sugiere de lo existente; la búsqueda
                server-side sigue saneada y parametrizada. *@
+            @* Sin CoerceValue (igual que en ContactoDialog): evita que el blur
+               coaccione el Text al Value nunca commiteado al tipear texto que
+               coincide con sugerencias. El texto vivo se sincroniza con
+               SincronizarBusquedaDesdeTexto. *@
             <MudAutocomplete T="string"
                              @ref="_refBusqueda"
                              @bind-Value="_busqueda"
                              TextChanged="@((string? t) => _busqueda = t)"
-                             CoerceValue="true"
                              Label="Buscar (nombre, empresa o país)"
                              Variant="Variant.Outlined"
                              Adornment="Adornment.Start"
@@ -51,24 +54,34 @@
             </MudSelect>
         </MudItem>
         <MudItem xs="6" md="2">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                       Disabled="_loading" OnClick="BuscarAsync"
-                       StartIcon="@Icons.Material.Filled.FilterList">Buscar</MudButton>
+            <MudTooltip Text="Filtra por nombre, empresa o país (también funciona con Enter en la caja).">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           Disabled="_loading" OnClick="BuscarAsync"
+                           StartIcon="@Icons.Material.Filled.FilterList">Buscar</MudButton>
+            </MudTooltip>
         </MudItem>
         <MudItem xs="6" md="2">
-            <MudButton Variant="Variant.Outlined" FullWidth="true"
-                       Disabled="_loading" OnClick="LimpiarFiltrosAsync">Limpiar</MudButton>
+            <MudTooltip Text="Quita los filtros y vuelve a mostrar todos los contactos.">
+                <MudButton Variant="Variant.Outlined" FullWidth="true"
+                           Disabled="_loading" OnClick="LimpiarFiltrosAsync">Limpiar</MudButton>
+            </MudTooltip>
         </MudItem>
         <MudItem xs="12" Class="d-flex justify-flex-end flex-wrap gap-2">
-            <MudButton Variant="Variant.Outlined" Color="Color.Info"
-                       Disabled="_loading" OnClick="ImportarAsync"
-                       StartIcon="@Icons.Material.Filled.Upload">Importar</MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                       Disabled="_loading || !_cargado" OnClick="ExportarCsv"
-                       StartIcon="@Icons.Material.Filled.Download">Exportar CSV</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Success"
-                       OnClick="NuevoAsync"
-                       StartIcon="@Icons.Material.Filled.PersonAdd">Nuevo contacto</MudButton>
+            <MudTooltip Text="Pega un chat, la firma de un correo o una lista CSV: los contactos se cargan en bloque (se ignoran los duplicados por correo o teléfono).">
+                <MudButton Variant="Variant.Outlined" Color="Color.Info"
+                           Disabled="_loading" OnClick="ImportarAsync"
+                           StartIcon="@Icons.Material.Filled.Upload">Importar</MudButton>
+            </MudTooltip>
+            <MudTooltip Text="Descarga un CSV con tildes correctas para Excel; cualquier texto se exporta como texto plano, nunca como fórmula.">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           Disabled="_loading || !_cargado" OnClick="ExportarCsv"
+                           StartIcon="@Icons.Material.Filled.Download">Exportar CSV</MudButton>
+            </MudTooltip>
+            <MudTooltip Text="Alta manual de un contacto comercial (nombre y empresa son obligatorios).">
+                <MudButton Variant="Variant.Filled" Color="Color.Success"
+                           OnClick="NuevoAsync"
+                           StartIcon="@Icons.Material.Filled.PersonAdd">Nuevo contacto</MudButton>
+            </MudTooltip>
         </MudItem>
     </MudGrid>
 </MudPaper>

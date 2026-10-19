@@ -8,12 +8,24 @@
 
 <MudDialog>
     <DialogContent>
+        @* Reglas de oro del formulario: el usuario ve SIN adivinar qué se
+           espera en cada campo y cómo se protegen sus datos. *@
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+            <MudText Typo="Typo.body2">
+                <b>País:</b> solo de la lista (escribí y elegí de las sugerencias).
+                <b>Teléfono:</b> con el prefijo del país elegido; se guarda en formato
+                internacional E.164. Los campos con <b>*</b> son obligatorios; el resto
+                es opcional. Todo el texto se guarda y se exporta siempre como texto
+                plano, nunca como fórmula.
+            </MudText>
+        </MudAlert>
         <MudGrid Spacing="2">
             <MudItem xs="12" md="6">
                 <MudTextField @bind-Value="Nombre"
                               Label="Nombre *"
                               Variant="Variant.Outlined"
                               Immediate="true"
+                              HelperText="Nombre y apellido o razón social."
                               Validation="@(new Func<string, string>(ValidarNombre))" />
             </MudItem>
             <MudItem xs="12" md="6">
@@ -21,6 +33,7 @@
                               Label="Empresa *"
                               Variant="Variant.Outlined"
                               Immediate="true"
+                              HelperText="Finca, empresa o razón social con la que opera."
                               Validation="@(new Func<string, string>(ValidarEmpresa))" />
             </MudItem>
             <MudItem xs="12" md="6">
@@ -49,7 +62,7 @@
                               Variant="Variant.Outlined"
                               InputType="InputType.Email"
                               Immediate="true"
-                              HelperText="Para enviarle reportes."
+                              HelperText="Para enviarle reportes. Formato: nombre@dominio.com"
                               Validation="@(new Func<string, string>(ValidarEmail))" />
             </MudItem>
             <MudItem xs="12" md="6">
@@ -61,7 +74,8 @@
                               Validation="@(new Func<string, string>(ValidarTelefono))" />
             </MudItem>
             <MudItem xs="12" md="6">
-                <MudSelect T="string" @bind-Value="Estado" Label="Estado" Variant="Variant.Outlined">
+                <MudSelect T="string" @bind-Value="Estado" Label="Estado" Variant="Variant.Outlined"
+                           HelperText="Seguimiento: Nuevo, En seguimiento, Cerrado o Descartado.">
                     @foreach (var estado in ContactoEstados.Todos)
                     {
                         <MudSelectItem Value="@(estado)">@estado</MudSelectItem>
@@ -90,7 +104,8 @@
                               Label="Notas"
                               Variant="Variant.Outlined"
                               Lines="3"
-                              Immediate="true" />
+                              Immediate="true"
+                              HelperText="Texto libre (hasta 4000). Se exporta siempre como texto plano, nunca como fórmula." />
             </MudItem>
         </MudGrid>
 
