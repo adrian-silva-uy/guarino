@@ -1,5 +1,6 @@
 using FluentValidation;
 using GuarinoApp.Application.Common.Behaviors;
+using GuarinoApp.Application.Modules.Auth.Services;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -29,6 +30,10 @@ public static class DependencyInjection
         services.AddTransient(
             typeof(IPipelineBehavior<,>),
             typeof(SerializacionDbContextBehavior<,>));
+
+        // Bloqueo temporal de cuentas tras intentos fallidos de login (fuerza
+        // bruta): singleton para que el contador se comparta entre circuitos.
+        services.AddSingleton<ControlIntentosLogin>();
 
         return services;
         }
