@@ -30,7 +30,7 @@ public class GetResumenLiquidacionesQueryHandler : IRequestHandler<GetResumenLiq
                 .AsNoTracking()
                 .Where(l => !l.IsDeleted && l.FechaIngreso.HasValue
                     && (!request.Anio.HasValue || l.FechaIngreso.Value.Year == request.Anio.Value))
-                .GroupBy(l => new { Productor = l.Productor.Nombre, Variedad = l.Variedad.Nombre, Año = l.FechaIngreso.Value.Year })
+                .GroupBy(l => new { Productor = l.Productor.Nombre, Variedad = l.Variedad.Nombre, Año = l.FechaIngreso!.Value.Year })
                 .Select(g => new ResumenLiquidacionDto
                     {
                     Productor = g.Key.Productor,
@@ -42,7 +42,7 @@ public class GetResumenLiquidacionesQueryHandler : IRequestHandler<GetResumenLiq
                     })
                 .ToListAsync(cancellationToken);
 
-            if (result == null || !result.Any())
+            if (!result.Any())
                 {
                 // Datos de ejemplo solo si la tabla está vacía; un año sin resultados no es dato demo.
                 var hayDatosReales = await _context.Lotes.AsNoTracking().AnyAsync(l => !l.IsDeleted, cancellationToken);
