@@ -1,4 +1,5 @@
 @page "/"
+@attribute [Authorize(Roles = "Admin, Gerencia, Contador, Operador")]
 @using MudBlazor
 
 <div class="d-flex flex-column gap-2 mb-6">
