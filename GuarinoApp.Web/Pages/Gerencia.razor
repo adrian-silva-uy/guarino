@@ -39,7 +39,7 @@
                     <MudCardContent Class="pb-3">
                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">@item.Categoria</MudText>
                         <MudText Typo="Typo.body2" Class="mt-1">@item.Indicador</MudText>
-                        <MudText Typo="Typo.h5" Color="@ColorDeIndicador(item)">@item.Valor.ToString("N0")</MudText>
+                        <MudText Typo="Typo.h5" Color="@ColorDeIndicador(item)">@item.Valor.ToString("N0")@(string.IsNullOrEmpty(item.Unidad) ? "" : $" {item.Unidad}")</MudText>
                         @if (item.Fecha.HasValue)
                         {
                             <MudText Typo="Typo.caption" Color="Color.Tertiary">@item.Fecha.Value.ToShortDateString()</MudText>

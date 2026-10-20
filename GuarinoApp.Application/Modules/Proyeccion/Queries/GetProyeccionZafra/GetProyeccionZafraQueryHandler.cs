@@ -109,10 +109,16 @@ public class GetProyeccionZafraQueryHandler : IRequestHandler<GetProyeccionZafra
             }
         else if (variacionesHistoricas.Any())
             {
-            factorCrecimiento = Math.Round(variacionesHistoricas.Average(), 1);
+            // MEDIANA (no media): un año parcial o atípico (p. ej. el salto entre
+            // datos legados incompletos y una zafra completa) sesga la media al
+            // extremo — con los datos actuales la media daba +3.953,1% y proyectaba
+            // una zafra de cientos de millones de kg que después veían Gerencia y
+            // Contaduría. La mediana es robusta a ese sesgo y sigue siendo
+            // determinista.
+            factorCrecimiento = Math.Round(Mediana(variacionesHistoricas), 1);
             var detalleAnios = string.Join(", ", zafras.Skip(1)
                 .Select(z => $"{z.Año}: {(z.VariacionPorcentual >= 0 ? "+" : "")}{z.VariacionPorcentual:F1}%"));
-            comentarioMetodo = $"Promedio de variación interanual real ({detalleAnios}) → +{factorCrecimiento:F1}%.";
+            comentarioMetodo = $"Mediana de variación interanual real ({detalleAnios}) → +{factorCrecimiento:F1}%.";
             }
         else
             {
@@ -156,6 +162,18 @@ public class GetProyeccionZafraQueryHandler : IRequestHandler<GetProyeccionZafra
             });
 
         return zafras;
+        }
+
+    /// <summary>Mediana de valores decimales: valor central cuando la cantidad es
+    /// impar, promedio de los dos centrales cuando es par. Ordena una copia, sin
+    /// efectos secundarios sobre la lista original.</summary>
+    private static decimal Mediana(IEnumerable<decimal> valores)
+        {
+        var ordenados = valores.OrderBy(v => v).ToList();
+        var n = ordenados.Count;
+        return n % 2 == 1
+            ? ordenados[n / 2]
+            : (ordenados[n / 2 - 1] + ordenados[n / 2]) / 2m;
         }
 
     private async Task<List<ZafraDto>> GenerarZafrasDummy(GetProyeccionZafraQuery request, CancellationToken cancellationToken)

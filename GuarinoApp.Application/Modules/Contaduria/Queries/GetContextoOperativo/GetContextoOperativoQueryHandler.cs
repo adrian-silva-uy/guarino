@@ -53,8 +53,10 @@ public class GetContextoOperativoQueryHandler
                     var kgs = liq.Sum(l => l.Kgs ?? 0m);
                     dto.LiquidacionesKgs = kgs;
                     dto.LiquidacionesBins = liq.Sum(l => l.Bins ?? 0);
-                    // Misma convención de la página: TotalPagar = kilos × 10.
-                    dto.PagarAProductores = Math.Round(kgs * 10, 0);
+                    // Misma convención de la página: TotalPagar = kilos × 10,
+                    // redondeado a centavos (escala 2) como en ResumenLiquidaciones,
+                    // para que el peso mostrado sea idéntico al de la grilla.
+                    dto.PagarAProductores = Math.Round(kgs * 10, 2);
                     }
                 }
             }

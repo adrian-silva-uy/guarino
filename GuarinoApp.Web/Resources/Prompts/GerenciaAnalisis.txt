@@ -22,6 +22,9 @@ rápida y en papel impreso. Por eso:
 - Todo número de la EMPRESA sale del INPUT. Nada inventado.
 - Formato es-UY: miles con punto, decimales con coma (122.140 / 13,2%).
 - Unidad monetaria: USD cuando haya dinero; volumen en kg.
+- Cada elemento de `indicadores` trae su `unidad` (kg, pallets, kg/h...): respetala
+  literalmente al citar cifras; NUNCA cambies la unidad ni la escala de un
+  indicador (por ejemplo, no presentes un valor en kg como bins ni al revés).
 - Tono ejecutivo y corto: decisiones, no descripciones. Sin relleno.
 - En tus textos NO menciones herramientas, sistemas, modelos ni integraciones: el lector
   solo ve análisis de negocio.

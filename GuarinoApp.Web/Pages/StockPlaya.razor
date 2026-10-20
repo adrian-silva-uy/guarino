@@ -17,13 +17,13 @@
         }
         <MudGrid>
             <MudItem xs="12" sm="6" md="4" lg="3">
-                <MudDatePicker @bind-Date="_fechaDesde" Label="Fecha Desde" DateFormat="dd-MM-yyyy" OnChange="@(() => LoadData())" HelperText="Solo fruta ingresada desde ese día; vacío = sin límite." />
+                <MudDatePicker @bind-Date="_fechaDesde" Label="Fecha Desde" DateFormat="dd-MM-yyyy" OnChange="@(() => Filtrar())" HelperText="Filtra por fecha de volcado; vacío = sin límite inferior." />
             </MudItem>
             <MudItem xs="12" sm="6" md="4" lg="3">
-                <MudDatePicker @bind-Date="_fechaHasta" Label="Fecha Hasta" DateFormat="dd-MM-yyyy" OnChange="@(() => LoadData())" HelperText="Solo fruta ingresada hasta ese día; vacío = hasta hoy." />
+                <MudDatePicker @bind-Date="_fechaHasta" Label="Fecha Hasta" DateFormat="dd-MM-yyyy" OnChange="@(() => Filtrar())" HelperText="Filtra por fecha de volcado; vacío = hasta hoy." />
             </MudItem>
             <MudItem xs="12" sm="6" md="4" lg="3">
-                <MudTooltip Text="Vuelve a leer el stock en playa del rango de fechas elegido.">
+                <MudTooltip Text="Vuelve a leer el stock en playa desde la base de datos.">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
                     @(_loading ? "Cargando..." : "Actualizar")
                 </MudButton>
@@ -31,6 +31,30 @@
             </MudItem>
             <MudItem xs="12" sm="6" md="4" lg="3">
                 <MudButton Variant="Variant.Outlined" OnClick="@ClearFilters" Disabled="@_loading" FullWidth="true">Limpiar filtros</MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @* Filtros de Variedad/Productor: valores precargados desde los datos reales
+           (MudSelect no admite texto libre) y filtrado en memoria junto a las fechas:
+           la grilla, los gráficos y el total del pie reaccionan al instante. *@
+        <MudGrid Class="mb-2">
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudSelect T="string" Label="Variedad" Value="_filtroVariedad" ValueChanged="OnVariedadChanged"
+                           Clearable="true" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined">
+                    @foreach (var v in _variedades)
+                    {
+                        <MudSelectItem Value="@v">@v</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudSelect T="string" Label="Productor" Value="_filtroProductor" ValueChanged="OnProductorChanged"
+                           Clearable="true" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined">
+                    @foreach (var p in _productores)
+                    {
+                        <MudSelectItem Value="@p">@p</MudSelectItem>
+                    }
+                </MudSelect>
             </MudItem>
         </MudGrid>
 
@@ -47,7 +71,7 @@
                 </MudItem>
             </MudGrid>
 
-            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" SortLabel="Ordenar por">
+            <MudTable Items="@_visibles" Hover="true" Striped="true" Dense="true" SortLabel="Ordenar por">
                 <HeaderContent>
                     <MudTh>Lote</MudTh><MudTh>Productor</MudTh><MudTh>Variedad</MudTh>
                     <MudTh>Ingresados</MudTh><MudTh>Volcados</MudTh><MudTh>Saldo</MudTh>
@@ -68,7 +92,7 @@
         {
             <MudAlert Severity="Severity.Info">No se encontraron registros.</MudAlert>
         }
-    <DataSourceFooter EsDummy="false" Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
+    <DataSourceFooter EsDummy="false" Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_visibles.Count()" />
 </MudCardContent>
 </MudCard>
 
@@ -82,6 +106,31 @@
     private List<ChartSeriesItem> _productorChartSeries = new();
     private ChartOptions _chartOptions = new() { YAxisTicks = 3 };
 
+    // Filtros de Variedad/Productor: valores precargados desde los datos reales
+    // (el usuario elige, no tipea). Feccha llega como "yyyy.MM.dd", ordenable
+    // como texto, así el rango de fechas se compara sin parsear.
+    private string? _filtroVariedad;
+    private string? _filtroProductor;
+    private List<string> _variedades = new();
+    private List<string> _productores = new();
+
+    private IEnumerable<StockPlayaDto> _visibles =>
+        _data.Where(d =>
+            (_fechaDesde == null || string.CompareOrdinal(d.Feccha, _fechaDesde.Value.ToString("yyyy.MM.dd")) >= 0) &&
+            (_fechaHasta == null || string.CompareOrdinal(d.Feccha, _fechaHasta.Value.ToString("yyyy.MM.dd")) <= 0) &&
+            (_filtroVariedad == null || d.Variedad == _filtroVariedad) &&
+            (_filtroProductor == null || d.Productor == _filtroProductor));
+
+    private void OnVariedadChanged(string? valor) { _filtroVariedad = valor; LoadCharts(); }
+    private void OnProductorChanged(string? valor) { _filtroProductor = valor; LoadCharts(); }
+
+    // Cualquier cambio de filtro rehace gráficos y estado sin volver a la BD.
+    private void Filtrar()
+    {
+        LoadCharts();
+        StateHasChanged();
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
@@ -94,6 +143,16 @@
         try
         {
             _data = await Mediator.Send(new GetStockPlayaQuery(new List<Filter>()));
+
+            // Opciones de los selects = valores distintos reales del resultado;
+            // si tras recargar una selección ya no existe, se limpia.
+            _variedades = _data.Select(d => d.Variedad!).Where(v => !string.IsNullOrWhiteSpace(v))
+                .Distinct().OrderBy(v => v, StringComparer.Ordinal).ToList();
+            _productores = _data.Select(d => d.Productor!).Where(p => !string.IsNullOrWhiteSpace(p))
+                .Distinct().OrderBy(p => p, StringComparer.Ordinal).ToList();
+            if (_filtroVariedad != null && !_variedades.Contains(_filtroVariedad)) _filtroVariedad = null;
+            if (_filtroProductor != null && !_productores.Contains(_filtroProductor)) _filtroProductor = null;
+
             LoadCharts();
         }
         catch (Exception ex)
@@ -108,9 +167,13 @@
         }
     }
 
+    // Gráficos sobre las filas visibles, para que sigan los filtros de fecha,
+    // variedad y productor.
     void LoadCharts()
     {
-        var varietyStock = _data.GroupBy(x => x.Variedad)
+        var visibles = _visibles.ToList();
+
+        var varietyStock = visibles.GroupBy(x => x.Variedad)
             .Select(g => new { Name = g.Key ?? "Sin variedad", Value = g.Sum(x => x.KgStock) })
             .OrderByDescending(x => x.Value)
             .Take(10)
@@ -121,7 +184,7 @@
             new ChartSeriesItem { Name = "Kg Stock", Data = varietyStock.Select(x => (double)x.Value).ToArray() }
         };
 
-        var productorStock = _data.GroupBy(x => x.Productor)
+        var productorStock = visibles.GroupBy(x => x.Productor)
             .Select(g => new { Name = g.Key ?? "Sin productor", Value = g.Sum(x => x.Saldo) })
             .OrderByDescending(x => x.Value)
             .Take(10)
@@ -137,6 +200,8 @@
     {
         _fechaDesde = DateTime.Now.AddMonths(-3);
         _fechaHasta = DateTime.Now;
-        StateHasChanged();
+        _filtroVariedad = null;
+        _filtroProductor = null;
+        Filtrar();
     }
 }

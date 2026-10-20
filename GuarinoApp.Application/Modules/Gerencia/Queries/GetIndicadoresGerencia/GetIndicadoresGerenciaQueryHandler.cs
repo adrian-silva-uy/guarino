@@ -28,7 +28,8 @@ public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadores
                 Indicador = "Total Volcados",
                 Valor = g.Sum(le => le.KilosNetos),
                 Fecha = g.Max(le => le.FechaProduccion),
-                Categoria = "Producción"
+                Categoria = "Producción",
+                Unidad = "kg"
                 })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -47,7 +48,8 @@ public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadores
                 Indicador = "Volcados Zafra Actual",
                 Valor = g.Sum(le => le.KilosNetos),
                 Fecha = g.Max(le => le.FechaProduccion),
-                Categoria = "Producción"
+                Categoria = "Producción",
+                Unidad = "kg"
                 })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -64,7 +66,8 @@ public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadores
                 Indicador = "Total Pallets",
                 Valor = g.Count(),
                 Fecha = g.Max(p => p.Fecha ?? p.CreatedAt),
-                Categoria = "Stock"
+                Categoria = "Stock",
+                Unidad = "pallets"
                 })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -80,7 +83,8 @@ public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadores
                 {
                 Indicador = "Pallets Despachados",
                 Valor = g.Count(),
-                Categoria = "Logística"
+                Categoria = "Logística",
+                Unidad = "pallets"
                 })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -96,24 +100,35 @@ public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadores
                 Indicador = "Pallets en Frío",
                 Valor = g.Count(),
                 Fecha = g.Max(p => p.Fecha ?? p.CreatedAt),
-                Categoria = "Stock"
+                Categoria = "Stock",
+                Unidad = "pallets"
                 })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (palletsEnFrio != null)
             result.Add(palletsEnFrio);
 
-        // Stock en Playa
-        var stockEnPlaya = await _context.Lotes
+        // Stock en Playa: KG en patio con la MISMA fórmula canónica que la grilla
+        // Stock en Playa y la tarjeta de Contaduría (LotesEmboquille Estado "E",
+        // kilo prorrateado por los bins restantes, redondeado por fila): un solo
+        // número de "stock en playa" en toda la app, medido en kg. Antes este
+        // indicador sumaba BINS desde Lotes y Gerencia mostraba6.750 mientras
+        // Contaduría mostraba 1.417.214 kg con la misma etiqueta.
+        var stockEnPlaya = await _context.LotesEmboquille
             .AsNoTracking()
-            .Where(l => !l.IsDeleted)
-            .GroupBy(l => 1)
+            .Where(le => le.Estado == "E")
+            .GroupBy(le => 1)
             .Select(g => new IndicadorGerenciaDto
                 {
                 Indicador = "Stock en Playa",
-                Valor = g.Sum(l => l.CantidadBins - l.CantidadBinsDesp - l.CantidadBinsEmb),
-                Fecha = g.Max(l => l.FechaIngreso ?? l.CreatedAt),
-                Categoria = "Stock"
+                Valor = g.Sum(le => le.CantidadBins != 0
+                    ? Math.Round(
+                        (le.KilosNetos / le.CantidadBins)
+                        * (le.CantidadBins - le.CantidadBinsDespachados - le.CantidadBinsVolcados), 0)
+                    : 0m),
+                Fecha = g.Max(le => le.FechaProduccion),
+                Categoria = "Stock",
+                Unidad = "kg"
                 })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -137,7 +152,8 @@ public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadores
                 Indicador = "Ritmo Promedio Línea",
                 Valor = ritmos.Average(r => r.Valor),
                 Fecha = ritmos.Max(r => r.Fecha),
-                Categoria = "Operación"
+                Categoria = "Operación",
+                Unidad = "kg/h"
                 });
             }
 

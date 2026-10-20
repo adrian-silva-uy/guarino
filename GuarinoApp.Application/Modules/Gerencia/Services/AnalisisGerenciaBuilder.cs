@@ -30,7 +30,7 @@ public static class AnalisisGerenciaBuilder
 
         insight.Lectura = volcadosZafra > 0
             ? $"Acumulado de la zafra en curso: {volcadosZafra:N0} kg, sobre un histórico de {volcadosTotal:N0} kg. " +
-              $"Stock en playa: {stockPlaya:N0} bins. Pallets: {totalPallets:N0} en total ({palletsDespachados:N0} despachados, {palletsEnFrio:N0} en frío)." +
+              $"Stock en playa: {stockPlaya:N0} kg. Pallets: {totalPallets:N0} en total ({palletsDespachados:N0} despachados, {palletsEnFrio:N0} en frío)." +
               (volumenProyectadoKgs > 0
                   ? $" Próxima zafra proyectada en {volumenProyectadoKgs:N0} kg" +
                     (variacionProyectadaPct != 0 ? $" ({(variacionProyectadaPct >= 0 ? "+" : "")}{variacionProyectadaPct:N1}%)" : string.Empty) +
@@ -39,12 +39,14 @@ public static class AnalisisGerenciaBuilder
             : "Cargá o actualizá los indicadores para construir la lectura estratégica de la operación.";
 
         // --- Hallazgos (máx. 4) ---
+        // El stock en playa está medido en KG (misma fórmula canónica que la grilla
+        // Stock en Playa y Contaduría); el umbral de severidad se expresa en kg.
         if (stockPlaya < 0)
             {
             insight.Hallazgos.Add(new InsightHallazgoDto
                 {
                 Titulo = "Diferencia de inventario en playa",
-                Detalle = $"El saldo de bins restantes da {stockPlaya:N0}: hay más despachos/embalajes cargados que ingresos. Reconciliar antes de reportar a Contaduría.",
+                Detalle = $"El saldo en playa da {stockPlaya:N0} kg: hay más despachos/volcados cargados que ingresos. Reconciliar antes de reportar a Contaduría.",
                 Severidad = "alta"
                 });
             }
@@ -53,8 +55,8 @@ public static class AnalisisGerenciaBuilder
             insight.Hallazgos.Add(new InsightHallazgoDto
                 {
                 Titulo = "Fruta en espera de despacho",
-                Detalle = $"{stockPlaya:N0} bins en playa: definir prioridad de empaque para no pierda ventana de flete.",
-                Severidad = stockPlaya > 100 ? "media" : "baja"
+                Detalle = $"{stockPlaya:N0} kg en playa: definir prioridad de empaque para no perder ventana de flete.",
+                Severidad = stockPlaya > 500_000m ? "media" : "baja"
                 });
             }
 
@@ -95,7 +97,7 @@ public static class AnalisisGerenciaBuilder
             {
             insight.Acciones.Add(new InsightAccionDto
                 {
-                Texto = "Reconciliar bins ingresados contra despachados/embalados y corregir el cierre de inventario",
+                Texto = "Reconciliar ingresos contra despachos/volcados y corregir el cierre de inventario",
                 Plazo = "esta semana",
                 Impacto = "inventario confiable para Contaduría y la proyección"
                 });
@@ -153,6 +155,9 @@ public static class AnalisisGerenciaBuilder
                 {
                 indicador = i.Indicador,
                 valor = i.Valor,
+                // La unidad viaja en el contexto para que el análisis refinado no
+                // confunda escalas (bins vs kg) al citar las cifras.
+                unidad = i.Unidad,
                 categoria = i.Categoria,
                 fecha = i.Fecha?.ToString("yyyy-MM-dd")
                 }).ToList()
