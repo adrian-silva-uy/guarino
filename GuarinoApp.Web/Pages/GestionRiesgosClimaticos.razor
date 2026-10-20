@@ -69,12 +69,12 @@
         <MudCardContent>
             <div id="mapa-riesgos-climaticos" style="height:420px; width:100%; border-radius:8px; overflow:hidden;"></div>
             <MudText Typo="Typo.caption" Class="mt-2">
-                🟢 Sin eventos (30 días + pronóstico) &nbsp;&nbsp; 🟡 Riesgo Alta &nbsp;&nbsp; 🔴 Riesgo Crítica
+                🟢 Sin eventos (30 días + hoy/pronóstico) &nbsp;&nbsp; 🟡 Riesgo Alta &nbsp;&nbsp; 🔴 Riesgo Crítica
                 @if (mapaMarcadores.Count > 0)
                 {
                     <span> &nbsp;&nbsp;·&nbsp;&nbsp; @mapaMarcadores.Count lote(s) con coordenadas</span>
                 }
-                <span> &nbsp;&nbsp;·&nbsp;&nbsp; En el popup de un marcador, «↗ Ver en la tabla» lleva a las filas de ese lote</span>
+                <span> &nbsp;&nbsp;·&nbsp;&nbsp; El popup de cada marcador detalla cuántos eventos ya ocurrieron y cuántos son de hoy/pronóstico</span>
             </MudText>
         </MudCardContent>
     </MudCard>
@@ -109,15 +109,15 @@
             <div class="col-md-3">
                 <MudCard><MudCardContent>
                     <MudText Typo="Typo.h6">@resumen.TotalEventosRecientes</MudText>
-                    <MudTooltip Text="Eventos confirmados en días ANTERIORES (la fecha es el día calendario del evento). Ventana: últimos 30 días.">
-                        <MudText Typo="Typo.caption">Ya ocurrieron (hasta ayer)</MudText>
+                    <MudTooltip Text="Eventos de los ÚLTIMOS 30 DÍAS que ya pasaron: de hace 30 días hasta ayer ( Fecha < hoy ). La fecha de cada evento es el día calendario en que se detectó la condición.">
+                        <MudText Typo="Typo.caption">Ya ocurrieron (30 días, hasta ayer)</MudText>
                     </MudTooltip>
                 </MudCardContent></MudCard>
             </div>
             <div class="col-md-3">
                 <MudCard><MudCardContent>
                     <MudText Typo="Typo.h6">@resumen.TotalEventosPronosticados</MudText>
-                    <MudTooltip Text="Eventos de HOY (día en curso: el dato se confirma con el próximo escáner cada 6 h) más los de los próximos 7 días según el pronóstico de Open-Meteo.">
+                    <MudTooltip Text="Eventos de HOY (día en curso: el dato se confirma con el próximo escáner cada 6 h) más los de los próximos 7 días según el pronóstico de Open-Meteo. Están en la tabla «De Hoy y Riesgo Pronosticado», más abajo.">
                         <MudText Typo="Typo.caption">De hoy + pronosticados (7 días)</MudText>
                     </MudTooltip>
                 </MudCardContent></MudCard>
@@ -235,8 +235,7 @@
                 <MudCardContent>
                     <MudTable Items="@resumen.EventosPronosticados" Hover="true" Dense="true"
                               T="EventoClimaticoDto"
-                              RowClick="IrAlLoteEnMapa"
-                              RowClassFunc="@((EventoClimaticoDto ev, int _) => FilaClase(ev))">
+                              RowClick="IrAlLoteEnMapa">
                         <HeaderContent>
                             <MudTh>Fecha (hoy/pronóstico)</MudTh>
                             <MudTh>Lote</MudTh>
@@ -278,8 +277,7 @@
                 <MudCardContent>
                     <MudTable Items="@resumen.EventosRecientes" Hover="true" Dense="true"
                               T="EventoClimaticoDto"
-                              RowClick="IrAlLoteEnMapa"
-                              RowClassFunc="@((EventoClimaticoDto ev, int _) => FilaClase(ev))">
+                              RowClick="IrAlLoteEnMapa">
                         <HeaderContent>
                             <MudTh>Fecha</MudTh>
                             <MudTh>Lote</MudTh>
@@ -354,8 +352,6 @@
 
     private IJSObjectReference? _mapModule;
     private bool _mapInicializado = false;
-    private DotNetObjectReference<GestionRiesgosClimaticos>? _dotNetRef;
-    private string? loteResaltado;
 
     [Inject] private IMediator Mediator { get; set; } = default!;
     [Inject] private ISnackbar Snackbar { get; set; } = default!;
@@ -370,8 +366,7 @@
             try
             {
                 _mapModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/climateMap.js");
-                _dotNetRef ??= DotNetObjectReference.Create(this);
-                await _mapModule.InvokeVoidAsync("initMap", "mapa-riesgos-climaticos", mapaMarcadores, _dotNetRef);
+                await _mapModule.InvokeVoidAsync("initMap", "mapa-riesgos-climaticos", mapaMarcadores);
                 _mapInicializado = true;
                 // Cierra la carrera: si los marcadores llegaron ANTES de que el módulo
                 // JS terminara de cargar Leaflet, initMap los dibujó vacíos; acá se
@@ -467,7 +462,8 @@
     private async Task RegenerarPlan() => await GenerarPlan();
 
     /// <summary>Clic en una fila de cualquiera de las dos tablas: el lote se ubica
-    /// en el mapa (vuelo + popup). Es el enlace bidireccional tabla → mapa.</summary>
+    /// en el mapa (vuelo + popup). Es el enlace bidireccional tabla → mapa. El
+    /// enlace inverso (popup → filas) lo resuelve climateMap.js 100% en el cliente.</summary>
     private async Task IrAlLoteEnMapa(TableRowClickEventArgs<EventoClimaticoDto> args)
     {
         var codigo = args.Item.LoteNombre;
@@ -488,44 +484,6 @@
         {
             Snackbar.Add($"No se pudo ubicar el lote en el mapa: {ex.Message}", Severity.Warning);
         }
-    }
-
-    /// <summary>Clase CSS de cada fila: marca (y parpadea) las filas del lote elegido
-    /// en el mapa. Se aplica vía RowClassFunc en ambas tablas.</summary>
-    private string FilaClase(EventoClimaticoDto ev) =>
-        string.Equals(ev.LoteNombre, loteResaltado, StringComparison.Ordinal)
-            ? "fila-lote-flash"
-            : string.Empty;
-
-    /// <summary>Invocado desde el JS del mapa (botón «↗ Ver en la tabla» del popup):
-    /// resalta y desplaza la vista a las filas de ese lote en las tablas. Es el
-    /// enlace bidireccional mapa → tabla.</summary>
-    [JSInvokable]
-    public async Task ResaltarFilasDelLote(string codigo)
-    {
-        loteResaltado = codigo;
-        StateHasChanged();
-        // Espera breve a que Blazor pinte la clase de resaltado antes de scrollear.
-        await Task.Delay(80);
-        if (_mapModule != null)
-        {
-            try { await _mapModule.InvokeVoidAsync("scrollToFilaResaltada"); }
-            catch (JSException) { /* silencioso: el resaltado ya está aplicado */ }
-        }
-        // Quita el resaltado al terminar la animación: si no, clickear dos veces el
-        // mismo lote no volvería a ejecutar la animación de parpadeo.
-        _ = QuitarResaltadoPasado();
-    }
-
-    private async Task QuitarResaltadoPasado()
-    {
-        await Task.Delay(2600);
-        try
-        {
-            loteResaltado = null;
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (ObjectDisposedException) { /* la página navegó fuera */ }
     }
 
     private static Color ColorSeveridad(string severidad) => severidad switch
@@ -558,6 +516,5 @@
             try { await _mapModule.InvokeVoidAsync("dispose"); } catch { }
             try { await _mapModule.DisposeAsync(); } catch { }
         }
-        _dotNetRef?.Dispose();
     }
 }
