@@ -118,9 +118,13 @@ builder.Services.AddHttpClient("Ollama", (sp, client) =>
 // ============================================================================
 // HEALTH CHECKS
 // Monitoreo de SQL Server y Ollama para herramientas de infraestructura.
+// Solo SQL Server lleva el tag "ready": es el requisito para recibir tráfico
+// (sin base no hay app). Ollama es opcional (Ollama:Enabled) y su caída no
+// debe marcar la instancia como no lista. Antes NINGÚN check tenía el tag y
+// /health/ready respondía siempre Healthy (vacío), sin validar nada.
 // ============================================================================
 builder.Services.AddHealthChecks()
-    .AddCheck<SqlServerHealthCheck>("sql-server")
+    .AddCheck<SqlServerHealthCheck>("sql-server", tags: new[] { "ready" })
     .AddCheck<OllamaHealthCheck>("ollama");
 
 // ============================================================================
