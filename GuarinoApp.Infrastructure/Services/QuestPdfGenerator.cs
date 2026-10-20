@@ -7,6 +7,10 @@ namespace GuarinoApp.Infrastructure.Services
         {
         public Task<byte[]> GeneratePalletPdfAsync(CancellationToken cancellationToken = default)
             {
+            // QuestPDF es CPU puro: se ejecuta fuera del hilo del circuito para
+            // no congelar la pantalla del usuario.
+            return Task.Run(() =>
+            {
             var bytes = Document.Create(container =>
             {
                 container.Page(page =>
@@ -43,11 +47,14 @@ namespace GuarinoApp.Infrastructure.Services
                         });
                 });
             }).GeneratePdf();
-
-            return Task.FromResult(bytes);
+            return bytes;
+            });
             }
 
         public Task<byte[]> GenerateDashboardPdfAsync(CancellationToken cancellationToken = default)
+            {
+            // QuestPDF es CPU puro: se ejecuta fuera del hilo del circuito.
+            return Task.Run(() =>
             {
             var bytes = Document.Create(container =>
             {
@@ -83,11 +90,14 @@ namespace GuarinoApp.Infrastructure.Services
                     page.Footer().AlignCenter().Text("GuarinoApp - Dashboard Export");
                 });
             }).GeneratePdf();
-
-            return Task.FromResult(bytes);
+            return bytes;
+            });
             }
 
         public Task<byte[]> GenerateFrutaPdfAsync(CancellationToken cancellationToken = default)
+            {
+            // QuestPDF es CPU puro: se ejecuta fuera del hilo del circuito.
+            return Task.Run(() =>
             {
             var bytes = Document.Create(container =>
             {
@@ -134,8 +144,8 @@ namespace GuarinoApp.Infrastructure.Services
                     page.Footer().AlignCenter().Text("GuarinoApp - Export Fruta");
                 });
             }).GeneratePdf();
-
-            return Task.FromResult(bytes);
+            return bytes;
+            });
             }
         }
     }

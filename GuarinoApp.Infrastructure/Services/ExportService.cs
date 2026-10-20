@@ -11,6 +11,14 @@ namespace GuarinoApp.Infrastructure.Services
         {
         public Task<byte[]> ExportToExcelAsync<T>(IEnumerable<T> data, string sheetName)
             {
+            // Materializa en el hilo del llamador (el DbContext del circuito no
+            // admite usos concurrentes) y genera el Excel FUERA del hilo del
+            // circuito: ClosedXML con AdjustToContents sobre reportes grandes
+            // congelaba la pantalla hasta terminar.
+            var filas = data as IReadOnlyList<T> ?? data.ToList();
+
+            return Task.Run(() =>
+            {
             using var workbook = new XLWorkbook();
             var worksheet = workbook.Worksheets.Add(string.IsNullOrWhiteSpace(sheetName) ? "Datos" : sheetName);
             var properties = typeof(T).GetProperties();
@@ -22,7 +30,7 @@ namespace GuarinoApp.Infrastructure.Services
                 }
 
             var row = 2;
-            foreach (var item in data)
+            foreach (var item in filas)
                 {
                 for (var column = 0; column < properties.Length; column++)
                     worksheet.Cell(row, column + 1).Value = properties[column].GetValue(item)?.ToString() ?? string.Empty;
@@ -32,7 +40,8 @@ namespace GuarinoApp.Infrastructure.Services
             worksheet.Columns().AdjustToContents();
             using var stream = new MemoryStream();
             workbook.SaveAs(stream);
-            return Task.FromResult(stream.ToArray());
+            return stream.ToArray();
+            });
             }
 
         public Task<byte[]> ExportToPdfAsync<T>(IEnumerable<T> data, string title, float? fontSize = null, IEnumerable<string>? columns = null)
@@ -56,6 +65,12 @@ namespace GuarinoApp.Infrastructure.Services
             var cuerpo = fontSize ?? 8.5f;
             var relleno = fontSize.HasValue ? 2f : 3f;
 
+            // Document.Create + GeneratePdf es CPU puro: corre fuera del hilo
+            // del circuito para no congelar la pantalla en reportes densos
+            // (Pallets Definitivos tiene 28 columnas). `rows` ya se materializó
+            // arriba en este hilo: ningún acceso a la base cruza de hilo.
+            return Task.Run(() =>
+            {
             var bytes = Document.Create(container =>
             {
                 container.Page(page =>
@@ -137,8 +152,8 @@ namespace GuarinoApp.Infrastructure.Services
                     });
                 });
             }).GeneratePdf();
-
-            return Task.FromResult(bytes);
+            return bytes;
+            });
             }
 
         public string ExportToCsv<T>(IEnumerable<T> data)
