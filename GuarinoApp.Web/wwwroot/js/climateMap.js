@@ -69,14 +69,19 @@ export async function initMap(elementId, markerData) {
 
     // Centro por defecto: Uruguay
     map = L.map(elementId);
+    // maxNativeZoom 18: a partir de z19 en zonas rurales Esri devuelve un placeholder
+    // gris ("Map data not yet available") con HTTP 200, indetectable como error de tile.
+    // Con maxNativeZoom 18 Leaflet escala el tile real de z18 en vez de pedir el placeholder.
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
-        maxZoom: 19
+        maxZoom: 19,
+        maxNativeZoom: 18
     }).addTo(map);
 
     // Capa de etiquetas (nombres de rutas/ciudades) superpuesta a la imagen satelital
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19,
+        maxNativeZoom: 18,
         opacity: 0.9
     }).addTo(map);
 
