@@ -25,9 +25,35 @@ namespace GuarinoApp.Infrastructure.Services
         {
         private const string NombreCliente = "IaWeb";
 
+        /// <summary>
+        /// Cortacircuito tras un 429 (cupo por minuto del plan gratuito agotado).
+        /// Mientras esté activo, <see cref="EnviarAsync"/> devuelve null al instante
+        /// sin tocar la red: en un pico de ~10 usuarios, un 429 indica que la ventana
+        /// de tokens está llena y reintentar en paralelo solo empeora la cola y retarda
+        /// a todos. Las consultas siguen por la vía local o el cálculo determinista de
+        /// cada página. Se cierra solo cuando vence la ventana.
+        /// </summary>
+        private readonly object _estadoCorto = new();
+        private DateTime _cortoAbiertoHastaUtc = DateTime.MinValue;
+
+        /// <summary>
+        /// Duración del cortacircuito tras un 429: equivale a la ventana por minuto
+        /// del plan gratuito. Corta un poco menos (55 s) para reabrir con margen antes
+        /// de que el usuario note una demora extra.
+        /// </summary>
+        private static readonly TimeSpan DuracionCorto = TimeSpan.FromSeconds(55);
+
         private readonly IOptionsMonitor<IaWebOptions> _options;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<IaWebClient> _logger;
+
+        /// <summary>
+        /// Admisión: limita a <c>ConsultasWebSimultaneas</c> la cantidad de USUARIOS
+        /// que compiten a la vez por la vía web. Sin esto, cada usuario lanza su propia
+        /// consulta en paralelo y 10 usuarios generan ~10 llamadas simultáneas que
+        /// desbordan el cupo por minuto (429 en cascada). El resto espera su turno
+        /// ordenadamente dentro de su timeout; si no alcanza, sigue por la ruta local.
+        /// </summary>
         private readonly SemaphoreSlim _candado;
 
         public IaWebClient(
@@ -50,6 +76,35 @@ namespace GuarinoApp.Infrastructure.Services
                 }
             }
 
+        /// <summary>true si el cortacircuito está activo (hubo un 429 reciente y la
+        /// ventana por minuto sigue llena).</summary>
+        private bool CortoActivo
+            {
+            get
+                {
+                lock (_estadoCorto)
+                    {
+                    return DateTime.UtcNow < _cortoAbiertoHastaUtc;
+                    }
+                }
+            }
+
+        /// <summary>Abre el cortacircuito por <see cref="DuracionCorto"/>. Idempotente:
+        /// si ya está activo, no lo extiende (para que una ráfaga no lo alargue infinito).</summary>
+        private void AbrirCorto(string diagnostico)
+            {
+            lock (_estadoCorto)
+                {
+                if (DateTime.UtcNow < _cortoAbiertoHastaUtc)
+                    return; // ya abierto: conservar el vencimiento original
+                _cortoAbiertoHastaUtc = DateTime.UtcNow.Add(DuracionCorto);
+                }
+
+            _logger.LogWarning(
+                "Servicio web de IA: cupo por minuto agotado ({Diag}); se corta la vía web {Segundos}s y las consultas siguen por la ruta local o el cálculo determinista.",
+                diagnostico, (int)DuracionCorto.TotalSeconds);
+            }
+
         public async Task<string?> EnviarAsync(
             IReadOnlyList<object> messages,
             bool modoJson,
@@ -59,8 +114,17 @@ namespace GuarinoApp.Infrastructure.Services
             if (!Habilitada || messages == null || messages.Count == 0)
                 return null;
 
-            // Cupo por minuto del plan gratuito: si ya hay el máximo de consultas
-            // en vuelo, espera su turno (la ruta local corre en paralelo igual).
+            // Cortacircuito activo tras un 429: no tiene sentido reintentar mientras la
+            // ventana por minuto siga llena — se sigue directo por la ruta local.
+            if (CortoActivo)
+                {
+                _logger.LogInformation("Servicio web de IA: cortacircuito activo por cupo agotado; se continúa por la ruta local.");
+                return null;
+                }
+
+            // Admisión: cupo por minuto del plan gratuito. Solo N usuarios compiten a la
+            // vez por la vía web; el resto espera su turno dentro del timeout. Si no
+            // alcanza la espera, se sigue por la ruta local (el llamador no se queda colgado).
             if (!await _candado.WaitAsync(TimeSpan.FromSeconds(opciones.TimeoutSegundos), cancellationToken))
                 {
                 _logger.LogInformation("Servicio web de IA: consultas simultáneas al tope del cupo gratuito; se continúa por la ruta local.");
@@ -114,18 +178,19 @@ namespace GuarinoApp.Infrastructure.Services
                         var status = (int)respuesta.StatusCode;
                         if (status == 429 && intento < 2)
                             {
-                            // El 429 del plan gratuito es la ventana por minuto
-                            // girando. Se calcula la espera con el propio retry-after
-                            // de Groq y con lo que falta para que entre esta petición
-                            // (la ventana se rellena a ~133 tok/s al envejecer las
-                            // consultas anteriores); así la ráfaga pico de usuarios
-                            // se convierte en 200 en lugar de caer al respaldo
-                            // determinista. Si no alcanza el timeout total, no se
-                            // reintenta y se sigue directo por la ruta local.
+                            // El 429 del plan gratuito es la ventana por minuto girando.
+                            // Se calcula la espera con el propio retry-after de Groq y con
+                            // lo que falta para que entre esta petición; así la ráfaga pico
+                            // de usuarios se convierte en un reintento en lugar de caer al
+                            // respaldo determinista. Si no alcanza el timeout total, no se
+                            // reintenta y se sigue directo por la ruta local (y se abre el
+                            // cortacircuito: si no alcanzó para uno, tampoco para los demás
+                            // que siguen en cola).
                             var espera = CalcularEsperaReintento(respuesta, estimadoTokens, limite - DateTime.UtcNow);
                             if (espera == null)
                                 {
                                 _logger.LogWarning("Servicio web de IA: cupo por minuto agotado (429) sin tiempo para reintentar; se continúa por la ruta local.");
+                                AbrirCorto("429 sin tiempo para reintentar");
                                 return null;
                                 }
                             _logger.LogInformation(
@@ -143,7 +208,12 @@ namespace GuarinoApp.Infrastructure.Services
                             }
 
                         if (status == 429)
+                            {
+                            // Segundo 429 (o cupo de uso agotado): se abre el cortacircuito
+                            // para que el resto de usuarios en cola no reintenten en vano.
+                            AbrirCorto("429 tras reintentar o límite de uso");
                             _logger.LogWarning("Servicio web de IA: límite de uso del plan gratuito (429). Se continúa por la ruta local.");
+                            }
                         else
                             {
                             // El tamaño del cuerpo explica rechazos como el 413
