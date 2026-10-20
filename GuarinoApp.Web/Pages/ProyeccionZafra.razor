@@ -739,9 +739,70 @@
         await LoadData();
     }
 
+    // Recarga con debounce y coalescencia: una tecla no debe lanzar una consulta
+    // por segundo, y una recarga no debe pisar a otra en vuelo (carrera que
+    // podía dejar en pantalla los valores de un porcentaje anterior).
+    private CancellationTokenSource? _debouncePorcentaje;
+    private bool _recargaEnCurso;
+    private bool _recargaPendiente;
+
     private void OnPorcentajeCambio()
     {
-        _ = LoadData();
+        // Debounce: recarga ~350 ms después de la última tecla.
+        _debouncePorcentaje?.Cancel();
+        _debouncePorcentaje?.Dispose();
+        _debouncePorcentaje = new CancellationTokenSource();
+        var ct = _debouncePorcentaje.Token;
+        _ = RecargarDespuesDeDebounceAsync(ct);
+    }
+
+    private async Task RecargarDespuesDeDebounceAsync(CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(350, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return; // llegó otra tecla: esta recarga queda descartada
+        }
+
+        try
+        {
+            await InvokeAsync(LoadData);
+        }
+        catch (ObjectDisposedException)
+        {
+            // El usuario navegó fuera de la página mientras esperaba el debounce.
+        }
+    }
+
+    /// <summary>
+    /// Punto de entrada único de las recargas: si ya hay una en vuelo se marca
+    /// pendiente y se re-ejecuta al terminar (gana la última tecla), de modo que
+    /// nunca corren dos cargas a la vez sobre el estado del componente.
+    /// </summary>
+    private async Task LoadData()
+    {
+        if (_recargaEnCurso)
+        {
+            _recargaPendiente = true;
+            return;
+        }
+
+        _recargaEnCurso = true;
+        try
+        {
+            do
+            {
+                _recargaPendiente = false;
+                await CargarTodoAsync();
+            } while (_recargaPendiente);
+        }
+        finally
+        {
+            _recargaEnCurso = false;
+        }
     }
 
     private static string NormalizarClaseIcono(string? icon)
@@ -753,7 +814,7 @@
         return $"bi-{nombre}";
     }
 
-    private async Task LoadData()
+    private async Task CargarTodoAsync()
     {
         _loading = true;
         _kpiFinanciero = null;
