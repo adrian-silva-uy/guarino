@@ -7,9 +7,12 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Queries
     {
     /// <summary>
     /// Trae los marcadores del mapa de riesgo climático: un punto por Lote con coordenadas,
-    /// coloreado según la severidad de su evento más reciente (verde = sin eventos).
+    /// coloreado según la severidad de su evento más reciente DENTRO DE LA MISMA VENTANA
+    /// QUE EL RESUMEN (histórico reciente + pronóstico): verde = sin eventos en la ventana.
+    /// Antes no había límite de fecha y un evento de hace un año dejaba el lote en rojo
+    /// para siempre, contradiciendo el alerta de "Sin exposición detectada".
     /// </summary>
-    public record GetClimateMapMarkersQuery : IRequest<List<ClimateMapMarkerDto>>;
+    public record GetClimateMapMarkersQuery(int DiasHistorial = 30) : IRequest<List<ClimateMapMarkerDto>>;
 
     public class GetClimateMapMarkersQueryHandler
         : IRequestHandler<GetClimateMapMarkersQuery, List<ClimateMapMarkerDto>>
@@ -24,7 +27,7 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Queries
         public async Task<List<ClimateMapMarkerDto>> Handle(GetClimateMapMarkersQuery request, CancellationToken cancellationToken)
             {
             var lotes = await _context.Lotes
-                .Where(l => l.Latitude != null && l.Longitude != null)
+                .Where(l => !l.IsDeleted && l.Latitude != null && l.Longitude != null)
                 .Select(l => new
                     {
                     l.Id,
@@ -40,8 +43,13 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Queries
                 return [];
                 }
 
+            // Misma ventana que GetClimateRiskSummaryQuery (reciente + pronóstico):
+            // mapa y KPIs tienen que contar exactamente lo mismo.
+            var fechaDesde = DateTime.Today.AddDays(-request.DiasHistorial);
+
             var eventosPorLote = await _context.EventosClimaticos
-                .Where(e => !e.IsDeleted)
+                .AsNoTracking()
+                .Where(e => !e.IsDeleted && e.Fecha >= fechaDesde)
                 .GroupBy(e => e.LoteId)
                 .Select(g => new
                     {
@@ -63,11 +71,12 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Queries
                     : info.SeveridadReciente == "Crítica" ? "#d32f2f" : "#f9a825";
 
                 var infoTexto = info == null
-                    ? "Sin eventos registrados"
-                    : $"{info.TotalEventos} evento(s) · Último: {info.UltimaFecha:dd/MM} ({info.SeveridadReciente})";
+                    ? $"Sin eventos en los últimos {request.DiasHistorial} días ni pronóstico"
+                    : $"{info.TotalEventos} evento(s) en los últimos {request.DiasHistorial} días + pronóstico · Último: {info.UltimaFecha:dd/MM} ({info.SeveridadReciente})";
 
                 return new ClimateMapMarkerDto
                     {
+                    Codigo = l.Codigo,
                     Lat = (double)l.Latitude!.Value,
                     Lng = (double)l.Longitude!.Value,
                     Label = $"{l.Codigo} — {l.ProductorNombre}",

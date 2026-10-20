@@ -53,7 +53,7 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Queries
                 EventosPronosticados = resumenClimatico.TotalEventosPronosticados,
                 ProyeccionEsDummy = proyectada.EsDummy,
                 Comentario = resumenClimatico.TotalEventosPronosticados > 0
-                    ? $"{resumenClimatico.TotalEventosPronosticados} evento(s) pronosticado(s) todavía se pueden mitigar con acción preventiva antes de afectar la cosecha exportable."
+                    ? $"{resumenClimatico.TotalEventosPronosticados} evento(s) de hoy y pronosticado(s) todavía se pueden mitigar con acción preventiva antes de afectar la cosecha exportable."
                     : "El riesgo mostrado corresponde a eventos que ya ocurrieron (impacto histórico reciente)."
                 };
             }

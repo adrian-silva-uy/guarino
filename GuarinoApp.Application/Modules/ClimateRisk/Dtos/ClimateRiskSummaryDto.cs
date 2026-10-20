@@ -23,5 +23,10 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Dtos
         public int TotalEventosRecientes { get; set; }
         public int TotalEventosPronosticados { get; set; }
         public decimal KilosEnRiesgoPronosticado { get; set; }
+
+        // Kilos netos de los lotes que tienen al menos un evento en la ventana:
+        // es el denominador REAL del % de pérdida total (antes se usaba un
+        // 1.000.000 kg fijo inventado que no coincidía con ningún lote).
+        public decimal KilosLotesAfectados { get; set; }
         }
     }

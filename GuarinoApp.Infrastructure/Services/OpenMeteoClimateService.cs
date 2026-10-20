@@ -112,6 +112,20 @@ namespace GuarinoApp.Infrastructure.Services
             var thresholds = _settings.Thresholds;
             var impacto = _settings.ImpactEstimates;
 
+            // Guardia anti-inventos: si la config de umbrales/impactos viene en cero
+            // (sección ausente o binding roto), el escáner dispararía "eventos" sobre
+            // clima normal —el 15/10/2026 una corrida con config en cero registró
+            // "LluviaExcesiva Crítica" con 0 mm y "VientoFuerte Crítica" con 14 km/h,
+            // todos con 0% de pérdida— y esos datos falsos se sumaban a los KPIs.
+            // Ante duda sobre la configuración: no se registra ningún evento
+            // (mejor ausencia de dato que dato falso).
+            if (EsConfigClimaticaInvalida(thresholds, impacto))
+                {
+                _logger.LogError(
+                    "Configuración ClimateRisk inválida (umbrales o impactos en cero). Escaneo cancelado sin registrar eventos: revisá appsettings (ClimateRisk:Thresholds / ClimateRisk:ImpactEstimates).");
+                return;
+                }
+
             _logger.LogInformation("Iniciando escaneo automático de eventos climáticos ({RegionalContext})...", _settings.RegionalContext);
 
             var lotes = await _context.Lotes
@@ -192,6 +206,29 @@ namespace GuarinoApp.Infrastructure.Services
             await _context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Escaneo climático finalizado. Eventos nuevos insertados: {Total}.", allEventos.Count);
             }
+
+        /// <summary>
+        /// true si falta configuración esencial: un umbral o porcentaje de impacto en
+        /// cero invalida todo el escáner (todo clima normal dispararía eventos y el
+        /// daño saldría multiplicado por cero). HeladaTempMin/HeladaTempSevera no se
+        /// validan: 0 °C es un umbral legítimo de helada.
+        /// </summary>
+        private static bool EsConfigClimaticaInvalida(ThresholdsConfig thresholds, ImpactEstimatesConfig impacto)
+            => thresholds.LluviaExcesivaMm <= 0
+            || thresholds.LluviaMuyExcesivaMm <= 0
+            || thresholds.VientoFuerteKmh <= 0
+            || thresholds.VientoFuerteKmhCritico <= 0
+            || thresholds.CalorExtremoTempMax <= 0
+            || thresholds.GranizoWeatherCodeMin <= 0
+            || thresholds.GranizoWeatherCodeSevera <= 0
+            || impacto.HeladaSeveraPerdida <= 0
+            || impacto.HeladaPerdida <= 0
+            || impacto.LluviaExcesivaPerdida <= 0
+            || impacto.LluviaMuyExcesivaPerdida <= 0
+            || impacto.VientoFuertePerdida <= 0
+            || impacto.CalorExtremoPerdida <= 0
+            || impacto.GranizoPerdida <= 0
+            || impacto.GranizoSeveraPerdida <= 0;
 
         /// <summary>
         /// Completa el indicador derivado "kilos perdidos" al momento de persistir:

@@ -317,8 +317,9 @@ namespace GuarinoApp.Infrastructure.Data
             // SemanaProd, Fecha/Hora, Lote, TipoPallet, Embalaje, etc.
             CompletarPallets(context, random);
 
-            // 9.6 Eventos climáticos: históricos + últimos días + pronosticados.
-            SembrarEventosClimaticos(context, random);
+            // 9.6 Eventos climáticos: NO se siembra ninguno. Los eventos son datos
+            // medidos (escáner Open-Meteo cada 6 h sobre coordenadas de los lotes);
+            // eventos sembrados inventados distorsionaban los KPIs financieros.
 
             // 9.7 vRitmoCalibradora: crea la tabla si no existe (ToView no la crea
             // en migraciones) y la siembra coherente con LotesEmboquille.
@@ -940,138 +941,11 @@ namespace GuarinoApp.Infrastructure.Data
         // ------------------------------------------------------------------
         // Eventos climáticos
         // ------------------------------------------------------------------
-
-        /// <summary>
-        /// Siembra eventos climáticos: ~45 históricos (450 días, tipo según
-        /// estación), 18 en los últimos 30 días, 2-3 frescos por día en los
-        /// últimos 4 días y ~4 pronosticados (próximos 6 días). Severidad sólo
-        /// "Crítica"/"Alta" y porcentajes alineados con ImpactEstimates de
-        /// appsettings.json; KilosPerdidosEstimados = % × KilosNetos del lote.
-        /// </summary>
-        private static void SembrarEventosClimaticos(ApplicationDbContext context, Random random)
-            {
-            if (context.EventosClimaticos.Any())
-                return;
-
-            var lotes = context.Lotes.AsNoTracking()
-                .Where(l => !l.IsDeleted && l.KilosNetos > 0)
-                .ToList();
-            if (lotes.Count == 0)
-                lotes = context.Lotes.AsNoTracking().Where(l => !l.IsDeleted).ToList();
-            if (lotes.Count == 0)
-                return;
-
-            var nombresCampo = new[] { "Juan Pérez", "María Gómez", "Carlos Rodríguez" };
-            var hoy = DateTime.Today;
-            var eventos = new List<EventoClimatico>();
-
-            string TipoPorEstacionalidad(int mes)
-                {
-                if (mes >= 5 && mes <= 9) return "Helada";              // invierno
-                if (mes == 12 || mes == 1 || mes == 2 || mes == 3) return "CalorExtremo"; // verano
-                var tormentas = new[] { "LluviaExcesiva", "VientoFuerte", "Granizo" };
-                return tormentas[random.Next(tormentas.Length)];
-                }
-
-            string Severidad(string tipo)
-                {
-                if (tipo == "CalorExtremo") return "Alta"; // según appsettings: siempre Alta
-                return random.Next(100) < 45 ? "Crítica" : "Alta";
-                }
-
-            decimal Porcentaje(string tipo, string severidad)
-                {
-                var critica = severidad == "Crítica";
-                return tipo switch
-                    {
-                    "Helada" => critica ? 45m : 15m,
-                    "LluviaExcesiva" => critica ? 50m : 20m,
-                    "VientoFuerte" => 10m,
-                    "CalorExtremo" => 25m,
-                    "Granizo" => critica ? 75m : 35m,
-                    _ => 20m
-                    };
-                }
-
-            string Observacion(string tipo)
-                {
-                return tipo switch
-                    {
-                    "Helada" => $"Temp mínima: {-1 - random.Next(0, 5)}°C a las {random.Next(3, 7)}:00. Riesgo de daño a frutos.",
-                    "LluviaExcesiva" => $"Acumulado 24h: {random.Next(50, 121)}mm. Riesgo de gomosis.",
-                    "VientoFuerte" => $"Viento máximo: {random.Next(50, 96)} km/h. Riesgo de ramas/fruta.",
-                    "CalorExtremo" => $"Temp máxima: {random.Next(38, 46)}°C a las {random.Next(13, 18)}:00. Riesgo de golpe de sol en fruta.",
-                    "Granizo" => $"weather_code {random.Next(96, 100)} a las {random.Next(12, 18)}:00. Daño mecánico en fruta y follaje.",
-                    _ => "Evento climático registrado."
-                    };
-                }
-
-            EventoClimatico CrearEvento(DateTime fecha, string tipo)
-                {
-                var severidad = Severidad(tipo);
-                var porcentaje = Porcentaje(tipo, severidad);
-                var lote = lotes[random.Next(lotes.Count)];
-
-                var automatica = random.Next(100) < 70;
-                var fuente = automatica
-                    ? (random.Next(100) < 40
-                        ? "Detección Automática - OpenMeteo (Salto, Paysandú, Uruguay)"
-                        : "Detección Automática - OpenMeteo")
-                    : $"Reporte de Campo - {nombresCampo[random.Next(nombresCampo.Length)]}";
-
-                return new EventoClimatico
-                    {
-                    LoteId = lote.Id,
-                    ProductorId = lote.ProductorId,
-                    Fecha = fecha.Date,
-                    TipoEvento = tipo,
-                    SeveridadEstimada = severidad,
-                    PorcentajePerdidaEstimada = porcentaje,
-                    KilosPerdidosEstimados = Math.Round(lote.KilosNetos * porcentaje / 100m, 2),
-                    Fuente = fuente,
-                    Observaciones = Observacion(tipo),
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = automatica ? "OpenMeteoClimateService" : "DbInitializer",
-                    IsDeleted = false
-                    };
-                }
-
-            // Históricos: últimos 450 días (excluyendo el último mes).
-            for (int i = 0; i < 45; i++)
-                {
-                var fecha = hoy.AddDays(-random.Next(31, 451));
-                eventos.Add(CrearEvento(fecha, TipoPorEstacionalidad(fecha.Month)));
-                }
-
-            // Últimos 30 días (del día 5 al 30 atrás).
-            for (int i = 0; i < 18; i++)
-                {
-                var fecha = hoy.AddDays(-random.Next(5, 31));
-                eventos.Add(CrearEvento(fecha, TipoPorEstacionalidad(fecha.Month)));
-                }
-
-            // Frescos: 2-3 por día en los últimos 4 días.
-            for (int diasAtras = 4; diasAtras >= 1; diasAtras--)
-                {
-                var cantidad = random.Next(2, 4);
-                for (int i = 0; i < cantidad; i++)
-                    {
-                    var fecha = hoy.AddDays(-diasAtras);
-                    eventos.Add(CrearEvento(fecha, TipoPorEstacionalidad(fecha.Month)));
-                    }
-                }
-
-            // Pronosticados: ~4 en los próximos 6 días (la app los distingue
-            // por Fecha futura).
-            for (int i = 0; i < 4; i++)
-                {
-                var fecha = hoy.AddDays(random.Next(1, 7));
-                eventos.Add(CrearEvento(fecha, TipoPorEstacionalidad(fecha.Month)));
-                }
-
-            context.EventosClimaticos.AddRange(eventos);
-            context.SaveChanges();
-            }
+        // (Acá antes se sembraba una tanda de eventos climáticos inventados con
+        // fechas al azar. Se eliminó: los eventos son datos medidos por el
+        // escáner automático de Open-Meteo; una siembra artificial distorsionaba
+        // los KPIs financieros y confundía al usuario, que veía "impactos ya
+        // ocurridos" que nunca pasaron.)
 
         // ------------------------------------------------------------------
         // vRitmoCalibradora (Gráfica de Procesos)
