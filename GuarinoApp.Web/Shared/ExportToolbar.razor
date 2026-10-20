@@ -13,6 +13,7 @@
                            Clearable="true"
                            Margin="Margin.Dense" 
                            Variant="Variant.Outlined" 
+                           HelperText="Primer día del período; vacío = desde el inicio."
                            Class="toolbar-fecha-picker" />
 
             <MudDatePicker Label="Fecha Hasta" 
@@ -22,15 +23,18 @@
                            Clearable="true"
                            Margin="Margin.Dense" 
                            Variant="Variant.Outlined" 
+                           HelperText="Último día del período; vacío = hasta hoy."
                            Class="toolbar-fecha-picker" />
 
-            <MudButton Variant="Variant.Filled" 
-                       Color="Color.Primary" 
-                       OnClick="@(() => OnRefresh.InvokeAsync())" 
-                       Disabled="IsLoading"
-                       StartIcon="@Icons.Material.Filled.Refresh">
-                @(IsLoading ? "Cargando..." : "Actualizar")
-            </MudButton>
+            <MudTooltip Text="Vuelve a consultar la base para el rango elegido (los exports usan siempre este período).">
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           OnClick="@(() => OnRefresh.InvokeAsync())" 
+                           Disabled="IsLoading"
+                           StartIcon="@Icons.Material.Filled.Refresh">
+                    @(IsLoading ? "Cargando..." : "Actualizar")
+                </MudButton>
+            </MudTooltip>
         </div>
     }
     else

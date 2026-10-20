@@ -39,9 +39,11 @@
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="4">
+                <MudTooltip Text="Busca el stock con los filtros de zafra y estado elegidos.">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
                     @(_loading ? "Cargando..." : "Buscar")
                 </MudButton>
+                </MudTooltip>
             </MudItem>
         </MudGrid>
 

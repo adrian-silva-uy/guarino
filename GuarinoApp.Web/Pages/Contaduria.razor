@@ -161,12 +161,15 @@
                 <MudDivider Class="my-4" />
 
                 <div class="d-flex justify-content-end gap-2">
+                    <MudTooltip Text="Deja los campos en blanco para cargar otras cifras (no se guarda nada hasta que apliques Guardar Datos).">
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Default"
                                OnClick="LimpiarFormulario"
                                Disabled="_loading">
                         Limpiar
                     </MudButton>
+                    </MudTooltip>
+                    <MudTooltip Text="Valida las cifras, guarda los datos y recalcula KPIs y análisis con IA.">
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Primary"
                                OnClick="GuardarDatos"
@@ -174,6 +177,7 @@
                                StartIcon="@Icons.Material.Filled.Save">
                         @(_loading ? "Guardando..." : "Guardar Datos")
                     </MudButton>
+                    </MudTooltip>
                 </div>
             </MudCardContent>
         </MudCard>
@@ -413,6 +417,35 @@
 
     private async Task GuardarDatos()
     {
+        // Validaciones mínimas: un costo o capacidad en cero se guardaría en
+        // silencio y rompería los KPIs de Proyección de Zafra (capital = kg
+        // proyectados × costo/kg). Se avisa y NO se guarda nada.
+        if (_costoPorKg <= 0)
+            {
+            Snackbar.Add("El costo por kg debe ser mayor a 0. No se guardó nada.", Severity.Warning);
+            return;
+            }
+        if (_flujoCaja < 0)
+            {
+            Snackbar.Add("El flujo de caja no puede ser negativo. No se guardó nada.", Severity.Warning);
+            return;
+            }
+        if (_margenBruto < 0 || _margenBruto > 100)
+            {
+            Snackbar.Add("El margen bruto debe estar entre 0 y 100 %. No se guardó nada.", Severity.Warning);
+            return;
+            }
+        if (_costoFlete.HasValue && _costoFlete.Value < 0)
+            {
+            Snackbar.Add("El costo de flete no puede ser negativo. No se guardó nada.", Severity.Warning);
+            return;
+            }
+        if (_capacidadInstalada <= 0)
+            {
+            Snackbar.Add("La capacidad instalada debe ser mayor a 0. No se guardó nada.", Severity.Warning);
+            return;
+            }
+
         _loading = true;
         StateHasChanged();
 

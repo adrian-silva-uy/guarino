@@ -12,9 +12,11 @@
     <MudCardContent>
         <MudGrid>
             <MudItem xs="12" sm="4">
+                <MudTooltip Text="Actualiza los pallets que todavía no tienen cliente asignado.">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
                     @(_loading ? "Cargando..." : "Actualizar")
                 </MudButton>
+                </MudTooltip>
             </MudItem>
         </MudGrid>
 

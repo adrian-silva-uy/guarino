@@ -10,10 +10,12 @@
 <MudText Typo="Typo.body2" Class="mb-4">Resumen de pallets sin cliente agrupado por variedad y estado (cantidad y peso total)</MudText>
 
 <div class="d-flex justify-end mb-4">
+    <MudTooltip Text="Agrupa de nuevo los pallets sin cliente por variedad y estado (cantidad y peso total).">
     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
                OnClick="@LoadData" Disabled="@_loading">
         @(_loading ? "Actualizando..." : "Actualizar")
     </MudButton>
+    </MudTooltip>
 </div>
 
 @if (_loading)

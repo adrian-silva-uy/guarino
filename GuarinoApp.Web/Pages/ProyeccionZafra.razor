@@ -118,10 +118,12 @@
                 {
                     <span class="badge bg-info text-white">Próxima zafra</span>
                 }
+                <MudTooltip Text="Abre el diálogo de impresión para guardar esta proyección como PDF.">
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
                            StartIcon="@Icons.Material.Filled.Print" OnClick="Imprimir" Class="no-print">
                     Imprimir / PDF
                 </MudButton>
+                </MudTooltip>
             </div>
             @if (_anioProyectado.HasValue)
             {
@@ -676,9 +678,11 @@
                 </div>
 
                 <div class="text-end mt-3 no-print">
+                    <MudTooltip Text="Recalcula la proyección, el capital de trabajo y la estrategia con los datos actualizados.">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RecalcularProyeccion" Disabled="_loading">
                         Recalcular Proyección y Estrategia
                     </MudButton>
+                    </MudTooltip>
                 </div>
             }
         </MudCardContent>

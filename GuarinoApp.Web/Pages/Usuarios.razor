@@ -21,6 +21,7 @@
    server-side, la UI solo oculta la opción a los demás roles). *@
 <AuthorizeView Roles="Admin">
     <Authorized>
+        <MudTooltip Text="Abre el formulario para crear un usuario nuevo (solo Admin).">
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.PersonAdd"
@@ -29,6 +30,7 @@
                    Class="mb-3">
             @(_showForm ? "Cerrar formulario" : "Nuevo usuario")
         </MudButton>
+        </MudTooltip>
 
         @if (_showForm)
         {
@@ -71,6 +73,7 @@
                                    Label="Rol"
                                    Variant="Variant.Outlined"
                                    Margin="Margin.Dense"
+                                   HelperText="Admin: todo · Operador: operaciones · Contador: reportes · Gerencia: lectura"
                                    Dense="true">
                             @foreach (var roleName in _roles)
                             {
@@ -80,17 +83,21 @@
                     </MudItem>
                 </MudGrid>
                 <MudStack Row="true" Spacing="2" Class="mt-3">
+                    <MudTooltip Text="Crea el usuario con los datos del formulario (usuario mín. 3 y contraseña mín. 6 caracteres).">
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Primary"
                                OnClick="CrearUsuarioAsync"
                                Disabled="_saving">
                         Crear usuario
                     </MudButton>
+                    </MudTooltip>
+                    <MudTooltip Text="Cierra el formulario sin crear nada.">
                     <MudButton Variant="Variant.Text"
                                OnClick="CancelarForm"
                                Disabled="_saving">
                         Cancelar
                     </MudButton>
+                    </MudTooltip>
                 </MudStack>
             </MudPaper>
         }
@@ -143,6 +150,7 @@ else
                 </div>
             </MudTd>
             <MudTd DataLabel="Rol">
+                <MudTooltip Text="Cambia el rol al instante (solo Admin); el cambio queda registrado en la auditoría.">
                 <MudSelect T="string"
                            Value="@context.Role"
                            ValueChanged="@(role => ChangeRoleAsync(context, role))"
@@ -155,17 +163,20 @@ else
                         <MudSelectItem Value="@roleName">@roleName</MudSelectItem>
                     }
                 </MudSelect>
+                </MudTooltip>
             </MudTd>
             <MudTd DataLabel="Activo">
                 @* Activar/desactivar es potestad exclusiva del Admin;
                    Gerencia solo consulta el estado. *@
                 <AuthorizeView Roles="Admin" Context="authCtx">
                     <Authorized>
+                        <MudTooltip Text="Activa o desactiva la cuenta (solo Admin). Los usuarios inactivos no pueden iniciar sesión.">
                         <MudSwitch T="bool"
                                    Checked="@context.IsActive"
                                    CheckedChanged="(active => ChangeActiveAsync(context, active))"
                                    Color="Color.Success"
                                    Disabled="_saving" />
+                        </MudTooltip>
                     </Authorized>
                     <NotAuthorized>
                         <MudText Typo="Typo.body2">@(context.IsActive ? "Sí" : "No")</MudText>

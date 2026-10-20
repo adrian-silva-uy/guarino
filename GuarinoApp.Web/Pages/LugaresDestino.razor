@@ -13,9 +13,11 @@
     <MudCardContent>
         <MudGrid>
             <MudItem xs="12" sm="4">
+                <MudTooltip Text="Vuelve a leer los destinos internos (frigoríficos y cámaras).">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
                     @(_loading ? "Cargando..." : "Cargar datos")
                 </MudButton>
+                </MudTooltip>
             </MudItem>
         </MudGrid>
 

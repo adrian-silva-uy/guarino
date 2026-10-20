@@ -12,9 +12,11 @@
     <MudCardContent>
         <MudGrid>
             <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudTooltip Text="Recalcula el total de pallets, envases y kilos por contramarca.">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
                     @(_loading ? "Cargando..." : "Cargar datos")
                 </MudButton>
+                </MudTooltip>
             </MudItem>
         </MudGrid>
 

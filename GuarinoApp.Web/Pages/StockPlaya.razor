@@ -12,15 +12,17 @@
     <MudCardContent>
         <MudGrid>
             <MudItem xs="12" sm="6" md="4" lg="3">
-                <MudDatePicker @bind-Date="_fechaDesde" Label="Fecha Desde" DateFormat="dd-MM-yyyy" OnChange="@(() => LoadData())" />
+                <MudDatePicker @bind-Date="_fechaDesde" Label="Fecha Desde" DateFormat="dd-MM-yyyy" OnChange="@(() => LoadData())" HelperText="Solo fruta ingresada desde ese día; vacío = sin límite." />
             </MudItem>
             <MudItem xs="12" sm="6" md="4" lg="3">
-                <MudDatePicker @bind-Date="_fechaHasta" Label="Fecha Hasta" DateFormat="dd-MM-yyyy" OnChange="@(() => LoadData())" />
+                <MudDatePicker @bind-Date="_fechaHasta" Label="Fecha Hasta" DateFormat="dd-MM-yyyy" OnChange="@(() => LoadData())" HelperText="Solo fruta ingresada hasta ese día; vacío = hasta hoy." />
             </MudItem>
             <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudTooltip Text="Vuelve a leer el stock en playa del rango de fechas elegido.">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
                     @(_loading ? "Cargando..." : "Actualizar")
                 </MudButton>
+                </MudTooltip>
             </MudItem>
             <MudItem xs="12" sm="6" md="4" lg="3">
                 <MudButton Variant="Variant.Outlined" OnClick="@ClearFilters" Disabled="@_loading" FullWidth="true">Limpiar filtros</MudButton>

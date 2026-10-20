@@ -20,9 +20,11 @@
     <MudCardContent>
         <MudGrid>
             <MudItem xs="12" sm="4">
+                <MudTooltip Text="Recalcula la tendencia y proyección de volcados con los datos nuevos.">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
                     @(_loading ? "Cargando..." : "Actualizar")
                 </MudButton>
+                </MudTooltip>
             </MudItem>
         </MudGrid>
 

@@ -18,6 +18,7 @@
             de fruta exportable a EEUU, Unión Europea y Brasil — tanto lo que ya ocurrió como lo pronosticado.
         </MudText>
         <div class="d-flex gap-2">
+            <MudTooltip Text="Analiza el historial y el pronóstico a 7 días (heladas, lluvias, viento, calor) sobre los lotes con coordenadas.">
             <MudButton OnClick="EjecutarEscaneo" Disabled="@escaneando" Color="Color.Warning">
                 @if (escaneando)
                 {
@@ -29,9 +30,12 @@
                     <span>Ejecutar Escaneo</span>
                 }
             </MudButton>
+            </MudTooltip>
+            <MudTooltip Text="Vuelve a cargar los lotes, los eventos climáticos y el mapa de riesgos.">
             <MudButton OnClick="CargarDatos" Disabled="@escaneando" Color="Color.Primary">
                 Actualizar
             </MudButton>
+            </MudTooltip>
         </div>
     </div>
 

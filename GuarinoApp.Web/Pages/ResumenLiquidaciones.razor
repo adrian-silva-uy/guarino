@@ -30,9 +30,11 @@
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="4">
+                <MudTooltip Text="Recalcula el resumen: total a pagar, kilos y bins por productor y variedad.">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
                     @(_loading ? "Cargando..." : "Actualizar")
                 </MudButton>
+                </MudTooltip>
             </MudItem>
         </MudGrid>
 
