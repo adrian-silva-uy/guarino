@@ -10,6 +10,10 @@
 
 <MudCard>
     <MudCardContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2" />
+        }
         <MudGrid>
             <MudItem xs="12" sm="6" md="4" lg="3">
                 <MudDatePicker @bind-Date="_fechaDesde" Label="Fecha Desde" DateFormat="dd-MM-yyyy" HelperText="Primer mes/año a resumir; vacío = desde el inicio." />
@@ -38,7 +42,11 @@
                     <MudTh>Nombre</MudTh>
                     <MudTh>Kgs Volcados</MudTh>
                     <MudTh>Bins Volcados</MudTh>
-                    <MudTh>Balanza</MudTh>
+                    <MudTh>
+                        <MudTooltip Text="Básculas con las que se volcó ese mes.">
+                            <span>Básculas</span>
+                        </MudTooltip>
+                    </MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd>@context.Año</MudTd>
@@ -46,7 +54,22 @@
                     <MudTd>@context.Nombre</MudTd>
                     <MudTd>@context.Kgs_Volcados.ToString("N0")</MudTd>
                     <MudTd>@context.BinsVolcados</MudTd>
-                    <MudTd>@context.Balanza</MudTd>
+                    <MudTd>
+                        @if (string.IsNullOrEmpty(context.Balanza))
+                        {
+                            <span>—</span>
+                        }
+                        else if (context.Balanza.Contains(", "))
+                        {
+                            <MudTooltip Text="@context.Balanza">
+                                <span>@($"{context.Balanza.Split(", ").Length} básculas")</span>
+                            </MudTooltip>
+                        }
+                        else
+                        {
+                            <span>@context.Balanza</span>
+                        }
+                    </MudTd>
                 </RowTemplate>
             </MudTable>
         }
@@ -54,7 +77,8 @@
         {
             <MudAlert Severity="Severity.Info">No se encontraron registros con los filtros seleccionados.</MudAlert>
         }
-    <DataSourceFooter EsDummy="false" Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />`n`</MudCardContent>
+    <DataSourceFooter EsDummy="false" Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
+</MudCardContent>
 </MudCard>
 
 @code {

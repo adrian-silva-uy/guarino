@@ -229,16 +229,15 @@
                             Incluye los eventos de <strong>HOY</strong> (día en curso: el dato se confirma con el próximo
                             escáner cada 6 h) y los pronosticados para los próximos 7 días según Open-Meteo.
                             Todavía no pasaron del todo: es la ventana para actuar antes de que impacten la fruta exportable.
-                            Clic en una fila para ver el lote en el mapa. La tabla pagina de a 10 y se filtra por lote o
-                            productor con el buscador (así también llega «↗ Ver en la tabla» del mapa); lista hasta 500
-                            eventos, mientras que los KPIs siempre cuentan el total exacto.
+                            Clic en una fila para ver el lote en el mapa. La tabla no pagina: lista todos los eventos
+                            del filtro (hasta 500) y se filtra por lote o productor con el buscador (así también llega
+                            «↗ Ver en la tabla» del mapa); los KPIs siempre cuentan el total exacto.
                         </MudText>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
                     <MudTable Items="@EventosPronosticadosVisibles" Hover="true" Dense="true"
-                              T="EventoClimaticoDto"
-                              RowsPerPage="10">
+                              T="EventoClimaticoDto">
                         <ToolBarContent>
                             @* Input nativo de Blazor (no MudTextField): @bind sincroniza
                                 garantizadamente en AMBOS sentidos — el usuario filtra al
@@ -277,11 +276,6 @@
                             </MudTd>
                             <MudTd>@(context.PorcentajePerdidaEstimada?.ToString("0.##") ?? "N/D")%</MudTd>
                         </RowTemplate>
-                        <PagerContent>
-                            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }"
-                                           RowsPerPageString="Filas por página:"
-                                           InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
-                        </PagerContent>
                     </MudTable>
                 </MudCardContent>
             </MudCard>
@@ -296,16 +290,15 @@
                         <MudText Typo="Typo.caption">
                             Eventos confirmados en días anteriores de los últimos 30 días (la fecha es el día calendario
                             del evento). La severidad y el % de pérdida son estimaciones por umbrales configurados.
-                            Clic en una fila para ver el lote en el mapa. La tabla pagina de a 10 y se filtra por lote o
-                            productor con el buscador; lista hasta 500 eventos, mientras que los KPIs siempre cuentan
-                            el total exacto.
+                            Clic en una fila para ver el lote en el mapa. La tabla no pagina: lista todos los eventos
+                            del filtro (hasta 500) y se filtra por lote o productor con el buscador; los KPIs siempre
+                            cuentan el total exacto.
                         </MudText>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
                     <MudTable Items="@EventosRecientesVisibles" Hover="true" Dense="true"
-                              T="EventoClimaticoDto"
-                              RowsPerPage="10">
+                              T="EventoClimaticoDto">
                         <ToolBarContent>
                             @* Input nativo de Blazor (ver nota en la tabla de pronóstico). *@
                             <input id="buscar-recientes" class="form-control form-control-sm"
@@ -340,11 +333,6 @@
                             </MudTd>
                             <MudTd>@(context.PorcentajePerdidaEstimada?.ToString("0.##") ?? "N/D")%</MudTd>
                         </RowTemplate>
-                        <PagerContent>
-                            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }"
-                                           RowsPerPageString="Filas por página:"
-                                           InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
-                        </PagerContent>
                     </MudTable>
                 </MudCardContent>
             </MudCard>
@@ -404,7 +392,7 @@
     // tabla o desde el botón «↗ Ver en la tabla» del mapa (climateMap.js fija el
     // valor del input y dispara el evento input → @bind-Value los aplica, todo en
     // el cliente, sin DotNetObjectReference). Así cualquier lote con eventos tiene
-    // sus filas a la vista aunque no esté entre las primeras de la paginación.
+    // sus filas a la vista al instante, sin recorrer la lista completa.
     private string _filtroPronostico = string.Empty;
     private string _filtroRecientes = string.Empty;
 

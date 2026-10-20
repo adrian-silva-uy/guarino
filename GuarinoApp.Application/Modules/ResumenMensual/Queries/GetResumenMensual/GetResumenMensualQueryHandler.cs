@@ -17,26 +17,67 @@ public class GetResumenMensualQueryHandler : IRequestHandler<GetResumenMensualQu
         {
         try
             {
-            var result = await _context.LotesEmboquille
+            // Límites por MES completos: el picker dice "primer/último mes a resumir",
+            // así que 15/05 incluye mayo entero (desde el día 1) y el hasta incluye
+            // el mes elegido completo (límite exclusivo = primer día del mes siguiente).
+            var desdeLimite = request.FechaDesde.HasValue
+                ? new DateTime(request.FechaDesde.Value.Year, request.FechaDesde.Value.Month, 1)
+                : (DateTime?)null;
+            var hastaLimite = request.FechaHasta.HasValue
+                ? new DateTime(request.FechaHasta.Value.Year, request.FechaHasta.Value.Month, 1).AddMonths(1)
+                : (DateTime?)null;
+
+            var meses = await _context.LotesEmboquille
                 .AsNoTracking()
-                .Where(le => !le.Lote.IsDeleted)
+                .Where(le => !le.Lote.IsDeleted
+                    && (!desdeLimite.HasValue || le.FechaProduccion >= desdeLimite.Value)
+                    && (!hastaLimite.HasValue || le.FechaProduccion < hastaLimite.Value))
                 .GroupBy(le => new { le.FechaProduccion.Year, le.FechaProduccion.Month })
-                .Select(g => new ResumenMensualDto
+                .Select(g => new
                     {
-                    Año = g.Key.Year,
-                    Mes = g.Key.Month,
-                    Nombre = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMMM"),
+                    g.Key.Year,
+                    g.Key.Month,
                     Kgs_Volcados = g.Sum(le => le.KilosNetos),
-                    BinsVolcados = g.Sum(le => le.CantidadBins),
-                    Balanza = string.Empty
+                    BinsVolcados = g.Sum(le => le.CantidadBins)
                     })
-                .OrderBy(r => r.Año)
-                .ThenBy(r => r.Mes)
+                .OrderBy(x => x.Year)
+                .ThenBy(x => x.Month)
                 .ToListAsync(cancellationToken);
 
-            if (result == null || !result.Any())
+            if (meses.Count == 0)
                 return new List<ResumenMensualDto>();
-            return result;
+
+            // Básculas reales por mes (SELECT DISTINCT en SQL): un mes puede volcar en
+            // varias básculas, por eso la celda las lista todas (la página muestra
+            // "N básculas" con el detalle al pasar el mouse). Nunca dato inventado.
+            var balanzasMes = await _context.LotesEmboquille
+                .AsNoTracking()
+                .Where(le => !le.Lote.IsDeleted
+                    && (!desdeLimite.HasValue || le.FechaProduccion >= desdeLimite.Value)
+                    && (!hastaLimite.HasValue || le.FechaProduccion < hastaLimite.Value))
+                .Select(le => new
+                    {
+                    le.FechaProduccion.Year,
+                    le.FechaProduccion.Month,
+                    Nombre = le.Bascula != null ? le.Bascula.Descripcion : null
+                    })
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            return meses.Select(m => new ResumenMensualDto
+                {
+                Año = m.Year,
+                Mes = m.Month,
+                Nombre = new DateTime(m.Year, m.Month, 1).ToString("MMMM"),
+                Kgs_Volcados = m.Kgs_Volcados,
+                BinsVolcados = m.BinsVolcados,
+                Balanza = string.Join(", ", balanzasMes
+                    .Where(b => b.Year == m.Year && b.Month == m.Month && b.Nombre != null)
+                    .Select(b => b.Nombre!)
+                    .Distinct()
+                    .OrderBy(n => n))
+                })
+                .ToList();
             }
         catch
             {

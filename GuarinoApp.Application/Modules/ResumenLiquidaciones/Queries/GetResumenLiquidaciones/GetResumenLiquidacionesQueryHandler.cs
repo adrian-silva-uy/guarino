@@ -38,9 +38,18 @@ public class GetResumenLiquidacionesQueryHandler : IRequestHandler<GetResumenLiq
                     Año = g.Key.Año,
                     TotalKgs = g.Sum(l => l.KilosNetos),
                     TotalBins = g.Sum(l => l.CantidadBins),
-                    TotalPagar = g.Sum(l => l.KilosNetos * 10)
+                    // TotalPagar = kilos × 10 (pesos); el redondeo a centavos se hace
+                    // en memoria más abajo (ver comentario).
+                    TotalPagar = g.Sum(l => l.KilosNetos * 10),
                     })
                 .ToListAsync(cancellationToken);
+
+            // TotalPagar en pesos: la BD trae kg con 3 decimales. ROUND() en SQL
+            // conserva la escala original (x,3) y la grilla lo imprimía como
+            // "22600,000"; el redondeo en memoria fija escala 2 → "22600,00" en la
+            // grilla, los exports y el email. Centavos exactos en toda la app.
+            foreach (var fila in result)
+                fila.TotalPagar = Math.Round(fila.TotalPagar, 2);
 
             if (!result.Any())
                 {

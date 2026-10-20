@@ -79,7 +79,7 @@
         </MudCardContent>
     </MudCard>
 
-    <!-- Tabla de Logs (paginación server-side con el mismo pie que el resto de la app) -->
+    <!-- Tabla de Logs: server-side sin paginar, carga todos los registros del filtro de una vez (misma conducta que Stock General) -->
     <MudCard Elevation="1">
         <MudCardContent>
             <MudText Typo="Typo.h6" GutterBottom="true">
@@ -91,8 +91,7 @@
                       Hover="true"
                       Dense="true"
                       Striped="true"
-                      Breakpoint="Breakpoint.Sm"
-                      RowsPerPage="25">
+                      Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     <MudTh>Fecha/Hora</MudTh>
                     <MudTh>Usuario</MudTh>
@@ -125,11 +124,6 @@
                         <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
                     </div>
                 </LoadingContent>
-                <PagerContent>
-                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }"
-                                   RowsPerPageString="Filas por página:"
-                                   InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
-                </PagerContent>
             </MudTable>
         </MudCardContent>
     </MudCard>
@@ -182,9 +176,11 @@
         }
     }
 
-    /// <summary>Carga server-side pageada: MudTable le pasa página y tamaño de
-    /// página (MudTablePager del resto de la app) y el handler consulta con
-    /// Skip/Take. Devuelve también el total para el pie "Mostrando X–Y de Z".</summary>
+    /// <summary>Carga server-side sin paginar (misma conducta que Stock General):
+    /// ignora la página/PageSize que manda la tabla (ya no hay MudTablePager) y pide
+    /// TODOS los registros del filtro de una sola vez (PageSize = int.MaxValue →
+    /// Skip/Take en el handler). Devuelve también el total para el título
+    /// "Registros (N total)".</summary>
     private async Task<TableData<LogDto>> ServerReload(TableState state)
     {
         try
@@ -194,8 +190,8 @@
                 FechaHasta: _fechaHasta,
                 UserName: EsFiltroTodosUsuarios() ? null : _userName,
                 Action: _action,
-                Page: state.Page + 1,
-                PageSize: state.PageSize
+                Page: 1,
+                PageSize: int.MaxValue
             );
 
             var result = await Mediator.Send(query);

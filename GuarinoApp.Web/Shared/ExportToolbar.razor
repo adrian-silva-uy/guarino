@@ -2,6 +2,12 @@
 @inject IJSRuntime JS
 
 <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-4 w-100">
+    @if (IsLoading)
+    {
+        @* Feedback visible mientras la query corre: w-100 ocupa su propia línea
+           (el contenedor tiene flex-wrap) y no desplaza los controles. *@
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="w-100" />
+    }
     <!-- SECCIÓN IZQUIERDA: FILTROS DE FECHA (OPCIONALES) -->
     @if (ShowDateFilters)
     {

@@ -36,7 +36,30 @@
 
         @if (_data.Any())
         {
-            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm" RowsPerPage="25">
+            @* Filtros de Variedad y Productor: los valores salen de los datos ya
+               cargados (no se tipean) y filtran en memoria, sin volver a la BD. *@
+            <MudGrid Class="mb-3">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect T="string" Label="Variedad" Value="_filtroVariedad" ValueChanged="OnFiltroVariedadChanged"
+                               Clearable="true" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined">
+                        @foreach (var v in _variedades)
+                        {
+                            <MudSelectItem Value="@v">@v</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect T="string" Label="Productor" Value="_filtroProductor" ValueChanged="OnFiltroProductorChanged"
+                               Clearable="true" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined">
+                        @foreach (var p in _productores)
+                        {
+                            <MudSelectItem Value="@p">@p</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <MudTable Items="@_visibles" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     @foreach (var prop in typeof(LoteVolcadoDto).GetProperties())
                     {
@@ -50,14 +73,9 @@
                         <MudTd>@value</MudTd>
                     }
                 </RowTemplate>
-                <PagerContent>
-                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }"
-                                   RowsPerPageString="Filas por página:"
-                                   InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
-                </PagerContent>
             </MudTable>
             <!-- refleja lo que devolvió el handler. -->
-            <DataSourceFooter EsDummy="@_esDummy" Origen="@(_esDummy ? "Datos de ejemplo" : "Base de datos DTrace (LotesEmboquille)")" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
+            <DataSourceFooter EsDummy="@_esDummy" Origen="@(_esDummy ? "Datos de ejemplo" : "Base de datos DTrace (LotesEmboquille)")" FechaActualizacion="@DateTime.Now" TotalRegistros="@_visibles.Count()" />
         }
         else if (!_loading && _cargado)
         {
@@ -71,6 +89,20 @@
     private bool _esDummy = false;
     private bool _loading = false;
     private bool _cargado = false;
+
+    // Filtros de Variedad/Productor: valores precargados desde los datos reales
+    // (el usuario elige, no tipea) y filtrado 100% en memoria sobre _data.
+    private string? _filtroVariedad;
+    private string? _filtroProductor;
+    private List<string> _variedades = new();
+    private List<string> _productores = new();
+
+    private IEnumerable<LoteVolcadoDto> _visibles =>
+        _data.Where(d => (_filtroVariedad == null || d.Variedad == _filtroVariedad)
+                      && (_filtroProductor == null || d.Productor == _filtroProductor));
+
+    private void OnFiltroVariedadChanged(string? valor) => _filtroVariedad = valor;
+    private void OnFiltroProductorChanged(string? valor) => _filtroProductor = valor;
 
     // Rango por defecto: últimos 3 meses (mismo criterio que el resto de la app);
     // limpiar el picker deja el límite libre y muestra el histórico completo.
@@ -97,6 +129,15 @@
             var resultado = await Mediator.Send(new GetLotesVolcadosQuery(_fechaDesde, _fechaHasta));
             _data = resultado.Lotes;
             _esDummy = resultado.EsDummy;
+
+            // Opciones de los selects = valores distintos reales del resultado
+            // (y limpio selecciones que ya no existan en el nuevo rango).
+            _variedades = _data.Select(d => d.Variedad).Where(v => !string.IsNullOrEmpty(v))
+                .Distinct().OrderBy(v => v).ToList()!;
+            _productores = _data.Select(d => d.Productor).Where(p => !string.IsNullOrEmpty(p))
+                .Distinct().OrderBy(p => p).ToList()!;
+            if (_filtroVariedad != null && !_variedades.Contains(_filtroVariedad)) _filtroVariedad = null;
+            if (_filtroProductor != null && !_productores.Contains(_filtroProductor)) _filtroProductor = null;
         }
         catch (Exception ex)
         {

@@ -11,6 +11,10 @@
 
 <MudCard>
     <MudCardContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2" />
+        }
         <MudGrid>
             <MudItem xs="12" sm="6" md="4" lg="3">
                 <MudDatePicker @bind-Date="_fechaDesde" Label="Fecha Desde" DateFormat="dd-MM-yyyy" OnChange="@(() => LoadData())" HelperText="Solo fruta ingresada desde ese día; vacío = sin límite." />
@@ -64,7 +68,8 @@
         {
             <MudAlert Severity="Severity.Info">No se encontraron registros.</MudAlert>
         }
-    <DataSourceFooter EsDummy="false" Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />`n`</MudCardContent>
+    <DataSourceFooter EsDummy="false" Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
+</MudCardContent>
 </MudCard>
 
 @code {
