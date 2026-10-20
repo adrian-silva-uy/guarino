@@ -6,12 +6,11 @@ let map = null;
 let markers = [];
 let leafletLoadingPromise = null;
 
-// Enlace bidireccional mapa ↔ tablas:
-// - markersPorCodigo permite que un clic en una fila lleve al lote en el mapa.
-// - window.__guarinoVerFilas lleva del popup del mapa a las filas del lote en las
-//   tablas. Se resuelve 100% en el cliente (sin DotNetObjectReference): es
-//   síncrono, no depende del estado del circuito Blazor y no puede quedar
-//   invalidado tras una reconexión.
+// Enlace bidireccional mapa ↔ tablas, resuelto 100% en el cliente (sin
+// DotNetObjectReference ni handlers de Blazor): síncrono, no depende del estado
+// del circuito y no puede quedar invalidado tras una reconexión.
+// - Fila de tabla → mapa: delegated listener (irAlLoteEnMapa).
+// - Popup del mapa → filas: onclick inline del botón (verFilasDelLote).
 const markersPorCodigo = {};
 
 function escaparHtml(texto) {
@@ -48,6 +47,7 @@ function ensureLeafletLoaded() {
 
 export async function initMap(elementId, markerData) {
     await ensureLeafletLoaded();
+    bindFilaClickListener();
 
     if (map) {
         map.remove();
@@ -124,6 +124,62 @@ export function setMarkers(markerData) {
 }
 
 // --- Enlace bidireccional mapa ↔ tablas -------------------------------------
+
+let filaClickBindeado = false;
+
+/**
+ * Clic en una fila de las tablas de riesgos → llevar al lote en el mapa.
+ * Delegado en document (una sola vez). Es inofensivo fuera de esta página: solo
+ * actúa si el mapa está inicializado y el código de la 2ª columna (Lote) de la
+ * fila clickeada corresponde a un marcador del mapa.
+ */
+function bindFilaClickListener() {
+    if (filaClickBindeado) return;
+    filaClickBindeado = true;
+
+    document.addEventListener('click', (ev) => {
+        const target = ev.target;
+        if (!target || !target.closest || !map) return;
+        if (target.closest('button')) return; // los botones de la fila no navegan
+        const fila = target.closest('.mud-table-body tr');
+        if (!fila) return;
+        const celdas = fila.querySelectorAll('td');
+        if (celdas.length < 2) return;
+        const codigo = celdas[1].textContent.trim();
+        if (!codigo || !markersPorCodigo[codigo]) return;
+        irAlLoteEnMapa(codigo);
+    });
+}
+
+/**
+ * Ubica el lote en el mapa. Si el mapa está fuera de la pantalla (la tabla quedó
+ * scrolleada hacia abajo), primero lleva la vista al mapa y recién ahí vuela al
+ * marcador, para que el usuario VEA la ubicación del lote.
+ */
+function irAlLoteEnMapa(codigo) {
+    const elMapa = document.getElementById('mapa-riesgos-climaticos');
+    let mapaVisible = true;
+    if (elMapa) {
+        const r = elMapa.getBoundingClientRect();
+        mapaVisible = r.top >= 0 && r.bottom <= (window.innerHeight || document.documentElement.clientHeight);
+    }
+
+    const volar = () => {
+        if (focusLote(codigo)) {
+            mostrarAviso(`Lote ${codigo} ubicado en el mapa.`);
+        } else {
+            mostrarAviso(`El lote ${codigo} no tiene coordenadas en el mapa.`);
+        }
+    };
+
+    if (elMapa && !mapaVisible) {
+        elMapa.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Espera a que termine el scroll para que flyTo y el popup se vean.
+        setTimeout(volar, 550);
+    } else {
+        volar();
+    }
+}
 
 /**
  * Muestra un aviso flotante breve (feedback para el usuario cuando una acción

@@ -234,8 +234,7 @@
                 </MudCardHeader>
                 <MudCardContent>
                     <MudTable Items="@resumen.EventosPronosticados" Hover="true" Dense="true"
-                              T="EventoClimaticoDto"
-                              RowClick="IrAlLoteEnMapa">
+                              T="EventoClimaticoDto">
                         <HeaderContent>
                             <MudTh>Fecha (hoy/pronóstico)</MudTh>
                             <MudTh>Lote</MudTh>
@@ -276,8 +275,7 @@
                 </MudCardHeader>
                 <MudCardContent>
                     <MudTable Items="@resumen.EventosRecientes" Hover="true" Dense="true"
-                              T="EventoClimaticoDto"
-                              RowClick="IrAlLoteEnMapa">
+                              T="EventoClimaticoDto">
                         <HeaderContent>
                             <MudTh>Fecha</MudTh>
                             <MudTh>Lote</MudTh>
@@ -460,31 +458,6 @@
     }
 
     private async Task RegenerarPlan() => await GenerarPlan();
-
-    /// <summary>Clic en una fila de cualquiera de las dos tablas: el lote se ubica
-    /// en el mapa (vuelo + popup). Es el enlace bidireccional tabla → mapa. El
-    /// enlace inverso (popup → filas) lo resuelve climateMap.js 100% en el cliente.</summary>
-    private async Task IrAlLoteEnMapa(TableRowClickEventArgs<EventoClimaticoDto> args)
-    {
-        var codigo = args.Item.LoteNombre;
-        if (_mapModule == null || !_mapInicializado)
-        {
-            Snackbar.Add("El mapa aún no está disponible.", Severity.Warning);
-            return;
-        }
-        try
-        {
-            var encontrado = await _mapModule.InvokeAsync<bool>("focusLote", codigo);
-            if (!encontrado)
-            {
-                Snackbar.Add($"El lote {codigo} no tiene coordenadas en el mapa.", Severity.Info);
-            }
-        }
-        catch (JSException ex)
-        {
-            Snackbar.Add($"No se pudo ubicar el lote en el mapa: {ex.Message}", Severity.Warning);
-        }
-    }
 
     private static Color ColorSeveridad(string severidad) => severidad switch
     {
