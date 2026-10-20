@@ -147,7 +147,8 @@
             lote puede acumular varios eventos en un mismo día. La severidad y el % de pérdida son
             <em>estimaciones</em> calculadas por umbrales, no mediciones de campo.
             <strong>Clic en una fila</strong> de las tablas para ver su lote en el mapa; en el popup de un marcador,
-            <strong>«↗ Ver en la tabla»</strong> lleva a las filas de ese lote.
+            <strong>«↗ Ver en la tabla»</strong> filtra la tabla por ese lote y te lleva a sus filas (quitás el filtro
+            con la etiqueta «Filtrado: …» o el buscador de la tabla).
         </MudText>
 
         <!-- KPIs Financieros Detallados -->
@@ -228,13 +229,34 @@
                             Incluye los eventos de <strong>HOY</strong> (día en curso: el dato se confirma con el próximo
                             escáner cada 6 h) y los pronosticados para los próximos 7 días según Open-Meteo.
                             Todavía no pasaron del todo: es la ventana para actuar antes de que impacten la fruta exportable.
-                            Clic en una fila para ver el lote en el mapa.
+                            Clic en una fila para ver el lote en el mapa. La tabla pagina de a 10 y se filtra por lote o
+                            productor con el buscador (así también llega «↗ Ver en la tabla» del mapa); lista hasta 500
+                            eventos, mientras que los KPIs siempre cuentan el total exacto.
                         </MudText>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudTable Items="@resumen.EventosPronosticados" Hover="true" Dense="true"
-                              T="EventoClimaticoDto">
+                    <MudTable Items="@EventosPronosticadosVisibles" Hover="true" Dense="true"
+                              T="EventoClimaticoDto"
+                              RowsPerPage="10">
+                        <ToolBarContent>
+                            @* Input nativo de Blazor (no MudTextField): @bind sincroniza
+                                garantizadamente en AMBOS sentidos — el usuario filtra al
+                                escribir (oninput) y el chip «Filtrado» limpia la caja al
+                                limpiar el campo; el JS del mapa setea el valor y dispara
+                                input/change para aplicar el filtro del botón del popup. *@
+                            <input id="buscar-pronostico" class="form-control form-control-sm"
+                                   style="max-width:280px;"
+                                   placeholder="Buscar lote o productor…"
+                                   @bind="_filtroPronostico" @bind:event="oninput" />
+                            @if (!string.IsNullOrEmpty(_filtroPronostico))
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="ms-2"
+                                         OnClick="LimpiarFiltroPronostico">
+                                    Filtrado: @_filtroPronostico — clic para quitar
+                                </MudChip>
+                            }
+                        </ToolBarContent>
                         <HeaderContent>
                             <MudTh>Fecha (hoy/pronóstico)</MudTh>
                             <MudTh>Lote</MudTh>
@@ -255,6 +277,11 @@
                             </MudTd>
                             <MudTd>@(context.PorcentajePerdidaEstimada?.ToString("0.##") ?? "N/D")%</MudTd>
                         </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }"
+                                           RowsPerPageString="Filas por página:"
+                                           InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+                        </PagerContent>
                     </MudTable>
                 </MudCardContent>
             </MudCard>
@@ -269,13 +296,30 @@
                         <MudText Typo="Typo.caption">
                             Eventos confirmados en días anteriores de los últimos 30 días (la fecha es el día calendario
                             del evento). La severidad y el % de pérdida son estimaciones por umbrales configurados.
-                            Clic en una fila para ver el lote en el mapa.
+                            Clic en una fila para ver el lote en el mapa. La tabla pagina de a 10 y se filtra por lote o
+                            productor con el buscador; lista hasta 500 eventos, mientras que los KPIs siempre cuentan
+                            el total exacto.
                         </MudText>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudTable Items="@resumen.EventosRecientes" Hover="true" Dense="true"
-                              T="EventoClimaticoDto">
+                    <MudTable Items="@EventosRecientesVisibles" Hover="true" Dense="true"
+                              T="EventoClimaticoDto"
+                              RowsPerPage="10">
+                        <ToolBarContent>
+                            @* Input nativo de Blazor (ver nota en la tabla de pronóstico). *@
+                            <input id="buscar-recientes" class="form-control form-control-sm"
+                                   style="max-width:280px;"
+                                   placeholder="Buscar lote o productor…"
+                                   @bind="_filtroRecientes" @bind:event="oninput" />
+                            @if (!string.IsNullOrEmpty(_filtroRecientes))
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="ms-2"
+                                         OnClick="LimpiarFiltroRecientes">
+                                    Filtrado: @_filtroRecientes — clic para quitar
+                                </MudChip>
+                            }
+                        </ToolBarContent>
                         <HeaderContent>
                             <MudTh>Fecha</MudTh>
                             <MudTh>Lote</MudTh>
@@ -296,6 +340,11 @@
                             </MudTd>
                             <MudTd>@(context.PorcentajePerdidaEstimada?.ToString("0.##") ?? "N/D")%</MudTd>
                         </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }"
+                                           RowsPerPageString="Filas por página:"
+                                           InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+                        </PagerContent>
                     </MudTable>
                 </MudCardContent>
             </MudCard>
@@ -350,6 +399,29 @@
 
     private IJSObjectReference? _mapModule;
     private bool _mapInicializado = false;
+
+    // Filtros de búsqueda de las dos tablas. Se escriben desde el buscador de la
+    // tabla o desde el botón «↗ Ver en la tabla» del mapa (climateMap.js fija el
+    // valor del input y dispara el evento input → @bind-Value los aplica, todo en
+    // el cliente, sin DotNetObjectReference). Así cualquier lote con eventos tiene
+    // sus filas a la vista aunque no esté entre las primeras de la paginación.
+    private string _filtroPronostico = string.Empty;
+    private string _filtroRecientes = string.Empty;
+
+    private IEnumerable<EventoClimaticoDto> EventosPronosticadosVisibles =>
+        resumen?.EventosPronosticados.Where(e => CoincideFiltro(e, _filtroPronostico)) ?? [];
+
+    private IEnumerable<EventoClimaticoDto> EventosRecientesVisibles =>
+        resumen?.EventosRecientes.Where(e => CoincideFiltro(e, _filtroRecientes)) ?? [];
+
+    private static bool CoincideFiltro(EventoClimaticoDto ev, string filtro) =>
+        string.IsNullOrWhiteSpace(filtro)
+        || (ev.LoteNombre?.Contains(filtro, StringComparison.OrdinalIgnoreCase) ?? false)
+        || (ev.ProductorNombre?.Contains(filtro, StringComparison.OrdinalIgnoreCase) ?? false);
+
+    private void LimpiarFiltroPronostico() => _filtroPronostico = string.Empty;
+
+    private void LimpiarFiltroRecientes() => _filtroRecientes = string.Empty;
 
     [Inject] private IMediator Mediator { get; set; } = default!;
     [Inject] private ISnackbar Snackbar { get; set; } = default!;

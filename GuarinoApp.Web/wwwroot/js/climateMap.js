@@ -7,11 +7,18 @@ let markers = [];
 let leafletLoadingPromise = null;
 
 // Enlace bidireccional mapa ↔ tablas, resuelto 100% en el cliente (sin
-// DotNetObjectReference ni handlers de Blazor): síncrono, no depende del estado
-// del circuito y no puede quedar invalidado tras una reconexión.
+// DotNetObjectReference ni handlers de Blazor): no depende del estado del
+// circuito y no puede quedar invalidado tras una reconexión.
 // - Fila de tabla → mapa: delegated listener (irAlLoteEnMapa).
-// - Popup del mapa → filas: onclick inline del botón (verFilasDelLote).
+// - Popup del mapa → filas: onclick inline del botón (verFilasDelLote), que
+//   FILTRA la tabla por el lote (los buscadores #buscar-pronostico /
+//   #buscar-recientes de la página) para que sus filas siempre estén a la vista,
+//   aunque la tabla esté paginada o el lote no esté entre las primeras filas.
 const markersPorCodigo = {};
+// Desglose de eventos por lote (mismo corte que el popup, del handler del mapa):
+// { ocurridos, pronosticados } — decide en qué tabla filtrar y si el marcador
+// muestra el botón (los verdes, sin eventos, no lo muestran).
+const datosPorCodigo = {};
 
 function escaparHtml(texto) {
     return (texto || '')
@@ -82,6 +89,7 @@ export function setMarkers(markerData) {
     markers.forEach(m => map.removeLayer(m));
     markers = [];
     Object.keys(markersPorCodigo).forEach(k => delete markersPorCodigo[k]);
+    Object.keys(datosPorCodigo).forEach(k => delete datosPorCodigo[k]);
 
     if (!markerData || markerData.length === 0) {
         map.setView([-32.5, -56.0], 7);
@@ -101,10 +109,20 @@ export function setMarkers(markerData) {
         const safeLabel = escaparHtml(m.label);
         const safeInfo = escaparHtml(m.info);
         const safeCodigo = escaparHtml(m.codigo);
+
+        // Desglose de eventos del lote (lo manda el servidor en cada marcador).
+        const ocurridos = m.ocurridos | 0;
+        const pronosticados = m.hoyPronosticados | 0;
+        if (m.codigo) {
+            datosPorCodigo[m.codigo] = { ocurridos, pronosticados };
+        }
+
         // Botón de enlace inverso: del popup del mapa a las filas del lote en las
         // tablas. onclick inline → llama a la función global definida abajo en este
         // mismo módulo (sin pasar por .NET: no puede fallar por circuito caído).
-        const botonTabla = m.codigo
+        // Solo si el lote tiene eventos: en un marcador verde (sin eventos) no hay
+        // filas que mostrar y el botón sería confuso.
+        const botonTabla = (m.codigo && (ocurridos + pronosticados) > 0)
             ? `<br/><button type="button" class="btn-ver-filas" data-lote="${safeCodigo}" onclick="window.__guarinoVerFilas(this.getAttribute('data-lote'))">↗ Ver en la tabla</button>`
             : '';
         marker.bindPopup(`<strong>${safeLabel}</strong><br/>${safeInfo}${botonTabla}`);
@@ -202,33 +220,89 @@ function mostrarAviso(texto) {
 }
 
 /**
- * «↗ Ver en la tabla» (popup del mapa) → encuentra las filas de ese lote en las
- * tablas de la página, las resalta con parpadeo y lleva la vista hasta ellas.
- * 100% cliente: las filas se identifican por la celda del código de lote
- * (columna 2 de ambas tablas: Fecha | Lote | ...).
- * Devuelve false si el lote no tiene filas visibles (Top-30 por fecha).
+ * Fija el texto de un buscador de tabla (#buscar-pronostico / #buscar-recientes)
+ * y dispara el evento input para que el enlace @bind-Value de Blazor aplique el
+ * filtro. Devuelve false si el buscador no existe en la página.
  */
-export function verFilasDelLote(codigo) {
-    if (!codigo) return false;
+function fijarFiltroTabla(id, valor) {
+    let el = document.getElementById(id);
+    if (!el) return false;
+    if (el.tagName !== 'INPUT') el = el.querySelector('input');
+    if (!el) return false;
+    // SIEMPRE setea y dispara (nunca saltear por "ya coincide"): el texto de la
+    // caja puede quedar desincronizado del filtro real tras limpiar con el chip, y
+    // un salteo dejaría el botón sin efecto para siempre. El input es nativo de
+    // Blazor (@bind:event="oninput") y también se atiende 'change' por seguridad.
+    el.value = valor || '';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+}
 
-    const filas = Array.from(document.querySelectorAll('.mud-table-body tr'))
+/** Filas del lote en el DOM actual (2ª columna = código de lote en ambas tablas). */
+function buscarFilasDelLote(codigo) {
+    return Array.from(document.querySelectorAll('.mud-table-body tr'))
         .filter(tr => {
             const celdas = tr.querySelectorAll('td');
             return celdas.length > 1 && celdas[1].textContent.trim() === codigo;
         });
+}
 
-    if (filas.length === 0) {
-        mostrarAviso(`El lote ${codigo} no tiene filas visibles en las tablas (se muestran los 30 eventos más recientes de cada tabla).`);
+/**
+ * «↗ Ver en la tabla» (popup del mapa) → filtra la(s) tabla(s) donde el lote
+ * tiene eventos por su código, espera a que Blazor pinte las filas filtradas,
+ * las resalta con parpadeo y lleva la vista hasta ellas. 100% cliente: el filtro
+ * se aplica escribiendo en el buscador de la tabla (sin DotNetObjectReference).
+ * Así el botón funciona SIEMPRE que el lote tenga eventos, aunque esté paginado
+ * fuera de pantalla o fuera de las primeras filas visibles.
+ */
+export function verFilasDelLote(codigo) {
+    if (!codigo) return false;
+
+    const datos = datosPorCodigo[codigo];
+    if (datos && (datos.ocurridos + datos.pronosticados) === 0) {
+        mostrarAviso(`El lote ${codigo} no tiene eventos en la ventana (30 días + pronóstico): no hay filas que mostrar.`);
         return false;
     }
 
-    // Limpia el resaltado anterior para que la animación pueda repetirse.
-    document.querySelectorAll('tr.fila-lote-flash').forEach(t => t.classList.remove('fila-lote-flash'));
-    filas.forEach(f => f.classList.add('fila-lote-flash'));
-    filas[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-    mostrarAviso(`${filas.length} fila(s) del lote ${codigo} resaltadas en la tabla.`);
-    // Quita el resaltado al terminar la animación CSS (para poder repetir el clic).
-    setTimeout(() => filas.forEach(f => f.classList.remove('fila-lote-flash')), 2600);
+    // Filtra SOLO la(s) tabla(s) donde el lote tiene filas; la otra se muestra
+    // completa. Sin desglose disponible (cache vieja): filtra ambas por las dudas.
+    if (datos) {
+        fijarFiltroTabla('buscar-pronostico', datos.pronosticados > 0 ? codigo : '');
+        fijarFiltroTabla('buscar-recientes', datos.ocurridos > 0 ? codigo : '');
+    } else {
+        fijarFiltroTabla('buscar-pronostico', codigo);
+        fijarFiltroTabla('buscar-recientes', codigo);
+    }
+
+    // Espera a que Blazor repinte las filas filtradas y resalta cuando ya están
+    // TODAS: se espera el conteo exacto que reporta el marcador (ocurridos +
+    // hoy/pronóstico) para no avisar con un número incompleto si el filtro aún no
+    // aterrizó. Si el lote está paginado en varias páginas, se resalta lo visible
+    // y se dice exactamente cuántas de cuántas hay.
+    const esperado = datos ? (datos.ocurridos + datos.pronosticados) : -1;
+    const esperar = (intento) => {
+        const filas = buscarFilasDelLote(codigo);
+        const completo = filas.length > 0 && (esperado < 0 || filas.length >= esperado);
+
+        if (completo || intento >= 15) { // ~3 s máximo
+            if (filas.length === 0) {
+                mostrarAviso(`No se encontraron filas del lote ${codigo} en las tablas.`);
+                return false;
+            }
+            document.querySelectorAll('tr.fila-lote-flash').forEach(t => t.classList.remove('fila-lote-flash'));
+            filas.forEach(f => f.classList.add('fila-lote-flash'));
+            filas[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            mostrarAviso(esperado >= 0 && filas.length < esperado
+                ? `El lote ${codigo}: ${filas.length} de ${esperado} fila(s) visibles (el resto está en otra página de la tabla).`
+                : `El lote ${codigo}: ${filas.length} fila(s) visibles en la tabla.`);
+            // Quita el resaltado al terminar la animación (para poder repetir el clic).
+            setTimeout(() => filas.forEach(f => f.classList.remove('fila-lote-flash')), 2600);
+            return completo;
+        }
+        setTimeout(() => esperar(intento + 1), 200);
+    };
+    esperar(0);
     return true;
 }
 
@@ -254,4 +328,5 @@ export function dispose() {
     }
     markers = [];
     Object.keys(markersPorCodigo).forEach(k => delete markersPorCodigo[k]);
+    Object.keys(datosPorCodigo).forEach(k => delete datosPorCodigo[k]);
 }

@@ -45,9 +45,20 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Commands
 
             var proyeccion = await ObtenerProyeccionActualAsync(cancellationToken);
 
+            // El historial que llega de la vista puede traer hasta 500 eventos por
+            // grupo (tablas paginadas de la UI), pero el PROMPT de IA se acota a
+            // 30 ya ocurridos + 30 de hoy/pronóstico (orden natural de la lista:
+            // severidad primero) — exactamente lo que la IA recibía antes del cambio:
+            // evita disparar el consumo de tokens y el timeout de 30 s con cientos
+            // de eventos casi idénticos (mismo lote, días seguidos).
+            var historialEventos = request.HistorialEventos
+                .Where(e => !e.EsPronostico).Take(30)
+                .Concat(request.HistorialEventos.Where(e => e.EsPronostico).Take(30))
+                .ToList();
+
             var input = JsonSerializer.Serialize(new
                 {
-                HistorialEventos = request.HistorialEventos,
+                HistorialEventos = historialEventos,
                 ProyeccionActual = proyeccion
                 });
 

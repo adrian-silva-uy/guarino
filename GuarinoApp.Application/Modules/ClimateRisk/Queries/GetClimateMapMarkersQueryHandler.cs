@@ -91,7 +91,12 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Queries
                     Lng = (double)l.Longitude!.Value,
                     Label = $"{l.Codigo} — {l.ProductorNombre}",
                     Info = infoTexto,
-                    Color = color
+                    Color = color,
+                    // Desglose por tabla: el botón «Ver en la tabla» del popup filtra
+                    // solo la tabla donde el lote realmente tiene filas, y los marcadores
+                    // verdes (sin eventos) no muestran el botón.
+                    Ocurridos = info?.Ocurridos ?? 0,
+                    HoyPronosticados = info?.HoyPronosticados ?? 0
                     };
             }).ToList();
             }

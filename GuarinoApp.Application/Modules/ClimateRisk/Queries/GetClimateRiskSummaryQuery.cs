@@ -14,8 +14,13 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Queries
     ///   resto es pronóstico Open-Meteo: es la ventana para actuar preventivamente
     ///   (riego antiheladas, adelantar cosecha, etc.) antes de que impacte la fruta
     ///   destinada a EEUU, UE o Brasil.
+    /// MaxEventosPorGrupo limita las filas de CADA tabla de la vista (paginadas de
+    /// a 10 en la UI). Si es muy chico, un lote con eventos queda fuera de la tabla
+    /// y el enlace «Ver en la tabla» del mapa no encuentra sus filas: por eso es
+    /// amplio (500 por tabla). Los KPIs y totales NUNCA se limitan: son COUNT/SUM
+    /// sobre toda la ventana.
     /// </summary>
-    public record GetClimateRiskSummaryQuery(int DiasHistorial = 30, int MaxEventosPorGrupo = 30)
+    public record GetClimateRiskSummaryQuery(int DiasHistorial = 30, int MaxEventosPorGrupo = 500)
         : IRequest<ClimateRiskSummaryDto?>;
 
     public class GetClimateRiskSummaryQueryHandler
@@ -78,6 +83,10 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Queries
             // global por severidad en SQL obligaba a sortear miles de filas (incluido un
             // nvarchar(max)), pedía un memory grant enorme y terminaba en
             // RESOURCE_SEMAPHORE / timeout según la presión del momento del servidor.
+            // N es amplio (500) para que TODO lote con eventos en la ventana tenga sus
+            // filas disponibles para el buscador/filtro y el botón «Ver en la tabla»
+            // del mapa; con N=30 un lote amarillo (con eventos) quedaba fuera de la
+            // tabla y el botón no encontraba nada.
             var eventosRecientes = await ventana
                 .Where(e => e.Fecha < hoy)
                 .OrderByDescending(e => e.Fecha)

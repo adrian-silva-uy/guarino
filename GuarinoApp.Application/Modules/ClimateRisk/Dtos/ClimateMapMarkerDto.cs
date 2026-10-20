@@ -10,5 +10,15 @@ namespace GuarinoApp.Application.Modules.ClimateRisk.Dtos
         public string Label { get; set; } = string.Empty;
         public string? Info { get; set; }
         public string? Color { get; set; }
+
+        /// <summary>Eventos del lote en la ventana con Fecha &lt; hoy: aparecen en la
+        /// tabla «Impacto Ya Ocurrido». Se expone al JS del mapa para que «Ver en la
+        /// tabla» filtre la tabla correcta (y para que los marcadores verdes, sin
+        /// eventos, no ofrezcan un botón que no tendría filas).</summary>
+        public int Ocurridos { get; set; }
+
+        /// <summary>Eventos del lote con Fecha &gt;= hoy (día en curso + pronóstico
+        /// 7 días): aparecen en la tabla «De Hoy y Riesgo Pronosticado».</summary>
+        public int HoyPronosticados { get; set; }
         }
     }
