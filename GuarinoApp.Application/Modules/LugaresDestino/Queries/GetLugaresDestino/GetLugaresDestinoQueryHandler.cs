@@ -35,14 +35,14 @@ public class GetLugaresDestinoQueryHandler : IRequestHandler<GetLugaresDestinoQu
                 .ToListAsync(cancellationToken);
 
             if (result == null || !result.Any())
-                return GetDummyData();
+                return new List<LugaresDestinoDto>();
 
             return result;
             }
         catch (Exception ex)
             {
             _logger.LogError(ex, "Error consultando lugares de destino vía EF Core; devolviendo datos de ejemplo.");
-            return GetDummyData();
+            return new List<LugaresDestinoDto>();
             }
         }
 

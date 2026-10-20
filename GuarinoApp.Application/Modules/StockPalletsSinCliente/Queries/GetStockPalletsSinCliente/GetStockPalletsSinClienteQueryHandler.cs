@@ -47,11 +47,11 @@ public class GetStockPalletsSinClienteQueryHandler : IRequestHandler<GetStockPal
                 Estado = g.Estado.ToDisplayName()
                 }).ToList();
 
-            return result.Any() ? result : GetDummyData();
+            return result;
             }
         catch
             {
-            return GetDummyData();
+            return new List<StockPalletSinClienteDto>();
             }
         }
 

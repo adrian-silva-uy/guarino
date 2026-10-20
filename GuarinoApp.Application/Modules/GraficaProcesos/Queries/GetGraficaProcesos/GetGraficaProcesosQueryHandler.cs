@@ -62,14 +62,14 @@ public class GetGraficaProcesosQueryHandler : IRequestHandler<GetGraficaProcesos
 
             // Si no hay datos reales (por ejemplo, la vista aún no tiene registros),
             // se devuelven datos dummy para el desarrollo.
-            return GetDummyData(request.FechaDesde, request.FechaHasta);
+            return new List<GraficaProcesosDto>();
             }
         catch (Exception ex)
             {
             // Si la consulta falla (la vista no existe, no hay acceso a producción, etc.),
             // se devuelven datos dummy para no romper la UI.
             _logger.LogError(ex, "Error en GetGraficaProcesos: {Message}", ex.Message);
-            return GetDummyData(request.FechaDesde, request.FechaHasta);
+            return new List<GraficaProcesosDto>();
             }
         }
 

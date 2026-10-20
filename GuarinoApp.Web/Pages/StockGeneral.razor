@@ -19,7 +19,8 @@
     <MudCardContent>
         <MudGrid>
             <MudItem xs="12" sm="4">
-                <MudSelect T="string" @bind-Value="_zafra" Label="Filtrar por Zafra" Variant="Variant.Outlined" Clearable="true">
+                <MudSelect T="string" @bind-Value="_zafra" Label="Filtrar por Zafra" Variant="Variant.Outlined" Clearable="true"
+                           HelperText="Solo esa zafra; sin selección = todas.">
                     <MudSelectItem T="string" Value="@("")">Todos</MudSelectItem>
                     @foreach (var z in _availableZafras)
                     {
@@ -28,7 +29,8 @@
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="4">
-                <MudSelect T="string" @bind-Value="_estado" Label="Estado" Variant="Variant.Outlined" Clearable="true">
+                <MudSelect T="string" @bind-Value="_estado" Label="Estado" Variant="Variant.Outlined" Clearable="true"
+                           HelperText="Despachado o En Frío; sin selección = todos.">
                     <MudSelectItem T="string" Value="@("")">Todos</MudSelectItem>
                     @foreach (var e in _availableEstados)
                     {

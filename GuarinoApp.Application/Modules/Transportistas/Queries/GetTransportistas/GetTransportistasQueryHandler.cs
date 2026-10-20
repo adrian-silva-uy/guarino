@@ -30,12 +30,12 @@ public class GetTransportistasQueryHandler : IRequestHandler<GetTransportistasQu
                 .ToListAsync(cancellationToken);
 
             if (result == null || !result.Any())
-                return GetDummyData();
+                return new List<TransportistaDto>();
             return result;
             }
         catch
             {
-            return GetDummyData();
+            return new List<TransportistaDto>();
             }
         }
 

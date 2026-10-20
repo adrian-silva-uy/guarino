@@ -637,7 +637,12 @@ namespace GuarinoApp.Infrastructure.Data
         /// </summary>
         private static void SembrarLotesEmboquille(ApplicationDbContext context, Random random)
             {
-            if (context.LotesEmboquille.Any())
+            // Solo saltar si YA sembramos nosotros: otras siembras (p. ej. la
+            // legada SeedProyeccionZafra, que escribe Estado="Finalizado") llenan
+            // esta misma tabla y no deben impedir la siembra de Stock Playa
+            // (filas con Estado "E"), que de lo contrario queda siempre vacía
+            // para el handler Estado == "E" de la página Stock en Playa.
+            if (context.LotesEmboquille.Any(e => e.CreatedBy == "DbInitializer"))
                 return;
 
             var basculas = context.Basculas.AsNoTracking().Where(b => !b.IsDeleted).Select(b => b.Id).ToList();

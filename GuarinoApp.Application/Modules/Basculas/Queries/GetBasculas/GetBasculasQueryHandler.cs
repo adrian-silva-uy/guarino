@@ -36,12 +36,12 @@ public class GetBasculasQueryHandler : IRequestHandler<GetBasculasQuery, List<Ba
                 .ToListAsync(cancellationToken);
 
             if (result == null || result.Count == 0)
-                return GetDummyData();
+                return new List<BasculaDto>();
             return result;
             }
         catch
             {
-            return GetDummyData();
+            return new List<BasculaDto>();
             }
         }
 

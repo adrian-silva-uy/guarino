@@ -37,7 +37,7 @@
                 </RowTemplate>
             </MudTable>
 
-            <DataSourceFooter EsDummy="true" Origen="Base de datos DTrace" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
+            <DataSourceFooter EsDummy="false" Origen="Base de datos DTrace" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />
         }
         else if (!_loading && _cargado)
         {

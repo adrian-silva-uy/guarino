@@ -35,12 +35,12 @@ public class GetResumenMensualQueryHandler : IRequestHandler<GetResumenMensualQu
                 .ToListAsync(cancellationToken);
 
             if (result == null || !result.Any())
-                return GetDummyData(request.FechaDesde, request.FechaHasta);
+                return new List<ResumenMensualDto>();
             return result;
             }
         catch
             {
-            return GetDummyData(request.FechaDesde, request.FechaHasta);
+            return new List<ResumenMensualDto>();
             }
         }
 

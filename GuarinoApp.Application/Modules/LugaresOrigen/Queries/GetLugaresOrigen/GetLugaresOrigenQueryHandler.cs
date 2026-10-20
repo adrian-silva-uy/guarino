@@ -35,14 +35,14 @@ public class GetLugaresOrigenQueryHandler : IRequestHandler<GetLugaresOrigenQuer
                 .ToListAsync(cancellationToken);
 
             if (result == null || result.Count == 0)
-                return GetDummyData();
+                return new List<LugaresOrigenDto>();
 
             return result;
             }
         catch (Exception ex)
             {
             _logger.LogError(ex, "Error consultando lugares de origen vía EF Core; devolviendo datos de ejemplo.");
-            return GetDummyData();
+            return new List<LugaresOrigenDto>();
             }
         }
 

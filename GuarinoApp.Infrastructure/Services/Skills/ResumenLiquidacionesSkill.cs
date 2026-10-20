@@ -34,7 +34,15 @@ public sealed class ResumenLiquidacionesSkill : ISkill
     public async Task<SkillOutput> ExecuteAsync(CancellationToken cancellationToken = default)
     {
         var resultado = await _mediator.Send(new GetResumenLiquidacionesQuery(), cancellationToken);
-        var liquidaciones = resultado?.Liquidaciones ?? [];
+
+        // Nunca alimenta al modelo con el fallback dummy del handler (EsDummy):
+        // si la tabla está vacía o hubo un error, el handler devuelve filas de
+        // ejemplo aleatorias y este guard las convierte en "sin datos" en vez de
+        // inventarle importes a la IA. Mismo patrón que VolcadosLotesSkill/PesadasSkill.
+        if (resultado is null || resultado.EsDummy)
+            return SkillOutput.Error("No hay liquidaciones reales registradas: el sistema no tiene datos de liquidaciones conectados.");
+
+        var liquidaciones = resultado.Liquidaciones ?? [];
 
         if (liquidaciones == null || liquidaciones.Count == 0)
             return SkillOutput.Error("No hay liquidaciones registradas en el sistema.");

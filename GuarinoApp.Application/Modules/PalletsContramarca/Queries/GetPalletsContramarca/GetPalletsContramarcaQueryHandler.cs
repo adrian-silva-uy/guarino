@@ -42,7 +42,7 @@ public class GetPalletsContramarcaQueryHandler : IRequestHandler<GetPalletsContr
             // Si no hay datos, retorna el fallback (dummy data)
             if (result.Count == 0)
                 {
-                return GetDummyData();
+                return new List<PalletContramarcaDto>();
                 }
 
             return result;
@@ -50,7 +50,7 @@ public class GetPalletsContramarcaQueryHandler : IRequestHandler<GetPalletsContr
         catch (Exception ex)
             {
             _logger.LogError(ex, "Error al obtener pallets por contramarca");
-            return GetDummyData();
+            return new List<PalletContramarcaDto>();
             }
         }
 

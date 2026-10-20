@@ -66,13 +66,13 @@ public class GetStockPlayaQueryHandler : IRequestHandler<GetStockPlayaQuery, Lis
                 }).ToListAsync(ct);
 
             if (!result.Any())
-                return GetDummyData();
+                return new List<StockPlayaDto>();
             return result;
             }
         catch (Exception ex)
             {
             _logger.LogError(ex, "Error al obtener Stock en Playa con filtros {@Filters}", request.Filters);
-            return GetDummyData();
+            return new List<StockPlayaDto>();
             }
         }
 

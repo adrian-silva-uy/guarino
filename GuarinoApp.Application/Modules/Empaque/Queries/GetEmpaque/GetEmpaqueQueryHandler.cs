@@ -49,7 +49,7 @@ public class GetEmpaqueQueryHandler : IRequestHandler<GetEmpaqueQuery, List<Empa
             if (queryResult.Count == 0)
                 {
                 _logger.LogInformation("No se encontraron registros de pallets empacados validos. Retornando Mock.");
-                return GetDummyData();
+                return new List<EmpaqueDto>();
                 }
 
             return queryResult.ConvertAll(r => new EmpaqueDto
@@ -65,7 +65,7 @@ public class GetEmpaqueQueryHandler : IRequestHandler<GetEmpaqueQuery, List<Empa
         catch (Exception ex)
             {
             _logger.LogError(ex, "Error crítico ejecutando la consulta de Empaques en la entidad Pallet.");
-            return GetDummyData();
+            return new List<EmpaqueDto>();
             }
         }
 

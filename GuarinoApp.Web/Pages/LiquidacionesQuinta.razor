@@ -21,7 +21,8 @@
         <MudGrid>
             <MudItem xs="12" sm="4">
                 <MudSelect T="int?" Label="Año" Value="_anio" ValueChanged="OnAnioChanged" Dense="true"
-                           Variant="Variant.Outlined" Style="max-width: 180px;" Disabled="@_loading">
+                           Variant="Variant.Outlined" Style="max-width: 180px;" Disabled="@_loading"
+                           HelperText="Solo ese año (por fecha de ingreso); sin selección = todos.">
                     <MudSelectItem T="int?" Value="@((int?)null)">Todos los años</MudSelectItem>
                     @foreach (var a in _anios)
                     {
@@ -30,9 +31,11 @@
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="4">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
-                    @(_loading ? "Cargando..." : "Actualizar")
-                </MudButton>
+                <MudTooltip Text="Vuelve a leer la base por el año elegido (kilos y a pagar por quinta, productor y variedad).">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadData" Disabled="@_loading" FullWidth="true">
+                        @(_loading ? "Cargando..." : "Actualizar")
+                    </MudButton>
+                </MudTooltip>
             </MudItem>
         </MudGrid>
 

@@ -65,7 +65,7 @@ public class GetPalletsSinClienteQueryHandler : IRequestHandler<GetPalletsSinCli
             if (result.Count == 0)
                 {
                 _logger.LogInformation("No se encontraron pallets sin cliente en la base de datos. Retornando datos dummy.");
-                return GetDummyData();
+                return new List<PalletSinClienteDto>();
                 }
 
             _logger.LogInformation("Se encontraron {Count} pallets sin cliente.", result.Count);
@@ -74,7 +74,7 @@ public class GetPalletsSinClienteQueryHandler : IRequestHandler<GetPalletsSinCli
         catch (Exception ex)
             {
             _logger.LogError(ex, "Error crítico al consultar pallets sin cliente. Retornando datos dummy.");
-            return GetDummyData();
+            return new List<PalletSinClienteDto>();
             }
         }
 

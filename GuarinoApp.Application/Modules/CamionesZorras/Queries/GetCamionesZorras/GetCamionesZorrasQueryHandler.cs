@@ -40,12 +40,12 @@ public class GetCamionesZorrasQueryHandler : IRequestHandler<GetCamionesZorrasQu
                 .ToList();
 
             if (result == null || !result.Any())
-                return GetDummyData();
+                return new List<CamionZorraDto>();
             return result;
             }
         catch
             {
-            return GetDummyData();
+            return new List<CamionZorraDto>();
             }
         }
 

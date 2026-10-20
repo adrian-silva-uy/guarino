@@ -9,6 +9,7 @@
                       Variant="Variant.Outlined"
                       InputType="InputType.Email"
                       Immediate="true"
+                      HelperText="Un solo correo (ej.: gerencia@empresa.uy); el reporte llega como mensaje con los datos del período."
                       Validation="@(new Func<string, string>(ValidateEmail))" />
 
         @if (!string.IsNullOrEmpty(_error))
