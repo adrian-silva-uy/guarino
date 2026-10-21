@@ -101,14 +101,21 @@ public class GetContextoOperativoQueryHandler
             {
             }
 
-        // --- Pallets sin cliente (mismo filtro que el módulo Stock de Pallets Sin Cliente) ---
+        // --- Pallets sin cliente (mismo filtro que el módulo Pallets Sin Cliente) ---
+        // Solo cuentan los que siguen EN NUESTRO PODER (PreFrío/EnFrío/Rearmado):
+        // un pallet sin cliente pero ya Despachado o de Baja no es stock
+        // inmovilizado — salió de la planta y mostrarlo como pendiente contradecía
+        // el propio KPI ("kg inmovilizados"). Es una inconsistencia de la ficha
+        // del pallet, que se corrige en el módulo de pallets, no acá.
         try
             {
             var hayPallets = await _context.Pallets.AsNoTracking().AnyAsync(ct);
             if (hayPallets)
                 {
                 var sinCliente = _context.Pallets.AsNoTracking()
-                    .Where(p => string.IsNullOrEmpty(p.Cliente) && p.Estado != EstadoPallet.Bajado);
+                    .Where(p => string.IsNullOrEmpty(p.Cliente)
+                        && p.Estado != EstadoPallet.Bajado
+                        && p.Estado != EstadoPallet.Despachado);
                 dto.PalletsSinCliente = await sinCliente.CountAsync(ct);
                 dto.PalletsSinClienteKg = await sinCliente.SumAsync(p => (decimal?)(p.PesoNeto ?? 0m), ct);
                 }

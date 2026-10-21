@@ -45,9 +45,15 @@ public class GetPalletsSinClienteQueryHandler : IRequestHandler<GetPalletsSinCli
 
             var query = _context.Pallets
                 .AsNoTracking()
-                // Filtra: Sin cliente (null o vacío) Y estado distinto de Bajado
+                // Solo pallets SIN cliente que siguen EN NUESTRO PODER (PreFrío/
+                // EnFrío/Rearmado): sin cliente y ni de Baja ni Despachado. Un
+                // pallet ya despachado sin cliente no es stock que falte asignar
+                // (salió de la planta): es una inconsistencia de la ficha, y
+                // mostrarlo como "pendiente" contradecía el módulo y el KPI de
+                // Contaduría ("kg inmovilizados").
                 .Where(p => (string.IsNullOrEmpty(p.Cliente) || p.Cliente.Trim().Length == 0)
-                           && p.Estado != EstadoPallet.Bajado);
+                           && p.Estado != EstadoPallet.Bajado
+                           && p.Estado != EstadoPallet.Despachado);
 
             var result = await query
                 .Select(p => new PalletSinClienteDto

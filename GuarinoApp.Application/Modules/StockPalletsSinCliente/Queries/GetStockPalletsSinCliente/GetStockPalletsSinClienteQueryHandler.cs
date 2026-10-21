@@ -24,7 +24,12 @@ public class GetStockPalletsSinClienteQueryHandler : IRequestHandler<GetStockPal
             // filas con NULL al filtrar contra el texto 'B').
             var rawData = await _context.Pallets
                 .AsNoTracking()
-                .Where(p => string.IsNullOrEmpty(p.Cliente) && p.Estado != EstadoPallet.Bajado)
+                // Mismo criterio que Pallets Sin Cliente: sin cliente y sigue en
+                // nuestro poder (ni Baja ni Despachado) — un pallet despachado
+                // no es stock inmovilizado pendiente de asignar.
+                .Where(p => string.IsNullOrEmpty(p.Cliente)
+                    && p.Estado != EstadoPallet.Bajado
+                    && p.Estado != EstadoPallet.Despachado)
                 .GroupBy(p => new
                     {
                     Variedad = p.Variedad ?? "Sin variedad",
