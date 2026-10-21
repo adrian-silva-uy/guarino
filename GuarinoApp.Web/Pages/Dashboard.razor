@@ -190,7 +190,7 @@
 
                 @if (_tableData.Any())
                 {
-                    <MudTable Items="@_tableData"
+                    <MudTable RowsPerPage="25" Items="@_tableData"
                               Hover="true"
                               Striped="true"
                               Dense="true"
@@ -209,6 +209,10 @@
                             <MudTd DataLabel="Bins" Numeric="true">@context.Bins</MudTd>
                             <MudTd DataLabel="Zafra">@context.Zafra</MudTd>
                         </RowTemplate>
+
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+                    </PagerContent>
                     </MudTable>
                 }
                 else

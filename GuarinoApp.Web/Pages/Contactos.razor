@@ -91,7 +91,7 @@
     <MudProgressLinear Indeterminate="true" Class="my-2" />
 }
 
-<MudTable T="ContactoDto" Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+<MudTable RowsPerPage="25" T="ContactoDto" Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
     <HeaderContent>
         <MudTh>Nombre</MudTh>
         <MudTh>Empresa</MudTh>
@@ -129,6 +129,10 @@
             <MudText Typo="Typo.body2">No se encontraron contactos.</MudText>
         }
     </NoRecordsContent>
+
+<PagerContent>
+    <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+</PagerContent>
 </MudTable>
 
 @if (_cargado && !_loading)

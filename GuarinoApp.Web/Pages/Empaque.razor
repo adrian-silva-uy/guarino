@@ -37,7 +37,7 @@
                 </MudItem>
             </MudGrid>
 
-            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+            <MudTable RowsPerPage="25" Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     <MudTh>Empaque</MudTh>
                     <MudTh Numeric="true">Pallets</MudTh>
@@ -54,6 +54,10 @@
                     <MudTd Numeric="true">@context.CapacidadMaxima</MudTd>
                     <MudTd Numeric="true">@(context.Ocupacion?.ToString() ?? "0")%</MudTd>
                 </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+            </PagerContent>
             </MudTable>
 
             <DataSourceFooter EsDummy="false" Origen="Base de datos DTrace (Producción)"

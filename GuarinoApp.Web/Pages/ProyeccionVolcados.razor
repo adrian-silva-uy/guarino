@@ -75,7 +75,7 @@
             </MudGrid>
 
             <!-- Tabla detallada -->
-            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm" Class="mt-4">
+            <MudTable RowsPerPage="25" Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm" Class="mt-4">
                 <HeaderContent>
                     <MudTh>Periodo</MudTh>
                     <MudTh Numeric="true">Histórico (Kgs)</MudTh>
@@ -106,6 +106,10 @@
                         <MudText Typo="Typo.caption" Color="Color.Tertiary">@(context.EsProyectado ? "80%" : "100%")</MudText>
                     </MudTd>
                 </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+            </PagerContent>
             </MudTable>
 
             <!-- Panel de IA interactivo -->

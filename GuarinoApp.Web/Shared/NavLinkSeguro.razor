@@ -1,0 +1,42 @@
+@using GuarinoApp.Web.Services
+@inject MapaAccesosRutas Mapa
+@inject ICurrentUserService UsuarioActual
+
+@* Link del menú lateral derivado de la matriz de autorización (MapaAccesosRutas):
+   si el rol del usuario no está en el [Authorize] de la página destino, se
+   renderiza bloqueado con candado y tooltip que explica qué rol lo requiere.
+   Es feedback de UX; la seguridad la impone el [Authorize] de la página. *@
+@if (Mapa.Permite(Href, Rol))
+{
+    <MudNavLink Href="@Href" Match="@Match" Icon="@Icon" IconColor="@IconColor">
+        @ChildContent
+    </MudNavLink>
+}
+else
+{
+    <MudTooltip Text="@Mapa.TextoBloqueo(Href, Rol)">
+        <MudNavLink Disabled="true" Icon="@Icons.Material.Filled.Lock" IconColor="Color.Default">
+            @ChildContent
+        </MudNavLink>
+    </MudTooltip>
+}
+
+@code {
+    /// <summary>Ruta destino (debe coincidir con el @page de la página).</summary>
+    [Parameter, EditorRequired] public string Href { get; set; } = string.Empty;
+
+    /// <summary>Texto visible del link.</summary>
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public Color IconColor { get; set; } = Color.Default;
+    [Parameter] public NavLinkMatch Match { get; set; } = NavLinkMatch.Prefix;
+
+    private string? Rol { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        // Se recalcula en cada set de parámetros para reflejar cambios de sesión.
+        Rol = RolUsuario.Resolver(UsuarioActual);
+    }
+}

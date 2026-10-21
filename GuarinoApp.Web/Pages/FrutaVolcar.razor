@@ -58,7 +58,7 @@
                 </MudItem>
             </MudGrid>
 
-            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm" Class="mt-6">
+            <MudTable RowsPerPage="25" Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm" Class="mt-6">
                 <HeaderContent>
                     <MudTh>Lote</MudTh>
                     <MudTh>Productor</MudTh>
@@ -77,6 +77,10 @@
                     <MudTd DataLabel="Saldo" Numeric="true">@context.Saldo</MudTd>
                     <MudTd DataLabel="Kg Saldo" Numeric="true">@context.KgSaldo.ToString("N0")</MudTd>
                 </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+            </PagerContent>
             </MudTable>
         }
         else if (!_loading && _cargado)

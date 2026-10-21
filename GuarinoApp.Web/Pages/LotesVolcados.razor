@@ -53,7 +53,7 @@
                 </MudItem>
             </MudGrid>
 
-            <MudTable Items="@_visibles" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+            <MudTable RowsPerPage="25" Items="@_visibles" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     @foreach (var prop in typeof(LoteVolcadoDto).GetProperties())
                     {
@@ -67,6 +67,10 @@
                         <MudTd>@value</MudTd>
                     }
                 </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+            </PagerContent>
             </MudTable>
             <!-- refleja lo que devolvió el handler. -->
             <DataSourceFooter EsDummy="@_esDummy" Origen="@(_esDummy ? "Datos de ejemplo" : "Base de datos DTrace (LotesEmboquille)")" FechaActualizacion="@DateTime.Now" TotalRegistros="@_visibles.Count()" />

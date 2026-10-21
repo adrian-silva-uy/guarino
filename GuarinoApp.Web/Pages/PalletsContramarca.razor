@@ -22,7 +22,7 @@
 
         @if (_data.Any())
         {
-            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+            <MudTable RowsPerPage="25" Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     <MudTh>Contramarca</MudTh>
                     <MudTh Numeric="true">Total Pallets</MudTh>
@@ -35,6 +35,10 @@
                     <MudTd Numeric="true">@context.TotalEnvases</MudTd>
                     <MudTd Numeric="true">@context.PesoTotal.ToString("N2")</MudTd>
                 </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+            </PagerContent>
             </MudTable>
 
             <MudText Typo="Typo.body2" Class="mt-4">Total registros: @_data.Count</MudText>

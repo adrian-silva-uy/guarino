@@ -1,0 +1,35 @@
+@using GuarinoApp.Web.Services
+@inject MapaAccesosRutas Mapa
+@inject ICurrentUserService UsuarioActual
+
+@* Enlace de la página Inicio derivado de la matriz de autorización
+   (MapaAccesosRutas): si el rol del usuario no está en el [Authorize] de la
+   página destino, se renderiza bloqueado con candado y tooltip que explica
+   qué rol lo requiere. Feedback de UX; la seguridad la impone la página. *@
+@if (Mapa.Permite(Href, Rol))
+{
+    <MudLink Href="@Href" Typo="Typo.body2">@ChildContent</MudLink>
+}
+else
+{
+    <MudTooltip Text="@Mapa.TextoBloqueo(Href, Rol)">
+        <MudLink Typo="Typo.body2" Disabled="true">
+            @ChildContent 🔒
+        </MudLink>
+    </MudTooltip>
+}
+
+@code {
+    /// <summary>Ruta destino (debe coincidir con el @page de la página).</summary>
+    [Parameter, EditorRequired] public string Href { get; set; } = string.Empty;
+
+    /// <summary>Texto visible del enlace.</summary>
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+
+    private string? Rol { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        Rol = RolUsuario.Resolver(UsuarioActual);
+    }
+}

@@ -35,7 +35,7 @@
 
         @if (_data.Any())
         {
-            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" SortLabel="Ordenar por" Breakpoint="Breakpoint.Sm">
+            <MudTable RowsPerPage="25" Items="@_data" Hover="true" Striped="true" Dense="true" SortLabel="Ordenar por" Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     <MudTh>Año</MudTh>
                     <MudTh>Mes</MudTh>
@@ -71,6 +71,10 @@
                         }
                     </MudTd>
                 </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+            </PagerContent>
             </MudTable>
         }
         else if (!_loading && _cargado)

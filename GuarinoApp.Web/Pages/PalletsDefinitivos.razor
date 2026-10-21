@@ -42,7 +42,7 @@
 
 <MudDivider Class="mb-4" />
 
-<MudTable T="PalletDefinitivoDto"
+<MudTable RowsPerPage="25" T="PalletDefinitivoDto"
           Items="_pallets"
           Loading="_isLoading"
           Hover="true"
@@ -119,6 +119,10 @@
         <MudText>No se encontraron pallets en el rango seleccionado. Ajustá las fechas para ampliar la búsqueda.</MudText>
     </NoRecordsContent>
 
+
+<PagerContent>
+    <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+</PagerContent>
 </MudTable>
 
 <DataSourceFooter EsDummy="@_esDummy"

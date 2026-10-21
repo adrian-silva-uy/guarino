@@ -446,7 +446,7 @@
                 <!-- Fila 3: Panorama completo de zafras (histórico + proyección + impacto operativo) -->
                 <MudDivider Class="my-4" />
                 <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-3">Panorama de Zafras: Histórico y Proyección</MudText>
-                <MudTable Items="@_zafras.OrderBy(z => z.Año)" Hover="true" Dense="true" Striped="true" Breakpoint="Breakpoint.Sm" Class="mb-2">
+                <MudTable RowsPerPage="25" Items="@_zafras.OrderBy(z => z.Año)" Hover="true" Dense="true" Striped="true" Breakpoint="Breakpoint.Sm" Class="mb-2">
                     <HeaderContent>
                         <MudTh>Zafra</MudTh>
                         <MudTh>Estado</MudTh>
@@ -495,6 +495,10 @@
                             }
                         </MudTd>
                     </RowTemplate>
+
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+                </PagerContent>
                 </MudTable>
                 @if (_proyectadaRef != null && !string.IsNullOrWhiteSpace(_proyectadaRef.SupuestosOperativos))
                 {
@@ -516,7 +520,7 @@
                                 </MudText>
                                 @if (_escenarios.Any())
                                 {
-                                    <MudTable Items="@_escenarios" Hover="true" Dense="true" Striped="true">
+                                    <MudTable RowsPerPage="25" Items="@_escenarios" Hover="true" Dense="true" Striped="true">
                                         <HeaderContent>
                                             <MudTh>Escenario</MudTh>
                                             <MudTh Numeric="true">Volumen Proj.</MudTh>
@@ -542,6 +546,10 @@
                                                 }
                                             </MudTd>
                                         </RowTemplate>
+
+                                    <PagerContent>
+                                        <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+                                    </PagerContent>
                                     </MudTable>
                                 }
                             </MudCardContent>

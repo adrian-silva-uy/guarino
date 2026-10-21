@@ -55,7 +55,7 @@
             <MudText Typo="Typo.subtitle2" Class="mt-3">
                 @_filas.Count contacto(s) detectado(s) — revisá la lista antes de importar.
             </MudText>
-            <MudTable Items="@_filas" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm"
+            <MudTable RowsPerPage="25" Items="@_filas" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm"
                       Height="240px" FixedHeader="true" Class="mt-1">
                 <HeaderContent>
                     <MudTh>Nombre</MudTh>
@@ -69,6 +69,10 @@
                     <MudTd DataLabel="Correo">@fila.Email</MudTd>
                     <MudTd DataLabel="Teléfono">@fila.Telefono</MudTd>
                 </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+            </PagerContent>
             </MudTable>
         }
 

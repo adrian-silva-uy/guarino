@@ -60,19 +60,11 @@
             </MudCardHeader>
             <MudCardContent>
                 <div class="d-flex flex-column gap-1">
-                    <MudLink Href="/dashboard" Typo="Typo.body2">Dashboard Ejecutivo</MudLink>
-                    <AuthorizeView Roles="Admin, Gerencia">
-                        <Authorized>
-                            <MudLink Href="/gerencia" Typo="Typo.body2">Panel de Gerencia</MudLink>
-                        </Authorized>
-                    </AuthorizeView>
-                    <MudLink Href="/proyeccion-volcados" Typo="Typo.body2">Proyección de Volcados</MudLink>
-                    <AuthorizeView Roles="Admin, Gerencia, Contador">
-                        <Authorized>
-                            <MudLink Href="/proyeccion-zafra" Typo="Typo.body2">Proyección de Zafra Siguiente</MudLink>
-                        </Authorized>
-                    </AuthorizeView>
-                    <MudLink Href="/resumenmensual" Typo="Typo.body2">Resumen Mensual</MudLink>
+                    <EnlaceSeguro Href="/dashboard">Dashboard Ejecutivo</EnlaceSeguro>
+                    <EnlaceSeguro Href="/gerencia">Panel de Gerencia</EnlaceSeguro>
+                    <EnlaceSeguro Href="/proyeccion-volcados">Proyección de Volcados</EnlaceSeguro>
+                    <EnlaceSeguro Href="/proyeccion-zafra">Proyección de Zafra Siguiente</EnlaceSeguro>
+                    <EnlaceSeguro Href="/resumenmensual">Resumen Mensual</EnlaceSeguro>
                 </div>
             </MudCardContent>
         </MudCard>
@@ -93,12 +85,12 @@
             </MudCardHeader>
             <MudCardContent>
                 <div class="d-flex flex-column gap-1">
-                    <MudLink Href="/frutavolcar" Typo="Typo.body2">Fruta a Volcar</MudLink>
-                    <MudLink Href="/empaque" Typo="Typo.body2">Gestión de Empaque</MudLink>
-                    <MudLink Href="/basculas" Typo="Typo.body2">Básculas</MudLink>
-                    <MudLink Href="/registropesadas" Typo="Typo.body2">Registro de Pesadas</MudLink>
-                    <MudLink Href="/camioneszorras" Typo="Typo.body2">Camiones y Zorras</MudLink>
-                    <MudLink Href="/graficaprocesos" Typo="Typo.body2">Gráfica de Procesos</MudLink>
+                    <EnlaceSeguro Href="/frutavolcar">Fruta a Volcar</EnlaceSeguro>
+                    <EnlaceSeguro Href="/empaque">Gestión de Empaque</EnlaceSeguro>
+                    <EnlaceSeguro Href="/basculas">Básculas</EnlaceSeguro>
+                    <EnlaceSeguro Href="/registropesadas">Registro de Pesadas</EnlaceSeguro>
+                    <EnlaceSeguro Href="/camioneszorras">Camiones y Zorras</EnlaceSeguro>
+                    <EnlaceSeguro Href="/graficaprocesos">Gráfica de Procesos</EnlaceSeguro>
                 </div>
             </MudCardContent>
         </MudCard>
@@ -119,11 +111,11 @@
             </MudCardHeader>
             <MudCardContent>
                 <div class="d-flex flex-column gap-1">
-                    <MudLink Href="/stockgeneral" Typo="Typo.body2">Stock General</MudLink>
-                    <MudLink Href="/stockplaya" Typo="Typo.body2">Stock en Playa</MudLink>
-                    <MudLink Href="/pallets-definitivos" Typo="Typo.body2">Pallets Definitivos</MudLink>
-                    <MudLink Href="/palletssincliente" Typo="Typo.body2">Pallets Sin Clientes</MudLink>
-                    <MudLink Href="/palletscontramarca" Typo="Typo.body2">Pallets por Contramarca</MudLink>
+                    <EnlaceSeguro Href="/stockgeneral">Stock General</EnlaceSeguro>
+                    <EnlaceSeguro Href="/stockplaya">Stock en Playa</EnlaceSeguro>
+                    <EnlaceSeguro Href="/pallets-definitivos">Pallets Definitivos</EnlaceSeguro>
+                    <EnlaceSeguro Href="/palletssincliente">Pallets Sin Clientes</EnlaceSeguro>
+                    <EnlaceSeguro Href="/palletscontramarca">Pallets por Contramarca</EnlaceSeguro>
                 </div>
             </MudCardContent>
         </MudCard>

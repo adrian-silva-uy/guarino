@@ -52,7 +52,7 @@
         </MudItem>
     </MudGrid>
 
-    <MudTable Items="@_vista" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+    <MudTable RowsPerPage="25" Items="@_vista" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
         <HeaderContent>
             <MudTh>Variedad</MudTh>
             <MudTh>Estado</MudTh>
@@ -76,6 +76,10 @@
                 </div>
             </MudTd>
         </RowTemplate>
+
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+    </PagerContent>
     </MudTable>
 
     <DataSourceFooter EsDummy="false" Origen="Base de datos DTrace" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />

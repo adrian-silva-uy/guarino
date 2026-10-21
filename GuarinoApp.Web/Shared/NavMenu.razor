@@ -1,111 +1,71 @@
-@using MudBlazor
-@using GuarinoApp.Application.Common.Interfaces
-@using AuthService = GuarinoApp.Application.Common.Interfaces.IAuthorizationService
-@inject AuthService AuthService
+@using GuarinoApp.Web.Services
+
+@* El acceso de cada link se deriva de los atributos [Authorize] de las páginas
+   (MapaAccesosRutas) — nunca se repiten literales de rol aquí. Los módulos
+   fuera del perfil del usuario se muestran bloqueados con candado y tooltip
+   que indica qué rol los requiere. *@
 
 <MudNavMenu>
     @* INICIO - Todos los usuarios *@
     <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Primary">🏠 INICIO</MudText>
-    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" IconColor="Color.Primary">Inicio</MudNavLink>
-    <MudNavLink Href="/dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard" IconColor="Color.Primary">Dashboard Ejecutivo</MudNavLink>
-    <AuthorizeView Roles="Admin, Gerencia">
-        <Authorized>
-            <MudNavLink Href="/gerencia" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Leaderboard" IconColor="Color.Primary">Panel de Gerencia</MudNavLink>
-        </Authorized>
-    </AuthorizeView>
+    <NavLinkSeguro Href="/" Icon="@Icons.Material.Filled.Home" IconColor="Color.Primary">Inicio</NavLinkSeguro>
+    <NavLinkSeguro Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard" IconColor="Color.Primary">Dashboard Ejecutivo</NavLinkSeguro>
+    <NavLinkSeguro Href="/gerencia" Icon="@Icons.Material.Filled.Leaderboard" IconColor="Color.Primary">Panel de Gerencia</NavLinkSeguro>
 
     <MudDivider Class="my-2" />
 
-    @* OPERACIÓN DIARIA - Todos los usuarios (incluye Empaque: es un reporte
-       operativo de pallets y ocupación, no una pantalla de administración). *@
+    @* OPERACIÓN DIARIA - operación de planta y campo. *@
     <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Success">📦 OPERACIÓN DIARIA</MudText>
-    <MudNavLink Href="/stockgeneral" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory" IconColor="Color.Success">Stock General</MudNavLink>
-    <MudNavLink Href="/stockplaya" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Warehouse" IconColor="Color.Success">Stock en Playa</MudNavLink>
-    <MudNavLink Href="/frutavolcar" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Agriculture" IconColor="Color.Success">Fruta a Volcar</MudNavLink>
-    <MudNavLink Href="/palletssincliente" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ProductionQuantityLimits" IconColor="Color.Success">Pallets Sin Clientes</MudNavLink>
-    <MudNavLink Href="/lotesvolcados" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.List" IconColor="Color.Success">Lotes Volcados</MudNavLink>
-    <MudNavLink Href="/registropesadas" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Balance" IconColor="Color.Success">Registro de Pesadas</MudNavLink>
-    <MudNavLink Href="/empaque" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets" IconColor="Color.Success">Gestión de Empaque</MudNavLink>
+    <NavLinkSeguro Href="/stockgeneral" Icon="@Icons.Material.Filled.Inventory" IconColor="Color.Success">Stock General</NavLinkSeguro>
+    <NavLinkSeguro Href="/stockplaya" Icon="@Icons.Material.Filled.Warehouse" IconColor="Color.Success">Stock en Playa</NavLinkSeguro>
+    <NavLinkSeguro Href="/frutavolcar" Icon="@Icons.Material.Filled.Agriculture" IconColor="Color.Success">Fruta a Volcar</NavLinkSeguro>
+    <NavLinkSeguro Href="/palletssincliente" Icon="@Icons.Material.Filled.ProductionQuantityLimits" IconColor="Color.Success">Pallets Sin Clientes</NavLinkSeguro>
+    <NavLinkSeguro Href="/lotesvolcados" Icon="@Icons.Material.Filled.List" IconColor="Color.Success">Lotes Volcados</NavLinkSeguro>
+    <NavLinkSeguro Href="/registropesadas" Icon="@Icons.Material.Filled.Balance" IconColor="Color.Success">Registro de Pesadas</NavLinkSeguro>
+    <NavLinkSeguro Href="/empaque" Icon="@Icons.Material.Filled.Widgets" IconColor="Color.Success">Gestión de Empaque</NavLinkSeguro>
 
     <MudDivider Class="my-2" />
 
-    @* INTELIGENCIA ARTIFICIAL - Todos los roles; la proyección de zafra es
-       planificación de dirección y queda para Admin, Gerencia y Contador. *@
-    <AuthorizeView Roles="Admin, Gerencia, Contador, Operador">
-        <Authorized>
-            <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Secondary">🤖 INTELIGENCIA ARTIFICIAL</MudText>
-            <MudNavLink Href="/proyeccion-volcados" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.TrendingUp" IconColor="Color.Secondary">Proyección de Volcados</MudNavLink>
-            <AuthorizeView Roles="Admin, Gerencia, Contador" Context="zafraCtx">
-                <Authorized>
-                    <MudNavLink Href="/proyeccion-zafra" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CalendarMonth" IconColor="Color.Secondary">Proyección de Zafra Siguiente</MudNavLink>
-                </Authorized>
-            </AuthorizeView>
-            <MudNavLink Href="/iachat" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SmartToy" IconColor="Color.Secondary">Asistente IA</MudNavLink>
-        </Authorized>
-    </AuthorizeView>
+    @* INTELIGENCIA ARTIFICIAL - la proyección de zafra es planificación de
+       dirección y su [Authorize] la reserva a los roles financieros. *@
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Secondary">🤖 INTELIGENCIA ARTIFICIAL</MudText>
+    <NavLinkSeguro Href="/proyeccion-volcados" Icon="@Icons.Material.Filled.TrendingUp" IconColor="Color.Secondary">Proyección de Volcados</NavLinkSeguro>
+    <NavLinkSeguro Href="/proyeccion-zafra" Icon="@Icons.Material.Filled.CalendarMonth" IconColor="Color.Secondary">Proyección de Zafra Siguiente</NavLinkSeguro>
+    <NavLinkSeguro Href="/iachat" Icon="@Icons.Material.Filled.SmartToy" IconColor="Color.Secondary">Asistente IA</NavLinkSeguro>
 
     <MudDivider Class="my-2" />
 
-    @* REPORTES Y ANÁLISIS - Stock y operación para todos; las liquidaciones
-       (remuneraciones) solo para Admin, Gerencia y Contador. *@
-    <AuthorizeView Roles="Admin, Gerencia, Contador, Operador">
-        <Authorized>
-            <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Warning">📊 REPORTES Y ANÁLISIS</MudText>
-            <AuthorizeView Roles="Admin, Gerencia, Contador" Context="liquidacionesCtx">
-                <Authorized>
-                    <MudNavLink Href="/resumenliquidaciones" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ReceiptLong" IconColor="Color.Warning">Resumen de Liquidaciones</MudNavLink>
-                    <MudNavLink Href="/liquidacionesquinta" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.House" IconColor="Color.Warning">Liquidaciones de Quinta</MudNavLink>
-                </Authorized>
-            </AuthorizeView>
-            <MudNavLink Href="/stockpalletssincliente" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory2" IconColor="Color.Warning">Stock de Pallets Sin Cliente</MudNavLink>
-            <MudNavLink Href="/resumenmensual" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BarChart" IconColor="Color.Warning">Resumen Mensual</MudNavLink>
-            <MudNavLink Href="/graficaprocesos" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ShowChart" IconColor="Color.Warning">Gráfica de Procesos</MudNavLink>
-            <MudNavLink Href="/palletscontramarca" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Receipt" IconColor="Color.Warning">Pallets por Contramarca</MudNavLink>
-            <MudNavLink Href="/pallets-definitivos" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ListAlt" IconColor="Color.Warning">Pallets Definitivos</MudNavLink>
-            <MudNavLink Href="/gestion-riesgos-climaticos" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Thunderstorm" IconColor="Color.Warning">
-                Gestión de Riesgos Climáticos
-            </MudNavLink>
-        </Authorized>
-    </AuthorizeView>
+    @* REPORTES Y ANÁLISIS *@
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Warning">📊 REPORTES Y ANÁLISIS</MudText>
+    <NavLinkSeguro Href="/resumenliquidaciones" Icon="@Icons.Material.Filled.ReceiptLong" IconColor="Color.Warning">Resumen de Liquidaciones</NavLinkSeguro>
+    <NavLinkSeguro Href="/liquidacionesquinta" Icon="@Icons.Material.Filled.House" IconColor="Color.Warning">Liquidaciones de Quinta</NavLinkSeguro>
+    <NavLinkSeguro Href="/stockpalletssincliente" Icon="@Icons.Material.Filled.Inventory2" IconColor="Color.Warning">Stock de Pallets Sin Cliente</NavLinkSeguro>
+    <NavLinkSeguro Href="/resumenmensual" Icon="@Icons.Material.Filled.BarChart" IconColor="Color.Warning">Resumen Mensual</NavLinkSeguro>
+    <NavLinkSeguro Href="/graficaprocesos" Icon="@Icons.Material.Filled.ShowChart" IconColor="Color.Warning">Gráfica de Procesos</NavLinkSeguro>
+    <NavLinkSeguro Href="/palletscontramarca" Icon="@Icons.Material.Filled.Receipt" IconColor="Color.Warning">Pallets por Contramarca</NavLinkSeguro>
+    <NavLinkSeguro Href="/pallets-definitivos" Icon="@Icons.Material.Filled.ListAlt" IconColor="Color.Warning">Pallets Definitivos</NavLinkSeguro>
+    <NavLinkSeguro Href="/gestion-riesgos-climaticos" Icon="@Icons.Material.Filled.Thunderstorm" IconColor="Color.Warning">Gestión de Riesgos Climáticos</NavLinkSeguro>
 
     <MudDivider Class="my-2" />
 
-    @* LOGÍSTICA Y RECURSOS - Todos los roles: son datos de las áreas. *@
-    <AuthorizeView Roles="Admin, Gerencia, Contador, Operador">
-        <Authorized>
-            <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Info">🚛 LOGÍSTICA Y RECURSOS</MudText>
-            <MudNavLink Href="/transportistas" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping" IconColor="Color.Info">Transportistas</MudNavLink>
-            <MudNavLink Href="/camioneszorras" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FireTruck" IconColor="Color.Info">Camiones y Zorras</MudNavLink>
-            <MudNavLink Href="/lugares" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Route" IconColor="Color.Info">Lugares de Origen y Destino</MudNavLink>
-            <MudNavLink Href="/basculas" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Scale" IconColor="Color.Info">Básculas</MudNavLink>
-        </Authorized>
-    </AuthorizeView>
+    @* LOGÍSTICA Y RECURSOS *@
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Info">🚛 LOGÍSTICA Y RECURSOS</MudText>
+    <NavLinkSeguro Href="/transportistas" Icon="@Icons.Material.Filled.LocalShipping" IconColor="Color.Info">Transportistas</NavLinkSeguro>
+    <NavLinkSeguro Href="/camioneszorras" Icon="@Icons.Material.Filled.FireTruck" IconColor="Color.Info">Camiones y Zorras</NavLinkSeguro>
+    <NavLinkSeguro Href="/lugares" Icon="@Icons.Material.Filled.Route" IconColor="Color.Info">Lugares de Origen y Destino</NavLinkSeguro>
+    <NavLinkSeguro Href="/basculas" Icon="@Icons.Material.Filled.Scale" IconColor="Color.Info">Básculas</NavLinkSeguro>
 
     <MudDivider Class="my-2" />
 
-    @* COMERCIAL - Contactos/leads: datos de dirección comercial, solo
-       Admin y Gerencia (ver ADR-002). *@
-    <AuthorizeView Roles="Admin, Gerencia">
-        <Authorized>
-            <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Secondary">📇 COMERCIAL</MudText>
-            <MudNavLink Href="/contactos" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Contacts" IconColor="Color.Secondary">Contactos</MudNavLink>
-        </Authorized>
-    </AuthorizeView>
+    @* COMERCIAL - Contactos/leads: datos de dirección comercial (ADR-002). *@
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Secondary">📇 COMERCIAL</MudText>
+    <NavLinkSeguro Href="/contactos" Icon="@Icons.Material.Filled.Contacts" IconColor="Color.Secondary">Contactos</NavLinkSeguro>
 
     <MudDivider Class="my-2" />
 
-    @* ADMINISTRACIÓN - Contaduría para Admin, Gerencia y Contador;
-       Usuarios y Auditoría solo para Admin y Gerencia. *@
-    <AuthorizeView Roles="Admin, Gerencia, Contador">
-        <Authorized>
-            <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Error">⚙️ ADMINISTRACIÓN</MudText>
-            <MudNavLink Href="/contaduria" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountBalance" IconColor="Color.Error">Contaduría</MudNavLink>
-            <AuthorizeView Roles="Admin, Gerencia" Context="usuariosCtx">
-                <Authorized>
-                    <MudNavLink Href="/usuarios" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People" IconColor="Color.Error">Usuarios</MudNavLink>
-                    <MudNavLink Href="/auditoria" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History" IconColor="Color.Error">Auditoría</MudNavLink>
-                </Authorized>
-            </AuthorizeView>
-        </Authorized>
-    </AuthorizeView>
+    @* ADMINISTRACIÓN *@
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2" Color="Color.Error">⚙️ ADMINISTRACIÓN</MudText>
+    <NavLinkSeguro Href="/contaduria" Icon="@Icons.Material.Filled.AccountBalance" IconColor="Color.Error">Contaduría</NavLinkSeguro>
+    <NavLinkSeguro Href="/usuarios" Icon="@Icons.Material.Filled.People" IconColor="Color.Error">Usuarios</NavLinkSeguro>
+    <NavLinkSeguro Href="/auditoria" Icon="@Icons.Material.Filled.History" IconColor="Color.Error">Auditoría</NavLinkSeguro>
 </MudNavMenu>

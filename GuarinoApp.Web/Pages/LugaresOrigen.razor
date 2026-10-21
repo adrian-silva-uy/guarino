@@ -23,7 +23,7 @@
 
         @if (_data.Any())
         {
-            <MudTable Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
+            <MudTable RowsPerPage="25" Items="@_data" Hover="true" Striped="true" Dense="true" Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     @foreach (var prop in typeof(LugaresOrigenDto).GetProperties())
                     {
@@ -37,6 +37,10 @@
                         <MudTd>@value?.ToString()</MudTd>
                     }
                 </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 25 }" RowsPerPageString="Filas por página:" InfoFormat="Mostrando {first_item}–{last_item} de {all_items} registros" />
+            </PagerContent>
             </MudTable>
 
             <DataSourceFooter Origen="Base de datos DTrace (Producción)" FechaActualizacion="@DateTime.Now" TotalRegistros="@_data.Count" />

@@ -6,6 +6,7 @@ using GuarinoApp.Infrastructure;
 using GuarinoApp.Infrastructure.Data;
 using GuarinoApp.Infrastructure.Services;
 using GuarinoApp.Web.Mcp;
+using GuarinoApp.Web.Services;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
@@ -57,6 +58,16 @@ builder.Services.AddMcpServer()
 var errorLogBuffer = new ErrorLogBuffer();
 builder.Services.AddSingleton(errorLogBuffer);
 builder.Logging.AddProvider(new ErrorLogBufferProvider(errorLogBuffer));
+
+// ============================================================================
+// MAPA DE ACCESOS DE LA UI (menú lateral e Inicio)
+// Singleton inmutable: escanea una vez los atributos [Authorize] de las
+// páginas Razor (matriz canónica de autorización) y expone ruta → roles para
+// que el menú y el Inicio muestren los módulos fuera del perfil del usuario
+// como bloqueados con candado y tooltip. Es SOLO presentación: la seguridad
+// real la imponen los propios [Authorize] de cada página.
+// ============================================================================
+builder.Services.AddSingleton<MapaAccesosRutas>();
 
 // ============================================================================
 // CACHÉ EN MEMORIA
