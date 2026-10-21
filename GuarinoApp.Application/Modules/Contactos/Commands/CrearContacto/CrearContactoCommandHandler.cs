@@ -21,6 +21,12 @@ public class CrearContactoCommandHandler : IRequestHandler<CrearContactoCommand,
 
     public async Task<ContactoResultDto> Handle(CrearContactoCommand request, CancellationToken cancellationToken)
         {
+        // Re-validación de rol server-side (defensa en profundidad): la pantalla
+        // /contactos es Admin/Gerencia; sin este check cualquier invocación directa
+        // del comando (otro componente o endpoint) saltaría la UI.
+        if (!_currentUser.IsInRole(RoleNames.Admin) && !_currentUser.IsInRole(RoleNames.Gerencia))
+            return ContactoResultDto.Fail("No tenés permisos para crear contactos (se requiere perfil Admin o Gerencia).");
+
         // Sanitiza ANTES de validar: caracteres de control, saltos no
         // deseados y pseudoetiquetas HTML jamás llegan a la BD (y las
         // longitudes de ContactoValidacion se miden sobre texto limpio).

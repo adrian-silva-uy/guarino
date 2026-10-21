@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccionZafra;
 using MediatR;
@@ -31,6 +32,9 @@ public sealed class ProyeccionZafraSkill : ISkill
         "bins estimados", "camiones estimados", "horas de empaque",
         "variacion interanual", "temporada"
     };
+
+    // Proyección de zafra: restringido a los roles financieros (matriz de módulos).
+    public IReadOnlyCollection<string> RolesPermitidos => RoleNames.Financieros;
 
     public async Task<SkillOutput> ExecuteAsync(CancellationToken cancellationToken = default)
     {

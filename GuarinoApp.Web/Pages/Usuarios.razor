@@ -1,5 +1,5 @@
 @page "/usuarios"
-@attribute [Authorize(Roles = "Admin, Gerencia")]
+@attribute [Authorize(Roles = RoleNames.AdministracionAutorizacion)]
 @using GuarinoApp.Application.Modules.Auth.Dtos
 @using GuarinoApp.Application.Modules.Auth.Queries.GetUsers
 @using GuarinoApp.Application.Modules.Auth.Queries.GetRoles
@@ -19,7 +19,7 @@
 
 @* Alta de usuarios: exclusiva del Admin (el handler también lo valida
    server-side, la UI solo oculta la opción a los demás roles). *@
-<AuthorizeView Roles="Admin">
+<AuthorizeView Roles="@RoleNames.Admin">
     <Authorized>
         <MudTooltip Text="Abre el formulario para crear un usuario nuevo (solo Admin).">
         <MudButton Variant="Variant.Filled"
@@ -137,7 +137,7 @@ else
                 <div class="d-flex align-center gap-1">
                     <MudText Typo="Typo.body2">@(context.Email ?? "—")</MudText>
                     @* El correo lo Admin lo edita (el handler también lo valida server-side). *@
-                    <AuthorizeView Roles="Admin" Context="emailCtx">
+                    <AuthorizeView Roles="@RoleNames.Admin" Context="emailCtx">
                         <Authorized>
                             <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                            Size="Size.Small"
@@ -168,7 +168,7 @@ else
             <MudTd DataLabel="Activo">
                 @* Activar/desactivar es potestad exclusiva del Admin;
                    Gerencia solo consulta el estado. *@
-                <AuthorizeView Roles="Admin" Context="authCtx">
+                <AuthorizeView Roles="@RoleNames.Admin" Context="authCtx">
                     <Authorized>
                         <MudTooltip Text="Activa o desactiva la cuenta (solo Admin). Los usuarios inactivos no pueden iniciar sesión.">
                         <MudSwitch T="bool"

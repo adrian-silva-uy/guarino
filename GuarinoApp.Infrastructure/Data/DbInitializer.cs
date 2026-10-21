@@ -1,6 +1,7 @@
 ﻿using System.Data;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using GuarinoApp.Application.Common;
 using GuarinoApp.Domain.Entities;
 using GuarinoApp.Domain.Enums;
 using GuarinoApp.Infrastructure.Services.Auth;
@@ -1154,9 +1155,9 @@ VALUES
 
             var candidatos = new (string UserName, string FullName, string Rol)[]
                 {
-                ("gerencia", "Gerencia General", "Gerencia"),
-                ("contador", "Contaduría General", "Contador"),
-                ("operador", "Operador de Planta", "Operador")
+                ("gerencia", "Gerencia General", RoleNames.Gerencia),
+                ("contador", "Contaduría General", RoleNames.Contador),
+                ("operador", "Operador de Planta", RoleNames.Operador)
                 };
 
             foreach (var (userName, fullName, nombreRol) in candidatos)
@@ -1199,7 +1200,7 @@ VALUES
             var adminsSinCorreo = context.Users
                 .Where(u => !u.IsDeleted
                     && (u.Email == null || u.Email == "")
-                    && u.Role != null && u.Role.Name == "Admin")
+                    && u.Role != null && u.Role.Name == RoleNames.Admin)
                 .ToList();
 
             foreach (var admin in adminsSinCorreo)
@@ -1220,12 +1221,12 @@ VALUES
                 return;
 
             var usuarios = context.Users.AsNoTracking()
-                .Select(u => new { u.UserName, Rol = u.Role != null ? u.Role.Name : "Admin" })
+                .Select(u => new { u.UserName, Rol = u.Role != null ? u.Role.Name : RoleNames.Admin })
                 .ToList();
             if (usuarios.Count == 0)
                 usuarios =
                     [
-                    new { UserName = "admin", Rol = "Admin" }
+                    new { UserName = "admin", Rol = RoleNames.Admin }
                     ];
 
             var acciones = new[]

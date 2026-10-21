@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Contactos;
 using GuarinoApp.Application.Modules.Contactos.Commands.ImportarContactos;
@@ -59,6 +60,9 @@ public sealed class ContactosImportSkill : ISkillConEntrada
         "alta de contactos", "alta masiva de contactos", "importar lista de contactos"
         };
 
+    // Importación de contactos: restringido a los roles de administración (matriz de módulos).
+    public IReadOnlyCollection<string> RolesPermitidos => RoleNames.Administracion;
+
     public Task<SkillOutput> ExecuteAsync(CancellationToken cancellationToken = default)
         => ExecuteAsync(string.Empty, cancellationToken);
 
@@ -66,7 +70,7 @@ public sealed class ContactosImportSkill : ISkillConEntrada
         {
         // Misma política de permisos que la pantalla /contactos (Admin/Gerencia):
         // el chat además lo usan Contador y Operador.
-        if (!_currentUser.IsInRole("Admin") && !_currentUser.IsInRole("Gerencia"))
+        if (!_currentUser.IsInRole(RoleNames.Admin) && !_currentUser.IsInRole(RoleNames.Gerencia))
             return SkillOutput.Error("No tenés permisos para importar contactos (se requiere perfil Admin o Gerencia).");
 
         var texto = QuitarInstruccion(entrada);

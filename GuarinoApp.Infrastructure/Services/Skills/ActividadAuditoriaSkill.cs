@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Auditoria.Queries.GetLogs;
 using MediatR;
@@ -31,6 +32,9 @@ public sealed class ActividadAuditoriaSkill : ISkill
         "auditoria", "actividad", "log", "historial",
         "quien hizo", "usuarios que", "acciones recientes", "ultimo acceso"
     };
+
+    // Auditoría del sistema: restringido a los roles de administración (matriz de módulos).
+    public IReadOnlyCollection<string> RolesPermitidos => RoleNames.Administracion;
 
     public async Task<SkillOutput> ExecuteAsync(CancellationToken cancellationToken = default)
     {

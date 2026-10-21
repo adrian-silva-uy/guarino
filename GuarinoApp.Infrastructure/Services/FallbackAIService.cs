@@ -22,6 +22,7 @@ public class FallbackAIService : IAIService
     private readonly IDashboardDataService _dashboardService;
     private readonly ISkillRegistry _skillRegistry;
     private readonly IMcpDataService _mcpDataService;
+    private readonly IFiltroConsultasIA _filtroConsultas;
     private readonly AiResultCache _cache;
 
     private const string FALLBACK_SUGGESTIONS_KEY = "FallbackSuggestions";
@@ -34,6 +35,7 @@ public class FallbackAIService : IAIService
         IDashboardDataService dashboardService,
         ISkillRegistry skillRegistry,
         IMcpDataService mcpDataService,
+        IFiltroConsultasIA filtroConsultas,
         AiResultCache cache)
         {
         _ollamaService = ollamaService;
@@ -42,6 +44,7 @@ public class FallbackAIService : IAIService
         _dashboardService = dashboardService;
         _skillRegistry = skillRegistry;
         _mcpDataService = mcpDataService;
+        _filtroConsultas = filtroConsultas;
         _cache = cache;
         }
 
@@ -59,6 +62,15 @@ public class FallbackAIService : IAIService
             _logger.LogInformation("Chat: saludo/prueba detectada, respuesta cordial sin datos de negocio.");
             return SaludoCordial();
             }
+
+        // Filtro IA por rol (capa 1): si el tema detectado está reservado para
+        // otros roles (matriz de módulos), se responde con el rechazo
+        // inteligente y queda auditado como "ConsultaIArestringida". Va antes
+        // de la caché y de la ruta IA: un rechazo jamás se cachea ni llega al
+        // modelo, y cubre también el MensajeInicial y los clicks de sugerencias.
+        var rechazo = await _filtroConsultas.EvaluarAsync(prompt);
+        if (rechazo != null)
+            return rechazo;
 
         // Misma consulta repetida en el período pico (p. ej. el chip de
         // sugerencia que varios usuarios tocan a la vez): respuesta IA al
@@ -205,6 +217,12 @@ public class FallbackAIService : IAIService
         try
             {
             var skillMatch = await _skillRegistry.MatchAsync(userPrompt ?? string.Empty);
+            if (skillMatch is { Restringido: true })
+                {
+                // Rechazo por rol (capa 2 del filtro): ya viene auditado y con
+                // el mensaje inteligente; no se arma la respuesta analítica.
+                return skillMatch.Text;
+                }
             if (skillMatch is { Success: true })
                 {
                 sb.AppendLine("**Datos del sistema para esta consulta:**");

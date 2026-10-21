@@ -1,5 +1,5 @@
 @page "/gerencia"
-@attribute [Authorize(Roles = "Admin, Gerencia")]
+@attribute [Authorize(Roles = RoleNames.AdministracionAutorizacion)]
 @using MediatR
 @using MudBlazor
 @using GuarinoApp.Application.Common.Dtos

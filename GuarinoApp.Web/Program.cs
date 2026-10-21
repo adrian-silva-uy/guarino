@@ -5,6 +5,7 @@ using GuarinoApp.Application.Settings;
 using GuarinoApp.Infrastructure;
 using GuarinoApp.Infrastructure.Data;
 using GuarinoApp.Infrastructure.Services;
+using GuarinoApp.Web.Mcp;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
@@ -33,6 +34,19 @@ builder.Services.AddMudServices();
 builder.Services.AddBlazoredLocalStorage();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// ============================================================================
+// SERVIDOR MCP (Model Context Protocol)
+// Expone las skills del Asistente como tools de solo lectura en /mcp para que
+// un agente externo consulte los MISMOS datos reales de la base. El endpoint
+// exige el token de sesión de la app (Authorization: Bearer <token>, el mismo
+// firmado con Data Protection que usa el navegador); cada tool revalida la
+// matriz de módulos con el rol real del token y audita la llamada (McpCall).
+// ============================================================================
+builder.Services.AddScoped<GuarinoMcpTools>();
+builder.Services.AddMcpServer()
+    .WithHttpTransport()
+    .WithTools<GuarinoMcpTools>();
 
 // ============================================================================
 // NOTIFICACIONES AL ADMINISTRADOR - captura global de errores para el reporte
@@ -234,6 +248,17 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // ============================================================================
+// AUTENTICACIÓN DEL ENDPOINT MCP (/mcp)
+// El cliente MCP envía el token de sesión de la app en «Authorization: Bearer
+// <token>». El middleware lo valida y compone HttpContext.User con el rol real,
+// de modo que las tools apliquen la misma matriz de módulos que la UI. Sin
+// token válido responde 401.
+// ============================================================================
+app.UseWhen(
+    context => context.Request.Path.StartsWithSegments("/mcp"),
+    branch => branch.UseMiddleware<McpAuthMiddleware>());
+
+// ============================================================================
 // HEALTH CHECKS ENDPOINTS
 // ============================================================================
 app.MapHealthChecks("/health");
@@ -244,6 +269,11 @@ app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.Health
 
 app.MapRazorPages();
 app.MapBlazorHub();
+
+// Endpoint MCP (streamable HTTP). Debe ir ANTES del fallback para que /mcp no
+// caiga en la página _Host.
+app.MapMcp("/mcp");
+
 app.MapFallbackToPage("/_Host");
 
 // ============================================================================

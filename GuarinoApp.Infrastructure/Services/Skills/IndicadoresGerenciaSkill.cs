@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Gerencia.Queries.GetIndicadoresGerencia;
 using MediatR;
@@ -30,6 +31,9 @@ public sealed class IndicadoresGerenciaSkill : ISkill
     {
         "indicador", "indicadores", "gerencia", "kpi", "kpis"
     };
+
+    // Panel de Gerencia: restringido a los roles de administración (matriz de módulos).
+    public IReadOnlyCollection<string> RolesPermitidos => RoleNames.Administracion;
 
     public async Task<SkillOutput> ExecuteAsync(CancellationToken cancellationToken = default)
     {

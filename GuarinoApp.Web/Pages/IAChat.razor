@@ -1,5 +1,5 @@
 @page "/iachat"
-@attribute [Authorize(Roles = "Admin, Gerencia, Contador, Operador")]
+@attribute [Authorize(Roles = RoleNames.TodosAutorizacion)]
 @using MudBlazor
 @using GuarinoApp.Application.Common
 @using GuarinoApp.Application.Common.Dtos
@@ -16,6 +16,7 @@
 @inject Microsoft.Extensions.Logging.ILogger<IAChat> Logger
 @inject GuarinoApp.Application.Common.Interfaces.IAuditService AuditService
 @inject GuarinoApp.Application.Common.Interfaces.ISkillRegistry SkillRegistry
+@inject GuarinoApp.Application.Common.Interfaces.ICurrentUserService CurrentUser
 @implements IDisposable
 
 <PageTitle>Asistente IA</PageTitle>
@@ -185,25 +186,63 @@
                     }
                 </MudPaper>
 
-                <!-- Input y botón de enviar -->
+                <!-- Consulta seleccionable: presets de las skills del sistema filtrados
+                     por el rol del usuario (matriz de módulos). No hay texto libre:
+                     el usuario ELIGE la consulta y presiona "Consultar". -->
                 <MudGrid>
-                    <MudItem xs="10">
-                        <MudTextField @bind-Value="_currentInput"
-                                      Immediate="true"
-                                      Label="Escribe tu consulta: stock, empaque, logística, tendencias... (Shift+Enter para salto de línea)"
-                                      Variant="Variant.Outlined"
-                                      T="string"
-                                      Lines="4"
-                                      @onkeydown="@HandleKeyDown"
-                                      For="@(() => _currentInput)" />
+                    <MudItem xs="12" md="9">
+                        <MudSelect T="string"
+                                   @bind-Value="_currentInput"
+                                   Label="Elegí una consulta para hacerle al Asistente"
+                                   Placeholder="Seleccioná una consulta…"
+                                   Variant="Variant.Outlined"
+                                   Dense="false"
+                                   Disabled="@_isLoading"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.Tune">
+                            @foreach (var preset in _presets)
+                            {
+                                <MudSelectItem Value="@preset">@preset</MudSelectItem>
+                            }
+                        </MudSelect>
                     </MudItem>
-                    <MudItem xs="2">
+                    <MudItem xs="12" md="3">
                         <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                   OnClick="@SendMessage" Disabled="@(_isLoading || string.IsNullOrWhiteSpace(_currentInput))" FullWidth="true">
-                            <MudIcon Icon="@Icons.Material.Filled.Send" />
+                                   OnClick="@SendMessage" Disabled="@(_isLoading || string.IsNullOrWhiteSpace(_currentInput))" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Send">
+                            Consultar
                         </MudButton>
                     </MudItem>
                 </MudGrid>
+
+                <!-- Importación de contactos (ISkillConEntrada): necesita texto pegado,
+                     por eso conserva su propio recuadro — exclusivo de Admin/Gerencia,
+                     igual que la pantalla de Contactos. -->
+                <AuthorizeView Roles="@RoleNames.AdministracionAutorizacion">
+                    <Authorized>
+                        <MudDivider Class="my-3" />
+                        <div class="d-flex align-center mb-1">
+                            <MudText Typo="Typo.subtitle2">📥 Importar contactos desde texto pegado</MudText>
+                            <MudSpacer />
+                            <MudTooltip Text="Pegá un CSV, una lista «Nombre, correo, teléfono» o un chat de WhatsApp. Formato: «María López: +598 991 234 567». Los duplicados se omiten solos.">
+                                <MudIconButton Icon="@Icons.Material.Filled.HelpOutline" Size="Size.Small" Color="Color.Primary" AriaLabel="Ayuda importación de contactos" />
+                            </MudTooltip>
+                        </div>
+                        <MudTextField @bind-Value="_textoImportacion"
+                                      Label="Pegá acá la lista de contactos"
+                                      Variant="Variant.Outlined"
+                                      T="string"
+                                      Lines="4"
+                                      Immediate="true"
+                                      Disabled="@_isLoading" />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                                   OnClick="@ImportarContactos" FullWidth="true" Class="mt-2"
+                                   StartIcon="@Icons.Material.Filled.Upload"
+                                   Disabled="@(_isLoading || string.IsNullOrWhiteSpace(_textoImportacion))">
+                            Importar contactos
+                        </MudButton>
+                    </Authorized>
+                </AuthorizeView>
             </MudCardContent>
         </MudCard>
     </MudItem>
@@ -280,7 +319,7 @@
                     <MudList Dense="true">
                         @foreach (var sug in _sugerencias)
                         {
-                            <MudListItem Class="cursor-pointer suggestion-item" OnClick="@(() => CargarSugerencia(sug))">
+                            <MudListItem Class="cursor-pointer suggestion-item" OnClick="@(() => EnviarSugerencia(sug))">
                                 <div class="d-flex align-start" style="gap:6px;">
                                     @{
                                         var icono = IconoDesde(sug.Icon);
@@ -298,32 +337,11 @@
                             </MudListItem>
                         }
                     </MudList>
-                    <MudText Typo="Typo.caption" Color="Color.Tertiary">@(_sugerencias.Count == 1 ? "1 sugerencia" : _sugerencias.Count + " sugerencias") — seleccioná una para ponerla en la caja y editarla antes de enviar</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">@(_sugerencias.Count == 1 ? "1 sugerencia" : _sugerencias.Count + " sugerencias") — hacé click para enviarla directamente al Asistente</MudText>
                 }
                 else
                 {
                     <MudText Typo="Typo.body2" Color="Color.Tertiary">No hay sugerencias activas.</MudText>
-                }
-
-                <!-- Acciones rápidas: ejemplos clickeables de las skills del sistema.
-                     El click SOLO carga el texto en la caja de edición (el usuario lo
-                     modifica y lo envía); al enviarlo, SkillRegistry lo ejecuta y lo
-                     registra en Auditoría del Sistema. -->
-                @if (AccionesRapidas().Any())
-                {
-                    <MudText Typo="Typo.body2" Class="mt-3">⚡ Acciones rápidas</MudText>
-                    <MudList Dense="true">
-                        @foreach (var accion in AccionesRapidas())
-                        {
-                            <MudListItem Class="cursor-pointer suggestion-item" OnClick="@(() => CargarAccionRapida(accion))">
-                                <div class="d-flex align-start" style="gap:6px;">
-                                    <MudIcon Icon="@Icons.Material.Filled.Bolt" Size="Size.Small" Style="color:var(--mud-palette-secondary);margin-top:2px;" />
-                                    <MudText Typo="Typo.body2" Class="suggestion-text">@accion</MudText>
-                                </div>
-                            </MudListItem>
-                        }
-                    </MudList>
-                    <MudText Typo="Typo.caption" Color="Color.Tertiary">— click para cargarla en la caja y editarla; cada acción ejecutada queda en Auditoría</MudText>
                 }
 
                 <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@ActualizarSugerencias" FullWidth="true" Class="mt-2"
@@ -435,6 +453,8 @@
 
     private List<ChatMessage> _messages = new();
     private string _currentInput = "";
+    private string _textoImportacion = "";
+    private List<string> _presets = new();
     private bool _isLoading = false;
     private int _minConfidence = 70;
     private int _horizonte = 6;
@@ -454,7 +474,7 @@
 
     // Copy de layout (no es prompt ni sugerencia de negocio)
     private const string TextoIntroductorioGeneral =
-        "Puedes hacer preguntas sobre tendencias, stock, empaque, estacionalidad, clientes, logística y más —o elegir una sugerencia para empezar. Si hace falta un dato al día de una fuente externa, lo consulto y te indico la fuente.";
+        "Elegí una consulta del listado y presioná «Consultar»: stock, empaque, logística, tendencias y más. Las consultas disponibles dependen de tu perfil. También podés usar las sugerencias del panel lateral y, si sos Admin o Gerencia, importar contactos desde texto pegado.";
     private string _textoIntroductorio = TextoIntroductorioGeneral;
 
     private readonly Dictionary<string, (string Short, string Long)> _recommendedParams = new()
@@ -487,6 +507,8 @@
         foreach (var k in _recommendedParams.Keys)
             _enabledExtras[k] = false;
 
+        CargarPresets();
+
         _refrescoEstadoIa = new System.Threading.Timer(
             _ => _ = InvokeAsync(StateHasChanged),
             null,
@@ -498,10 +520,31 @@
         if (!string.IsNullOrWhiteSpace(MensajeInicial) && !_mensajeInicialEnviado)
         {
             _mensajeInicialEnviado = true;
-            _textoIntroductorio = "Estás viendo la explicación de tu análisis de proyección. Puedes hacer más preguntas operativas.";
+            _textoIntroductorio = "Estás viendo la explicación de tu análisis de proyección. Podés seguir con otra consulta del listado.";
             _currentInput = MensajeInicial;
             await SendMessage();
         }
+    }
+
+    /// <summary>
+    /// Consultas seleccionables: los ejemplos de las skills del sistema, filtrados
+    /// por la matriz de módulos (RolesPermitidos de cada skill contra el rol del
+    /// usuario). Un Operador nunca ve la consulta de datos financieros ni la de
+    /// contactos; si aun así intentara una consulta reservada, el filtro IA la
+    /// rechaza y la audita. Los ejemplos que terminan en «:» son prefijos que
+    /// esperan texto pegado (p. ej. la importación de contactos, que tiene su
+    /// propio recuadro): no son consultas completas y no entran al listado.
+    /// </summary>
+    private void CargarPresets()
+    {
+        var rolActual = RoleNames.Todos.FirstOrDefault(r => CurrentUser.IsInRole(r));
+
+        _presets = SkillRegistry.Skills
+            .Where(s => s.RolesPermitidos.Count == 0
+                || (rolActual is not null && s.RolesPermitidos.Contains(rolActual)))
+            .SelectMany(s => s.Ejemplos)
+            .Where(e => !string.IsNullOrWhiteSpace(e) && !e.Trim().EndsWith(':'))
+            .ToList();
     }
 
     public void Dispose() => _refrescoEstadoIa?.Dispose();
@@ -512,16 +555,6 @@
         foreach (var k in keys) _popoverStates[k] = false;
         if (_popoverStates.ContainsKey(key)) _popoverStates[key] = true;
         StateHasChanged();
-    }
-
-    private async Task HandleKeyDown(KeyboardEventArgs e)
-    {
-        // Enter envía; Shift+Enter hace salto de línea (el input es multi-línea
-        // para poder pegar listas, p. ej. la importación de contactos).
-        if (e is not null && e.Key == "Enter" && !e.ShiftKey)
-        {
-            await SendMessage();
-        }
     }
 
     private async Task SendMessage()
@@ -696,22 +729,34 @@
         Snackbar.Add("Sugerencias recalculadas", Severity.Success);
     }
 
-    private void CargarSugerencia(BusinessSuggestionDto sugerencia)
+    /// <summary>
+    /// La sugerencia se envía directamente (no hay caja de texto libre): el click
+    /// es la consulta seleccionada. El filtro IA por rol la evalúa igual que
+    /// cualquier otra antes de llegar al modelo.
+    /// </summary>
+    private async Task EnviarSugerencia(BusinessSuggestionDto sugerencia)
     {
-        // Solo carga la sugerencia en la caja de edición (sin enviarla): el
-        // usuario puede modificarla antes de que el Asistente la responda.
-        _currentInput = sugerencia.Text ?? string.Empty;
+        if (_isLoading || string.IsNullOrWhiteSpace(sugerencia.Text))
+            return;
+
+        _currentInput = sugerencia.Text;
+        await SendMessage();
     }
 
-    /// <summary>Acciones rápidas: ejemplos clickeables de las skills del sistema
-    /// (importar contactos, datos financieros, proyección de zafra, ...). Carga el
-    /// texto en la caja para editarlo; al enviarlo, SkillRegistry ejecuta la skill
-    /// y la registra en Auditoría.</summary>
-    private IEnumerable<string> AccionesRapidas() =>
-        SkillRegistry.Skills.SelectMany(s => s.Ejemplos);
-
-    private void CargarAccionRapida(string texto)
+    /// <summary>
+    /// Importación de contactos (solo Admin/Gerencia en la UI; la skill y los
+    /// handlers además lo validan server-side): arma el mensaje con la
+    /// instrucción «Importar contactos:» y la lista pegada, y lo envía por el
+    /// mismo camino del chat — SkillRegistry ejecuta la skill de importación,
+    /// que parsea, valida y da de alta vía ImportarContactosCommand.
+    /// </summary>
+    private async Task ImportarContactos()
     {
-        _currentInput = texto;
+        if (_isLoading || string.IsNullOrWhiteSpace(_textoImportacion))
+            return;
+
+        _currentInput = "Importar contactos:\n" + _textoImportacion.Trim();
+        _textoImportacion = "";
+        await SendMessage();
     }
 }

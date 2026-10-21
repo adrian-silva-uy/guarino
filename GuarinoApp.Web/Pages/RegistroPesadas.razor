@@ -1,5 +1,5 @@
 @page "/registropesadas"
-@attribute [Authorize(Roles = "Admin, Gerencia, Contador, Operador")]
+@attribute [Authorize(Roles = RoleNames.TodosAutorizacion)]
 @using MediatR
 @using MudBlazor
 @using GuarinoApp.Application.Common.Interfaces

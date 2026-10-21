@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Auth.Dtos;
 using GuarinoApp.Application.Settings;
@@ -10,9 +11,6 @@ namespace GuarinoApp.Application.Modules.Auth.Commands.Register;
 
 public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthSessionDto>
 {
-    /// <summary>Rol del primer usuario registrado: el super-usuario de la aplicación.</summary>
-    private const string AdminRole = "Admin";
-
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IAuthTokenService _tokenService;
@@ -58,7 +56,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthSessi
 
         // El primer usuario de la organización siempre queda como Admin.
         var hasUsers = await _context.Users.AnyAsync(u => !u.IsDeleted, ct);
-        var roleName = hasUsers ? _authSettings.DefaultRole : AdminRole;
+        var roleName = hasUsers ? _authSettings.DefaultRole : RoleNames.Admin;
 
         // El rol se resuelve contra la tabla Roles (fuente única de verdad).
         var role = await _context.Roles

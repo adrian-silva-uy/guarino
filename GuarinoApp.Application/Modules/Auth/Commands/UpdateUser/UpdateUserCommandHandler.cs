@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Auth.Dtos;
 using MediatR;
@@ -17,8 +18,6 @@ namespace GuarinoApp.Application.Modules.Auth.Commands.UpdateUser;
 /// </summary>
 public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, AuthResultDto>
 {
-    private const string AdminRole = "Admin";
-
     private readonly IApplicationDbContext _context;
     private readonly ICurrentUserService _currentUser;
     private readonly IAuditService _audit;
@@ -43,7 +42,7 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, AuthR
             return AuthResultDto.Fail("El rol seleccionado no es válido.");
 
         var adminRole = await _context.Roles
-            .FirstOrDefaultAsync(r => r.Name == AdminRole && !r.IsDeleted, ct);
+            .FirstOrDefaultAsync(r => r.Name == RoleNames.Admin && !r.IsDeleted, ct);
         if (adminRole == null)
             return AuthResultDto.Fail("La configuración de roles está incompleta. Contactá al soporte.");
 
@@ -62,8 +61,8 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, AuthR
         if (isSelf && user.RoleId != role.Id)
             return AuthResultDto.Fail("No podés cambiar tu propio rol. Pedile a otro usuario con permisos.");
 
-        var isAdmin = _currentUser.IsInRole(AdminRole);
-        var isGerencia = _currentUser.IsInRole("Gerencia");
+        var isAdmin = _currentUser.IsInRole(RoleNames.Admin);
+        var isGerencia = _currentUser.IsInRole(RoleNames.Gerencia);
 
         // Activar/desactivar: potestad exclusiva del Admin.
         var statusChanged = user.IsActive != request.IsActive;

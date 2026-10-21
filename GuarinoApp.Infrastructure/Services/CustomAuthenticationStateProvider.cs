@@ -25,7 +25,7 @@ namespace GuarinoApp.Infrastructure.Services;
 /// </summary>
 public class CustomAuthenticationStateProvider : AuthenticationStateProvider, IAuthenticationStateNotifier
 {
-    private static readonly string[] KnownRoles = { "Admin", "Gerencia", "Contador", "Operador" };
+    private static readonly string[] KnownRoles = RoleNames.Todos.ToArray();
 
     /// <summary>Tarea única en vuelo para resolver la sesión (evita consultas concurrentes a la BD).</summary>
     private Task<AuthenticationState>? _pendingState;

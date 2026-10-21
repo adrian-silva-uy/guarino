@@ -1,3 +1,5 @@
+using GuarinoApp.Application.Common;
+
 namespace GuarinoApp.Application.Settings;
 
 /// <summary>
@@ -15,7 +17,7 @@ public class SecuritySettings
     public bool EnableFallbackIdentity { get; set; } = true;
 
     /// <summary>Rol asignado cuando el usuario no tiene un rol configurado.</summary>
-    public string DefaultRole { get; set; } = "Gerencia";
+    public string DefaultRole { get; set; } = RoleNames.Gerencia;
 
     /// <summary>
     /// Asignación explícita de rol por usuario de Windows.

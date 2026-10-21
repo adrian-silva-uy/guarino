@@ -1,3 +1,5 @@
+using GuarinoApp.Application.Common;
+
 namespace GuarinoApp.Application.Settings;
 
 /// <summary>
@@ -20,7 +22,7 @@ public class AuthSettings
     public int TokenValidityHours { get; set; } = 12;
 
     /// <summary>Rol que se asigna a los usuarios nuevos (el primero siempre es Gerencia).</summary>
-    public string DefaultRole { get; set; } = "Operador";
+    public string DefaultRole { get; set; } = RoleNames.Operador;
 
     /// <summary>True cuando la autenticación se hace con la identidad de Windows.</summary>
     public bool IsWindowsMode =>

@@ -1,5 +1,5 @@
 @page "/liquidacionesquinta"
-@attribute [Authorize(Roles = "Admin, Gerencia, Contador")]
+@attribute [Authorize(Roles = RoleNames.FinancierosAutorizacion)]
 @using MediatR
 @using MudBlazor
 @using GuarinoApp.Application.Common.Interfaces

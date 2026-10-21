@@ -33,6 +33,12 @@ public class ImportarContactosCommandHandler : IRequestHandler<ImportarContactos
 
     public async Task<ImportarContactosResultDto> Handle(ImportarContactosCommand request, CancellationToken cancellationToken)
         {
+        // Re-validación de rol server-side (defensa en profundidad): la pantalla
+        // /contactos es Admin/Gerencia y ContactosImportSkill ya lo verifica, pero
+        // el comando invocado directamente no debe saltarse esa política.
+        if (!_currentUser.IsInRole(RoleNames.Admin) && !_currentUser.IsInRole(RoleNames.Gerencia))
+            return ImportarContactosResultDto.Fail("No tenés permisos para importar contactos (se requiere perfil Admin o Gerencia).");
+
         if (request.Contactos == null || request.Contactos.Count == 0)
             return ImportarContactosResultDto.Fail("No hay contactos para importar.");
         if (request.Contactos.Count > MaximoPorLote)

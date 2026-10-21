@@ -17,7 +17,9 @@ public sealed record SkillOutput(bool Success, string Text)
 /// <param name="SkillName">Identificador de la skill ejecutada.</param>
 /// <param name="Success">true si devolvió datos reales.</param>
 /// <param name="Text">Salida en texto de la skill.</param>
-public sealed record SkillMatch(string SkillName, bool Success, string Text);
+/// <param name="Restringido">true si la ejecución se denegó por rol: Text contiene
+/// el mensaje de rechazo inteligente (ya auditado) y no se ejecutó la skill.</param>
+public sealed record SkillMatch(string SkillName, bool Success, string Text, bool Restringido = false);
 
 /// <summary>
 /// Habilidad (skill) invocable por la IA: una consulta real de negocio cuyo
@@ -33,9 +35,10 @@ public interface ISkill
     string Description { get; }
 
     /// <summary>
-    /// Ejemplos de uso clickeables en el panel del Asistente (se cargan en la
-    /// caja de edición para que el usuario los modifique antes de enviarlos).
-    /// Vacío por defecto: las skills sin ejemplos no se muestran en el panel.
+    /// Ejemplos de uso: el Asistente los ofrece como consultas SELECCIONABLES
+    /// (MudSelect), filtradas por <see cref="RolesPermitidos"/>. Los ejemplos
+    /// que terminan en «:» son prefijos que esperan texto pegado (p. ej.
+    /// importación de contactos) y no se ofrecen como consulta completa.
     /// </summary>
     IReadOnlyCollection<string> Ejemplos => Array.Empty<string>();
 
@@ -44,6 +47,16 @@ public interface ISkill
     /// por intención. Se comparan como palabras completas.
     /// </summary>
     IReadOnlyCollection<string> Keywords { get; }
+
+    /// <summary>
+    /// Roles que pueden consultar esta skill (matriz real de permisos de las
+    /// páginas: Contaduría → Admin/Gerencia/Contador, Usuarios/Auditoría/
+    /// Contactos → Admin/Gerencia, operación diaria → todos). Vacío = cualquier
+    /// rol autenticado. Fuera de este conjunto el Asistente rechaza la consulta
+    /// con un mensaje inteligente y la registra en Auditoría como
+    /// "ConsultaIArestringida" (detección temprana de intentos de acceso).
+    /// </summary>
+    IReadOnlyCollection<string> RolesPermitidos => Array.Empty<string>();
 
     /// <summary>Ejecuta la consulta y devuelve el resultado formateado en texto.</summary>
     Task<SkillOutput> ExecuteAsync(CancellationToken cancellationToken = default);

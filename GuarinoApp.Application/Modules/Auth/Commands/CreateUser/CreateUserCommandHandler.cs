@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Auth.Dtos;
 using GuarinoApp.Domain.Entities;
@@ -15,8 +16,6 @@ namespace GuarinoApp.Application.Modules.Auth.Commands.CreateUser;
 /// </summary>
 public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, AuthResultDto>
 {
-    private const string AdminRole = "Admin";
-
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ICurrentUserService _currentUser;
@@ -36,7 +35,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, AuthR
 
     public async Task<AuthResultDto> Handle(CreateUserCommand request, CancellationToken ct)
     {
-        if (!_currentUser.IsInRole(AdminRole))
+        if (!_currentUser.IsInRole(RoleNames.Admin))
             return AuthResultDto.Fail("Solo un Administrador puede crear usuarios.");
 
         // El rol se valida contra la tabla Roles: la BD es la única fuente de verdad.

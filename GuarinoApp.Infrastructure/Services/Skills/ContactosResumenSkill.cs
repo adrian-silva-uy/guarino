@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Contactos.Queries.GetContactos;
 using MediatR;
@@ -35,6 +36,9 @@ public sealed class ContactosResumenSkill : ISkill
         "contacto", "contactos", "cliente", "clientes", "productor", "productores",
         "exportadora", "exportadoras", "comprador", "compradores", "cartera"
     };
+
+    // Contactos/clientes: restringido a los roles de administración (matriz de módulos).
+    public IReadOnlyCollection<string> RolesPermitidos => RoleNames.Administracion;
 
     public async Task<SkillOutput> ExecuteAsync(CancellationToken cancellationToken = default)
     {

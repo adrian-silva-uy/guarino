@@ -18,13 +18,16 @@ public class UpdateFinancialDataCommandHandler : IRequestHandler<UpdateFinancial
 {
     private readonly IApplicationDbContext _context;
     private readonly ICurrentUserService _currentUser;
+    private readonly IAuditService _audit;
 
     public UpdateFinancialDataCommandHandler(
         IApplicationDbContext context,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IAuditService audit)
     {
         _context = context;
         _currentUser = currentUser;
+        _audit = audit;
     }
 
     public async Task<FinancialDataDto> Handle(UpdateFinancialDataCommand request, CancellationToken cancellationToken)
@@ -32,6 +35,16 @@ public class UpdateFinancialDataCommandHandler : IRequestHandler<UpdateFinancial
         var data = await _context.FinancialData
             .OrderByDescending(d => d.FechaActualizacion)
             .FirstOrDefaultAsync(cancellationToken);
+
+        // Valores previos para la entrada de auditoría: sin esto la edición de
+        // Contaduría no dejaba rastro en el log (hallazgo de la revisión).
+        var antes = data == null
+            ? null
+            : $"costo/kg {data.CostoPorKg.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}, " +
+              $"flujo de caja {data.FlujoCaja.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}, " +
+              $"margen {data.MargenBruto.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}, " +
+              $"flete {(data.CostoFlete.HasValue ? data.CostoFlete.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "s/d")}, " +
+              $"capacidad {data.CapacidadInstalada.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}";
 
         if (data == null)
         {
@@ -65,6 +78,21 @@ public class UpdateFinancialDataCommandHandler : IRequestHandler<UpdateFinancial
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        // Entrada de auditoría con valores antes/después (reales, de la misma
+        // fila recién guardada): toda edición financiera queda trazable.
+        var despues = $"costo/kg {data.CostoPorKg.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}, " +
+            $"flujo de caja {data.FlujoCaja.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}, " +
+            $"margen {data.MargenBruto.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}, " +
+            $"flete {(data.CostoFlete.HasValue ? data.CostoFlete.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "s/d")}, " +
+            $"capacidad {data.CapacidadInstalada.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}";
+        await _audit.LogAsync(
+            antes == null ? "Create" : "Update",
+            "Contaduría",
+            antes == null
+                ? $"Alta de datos financieros por {_currentUser.UserName}: {despues}."
+                : $"Edición de datos financieros por {_currentUser.UserName}. Antes: {antes}. Después: {despues}.",
+            additionalData: request.Observaciones);
 
         return new FinancialDataDto
         {

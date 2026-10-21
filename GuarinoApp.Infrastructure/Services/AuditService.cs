@@ -1,4 +1,5 @@
-﻿using GuarinoApp.Application.Common.Interfaces;
+﻿using GuarinoApp.Application.Common;
+using GuarinoApp.Application.Common.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace GuarinoApp.Infrastructure.Services;
@@ -30,10 +31,10 @@ public class AuditService : IAuditService
             var logEntry = new GuarinoApp.Domain.Entities.LogEntry
             {
                 UserName = _currentUser.UserName ?? "Sistema",
-                Role = _currentUser.IsInRole("Admin") ? "Admin" :
-                       _currentUser.IsInRole("Gerencia") ? "Gerencia" :
-                       _currentUser.IsInRole("Contador") ? "Contador" :
-                       _currentUser.IsInRole("Operador") ? "Operador" : "Usuario",
+                Role = _currentUser.IsInRole(RoleNames.Admin) ? RoleNames.Admin :
+                       _currentUser.IsInRole(RoleNames.Gerencia) ? RoleNames.Gerencia :
+                       _currentUser.IsInRole(RoleNames.Contador) ? RoleNames.Contador :
+                       _currentUser.IsInRole(RoleNames.Operador) ? RoleNames.Operador : "Usuario",
                 Action = action,
                 Module = module,
                 Description = description,

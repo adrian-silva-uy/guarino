@@ -1,5 +1,5 @@
 @page "/gestion-riesgos-climaticos"
-@attribute [Authorize(Roles = "Admin, Gerencia, Contador, Operador")]
+@attribute [Authorize(Roles = RoleNames.TodosAutorizacion)]
 @using GuarinoApp.Application.Modules.ClimateRisk.Dtos
 @using GuarinoApp.Application.Modules.ClimateRisk.Queries
 @using GuarinoApp.Application.Modules.ClimateRisk.Commands

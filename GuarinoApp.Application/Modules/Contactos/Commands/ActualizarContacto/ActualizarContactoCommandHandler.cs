@@ -21,6 +21,12 @@ public class ActualizarContactoCommandHandler : IRequestHandler<ActualizarContac
 
     public async Task<ContactoResultDto> Handle(ActualizarContactoCommand request, CancellationToken cancellationToken)
         {
+        // Re-validación de rol server-side (defensa en profundidad): la pantalla
+        // /contactos es Admin/Gerencia; sin este check el comando sería invocable
+        // directamente por cualquier rol.
+        if (!_currentUser.IsInRole(RoleNames.Admin) && !_currentUser.IsInRole(RoleNames.Gerencia))
+            return ContactoResultDto.Fail("No tenés permisos para editar contactos (se requiere perfil Admin o Gerencia).");
+
         var contacto = await _context.Contactos
             .FirstOrDefaultAsync(c => c.Id == request.Id && !c.IsDeleted, cancellationToken);
         if (contacto == null)

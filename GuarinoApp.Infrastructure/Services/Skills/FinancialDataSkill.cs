@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Contaduria.Queries.GetFinancialData;
 using MediatR;
@@ -31,6 +32,9 @@ public sealed class FinancialDataSkill : ISkill
         "capacidad instalada", "datos financieros", "financiero", "financiera",
         "contaduria", "efectivo", "liquidez", "capex", "presupuesto"
     };
+
+    // Contaduría: restringido a los roles financieros (matriz de módulos).
+    public IReadOnlyCollection<string> RolesPermitidos => RoleNames.Financieros;
 
     public async Task<SkillOutput> ExecuteAsync(CancellationToken cancellationToken = default)
     {

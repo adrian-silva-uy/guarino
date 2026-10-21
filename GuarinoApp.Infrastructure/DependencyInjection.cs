@@ -178,6 +178,12 @@ namespace GuarinoApp.Infrastructure
             services.AddScoped<ISkill, ClimaRiesgoSkill>();
             services.AddScoped<ISkillRegistry, SkillRegistry>();
 
+            // Filtro IA por rol (capa 1): clasifica la consulta por temas según
+            // la matriz de módulos y rechaza con mensaje inteligente + auditoría
+            // cuando el rol no puede consultar ese tema. Se invoca en el único
+            // punto de entrada del chat, antes de la caché.
+            services.AddScoped<IFiltroConsultasIA, FiltroConsultasIA>();
+
             // Registrar servicio de autorización
             services.AddScoped<IAuthorizationService, AuthorizationService>();
 

@@ -1,4 +1,4 @@
 @page "/facturacion"
-@attribute [Authorize(Roles = "Admin, Gerencia, Contador")]
+@attribute [Authorize(Roles = RoleNames.FinancierosAutorizacion)]
 <MudText Typo="Typo.h4" GutterBottom="true">💰 Módulo Facturación</MudText>
 <MudAlert Severity="Severity.Info">Módulo en construcción. Pendiente definición de requisitos.</MudAlert>

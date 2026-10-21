@@ -70,10 +70,10 @@
         _userName = user.Identity?.Name;
         _fullName = user.Claims.FirstOrDefault(c => c.Type == AuthClaims.FullName)?.Value;
 
-        _isAdmin = _isAuthenticated && user.IsInRole("Admin");
-        _isGerencia = _isAuthenticated && user.IsInRole("Gerencia");
-        _isContador = _isAuthenticated && user.IsInRole("Contador");
-        _isOperador = _isAuthenticated && user.IsInRole("Operador");
+        _isAdmin = _isAuthenticated && user.IsInRole(RoleNames.Admin);
+        _isGerencia = _isAuthenticated && user.IsInRole(RoleNames.Gerencia);
+        _isContador = _isAuthenticated && user.IsInRole(RoleNames.Contador);
+        _isOperador = _isAuthenticated && user.IsInRole(RoleNames.Operador);
     }
 
     private async Task LogoutAsync()

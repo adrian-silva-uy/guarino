@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.Auth.Dtos;
 using MediatR;
@@ -15,8 +16,6 @@ namespace GuarinoApp.Application.Modules.Auth.Commands.UpdateUser;
 /// </summary>
 public class UpdateUserEmailCommandHandler : IRequestHandler<UpdateUserEmailCommand, AuthResultDto>
 {
-    private const string AdminRole = "Admin";
-
     private readonly IApplicationDbContext _context;
     private readonly ICurrentUserService _currentUser;
     private readonly IAuditService _audit;
@@ -33,7 +32,7 @@ public class UpdateUserEmailCommandHandler : IRequestHandler<UpdateUserEmailComm
 
     public async Task<AuthResultDto> Handle(UpdateUserEmailCommand request, CancellationToken ct)
     {
-        if (!_currentUser.IsInRole(AdminRole))
+        if (!_currentUser.IsInRole(RoleNames.Admin))
             return AuthResultDto.Fail("Solo un Administrador puede modificar correos de usuarios.");
 
         var user = await _context.Users

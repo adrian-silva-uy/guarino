@@ -1,3 +1,4 @@
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.ResumenLiquidaciones.Queries.GetResumenLiquidaciones;
 using MediatR;
@@ -30,6 +31,9 @@ public sealed class ResumenLiquidacionesSkill : ISkill
         "liquidacion", "liquidaciones", "quinta", "quintas",
         "lo que se le debe", "total a pagar", "pagos a productores"
     };
+
+    // Resumen de liquidaciones: restringido a los roles financieros (matriz de módulos).
+    public IReadOnlyCollection<string> RolesPermitidos => RoleNames.Financieros;
 
     public async Task<SkillOutput> ExecuteAsync(CancellationToken cancellationToken = default)
     {

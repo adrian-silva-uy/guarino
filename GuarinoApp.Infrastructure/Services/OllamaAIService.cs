@@ -467,6 +467,12 @@ public class OllamaAIService : IAIService
             var skillMatch = await _skillRegistry.MatchAsync(prompt);
             if (skillMatch != null)
                 {
+                // Rechazo por rol (capa 2 del filtro): el texto ya es la
+                // respuesta con el rechazo inteligente — no se consulta el
+                // modelo ni se le pasa contexto del sistema.
+                if (skillMatch.Restringido)
+                    return skillMatch.Text;
+
                 system += skillMatch.Success
                     ? "\n\nDATOS REALES CONSULTADOS AL SISTEMA (habilidad: " + skillMatch.SkillName + "):\n"
                       + skillMatch.Text
