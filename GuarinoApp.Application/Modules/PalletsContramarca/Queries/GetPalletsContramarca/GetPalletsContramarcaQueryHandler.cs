@@ -1,4 +1,4 @@
-﻿using GuarinoApp.Application.Common.Interfaces;
+using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.PalletsContramarca.Dtos;
 using GuarinoApp.Domain.Enums;
 using MediatR;
@@ -39,7 +39,8 @@ public class GetPalletsContramarcaQueryHandler : IRequestHandler<GetPalletsContr
                 .OrderByDescending(x => x.TotalPallets) 
                 .ToListAsync(cancellationToken);
 
-            // Si no hay datos, retorna el fallback (dummy data)
+            // Cero datos inventados: sin resultados → lista vacía (la página
+            // informa "sin registros"); nunca filas de ejemplo.
             if (result.Count == 0)
                 {
                 return new List<PalletContramarcaDto>();
@@ -52,18 +53,5 @@ public class GetPalletsContramarcaQueryHandler : IRequestHandler<GetPalletsContr
             _logger.LogError(ex, "Error al obtener pallets por contramarca");
             return new List<PalletContramarcaDto>();
             }
-        }
-
-    private List<PalletContramarcaDto> GetDummyData()
-        {
-        return
-        [
-            new() { Contramarca = "NANAK", TotalPallets = 245, TotalEnvases = 12450, PesoTotal = 45200 },
-            new() { Contramarca = "SUNKIST", TotalPallets = 189, TotalEnvases = 9870, PesoTotal = 32800 },
-            new() { Contramarca = "DEL MONTE", TotalPallets = 156, TotalEnvases = 8230, PesoTotal = 28400 },
-            new() { Contramarca = "DOLCE", TotalPallets = 132, TotalEnvases = 6540, PesoTotal = 22100 },
-            new() { Contramarca = "EL DORADO", TotalPallets = 98, TotalEnvases = 4980, PesoTotal = 17600 },
-            new() { Contramarca = "Sin contramarca", TotalPallets = 43, TotalEnvases = 2130, PesoTotal = 7800 }
-        ];
         }
     }

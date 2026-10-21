@@ -41,17 +41,8 @@ public class GetLugaresDestinoQueryHandler : IRequestHandler<GetLugaresDestinoQu
             }
         catch (Exception ex)
             {
-            _logger.LogError(ex, "Error consultando lugares de destino vía EF Core; devolviendo datos de ejemplo.");
+            _logger.LogError(ex, "Error consultando lugares de destino vía EF Core; se devuelve vacío (sin datos de ejemplo).");
             return new List<LugaresDestinoDto>();
             }
-        }
-
-    private List<LugaresDestinoDto> GetDummyData()
-        {
-        return
-        [
-            new LugaresDestinoDto { IdLugarDestino = 1, Nombre = "Puerto de Montevideo", Direccion = "Rambla Sur", Localidad = "Montevideo" },
-            new LugaresDestinoDto { IdLugarDestino = 2, Nombre = "Empaque Central", Direccion = "Ruta 1 km 15", Localidad = "San José" }
-        ];
         }
     }

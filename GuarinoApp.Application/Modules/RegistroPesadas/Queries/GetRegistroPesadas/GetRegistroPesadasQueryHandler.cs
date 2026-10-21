@@ -48,48 +48,17 @@ public class GetRegistroPesadasQueryHandler : IRequestHandler<GetRegistroPesadas
 
             var result = await query.ToListAsync(cancellationToken);
 
-            if (result.Count == 0)
-                {
-                // Datos de ejemplo solo si la tabla está vacía (BD sin datos reales);
-                // un rango de fechas sin resultados no es dato demo y se devuelve vacío.
-                var hayDatosReales = await _context.LotesEmboquille.AsNoTracking().AnyAsync(cancellationToken);
-                if (!hayDatosReales)
-                    {
-                    _logger.LogInformation("No se encontraron registros de pesada en LotesEmboquille. Retornando datos dummy.");
-                    return new RegistroPesadasResultDto(GetDummyData(), EsDummy: true);
-                    }
-                }
-
+            // Cero datos inventados: tabla vacía o rango vacío → vacío real.
+            // Nunca datos de ejemplo: en Demo/Prod todo sale de DTrace.
             _logger.LogInformation("Se encontraron {Count} registros de pesada desde LotesEmboquille.", result.Count);
             return new RegistroPesadasResultDto(result, EsDummy: false);
             }
         catch (Exception ex)
             {
-            _logger.LogError(ex, "Error al consultar registros de pesada desde LotesEmboquille. Retornando datos dummy.");
-            return new RegistroPesadasResultDto(GetDummyData(), EsDummy: true);
+            // Vacío + log ante error de BD (nunca ejemplos: ocultarían el fallo
+            // y romperían la coherencia de cifras con la base real).
+            _logger.LogError(ex, "Error al consultar registros de pesada desde LotesEmboquille. Se devuelve vacío (sin datos de ejemplo).");
+            return new RegistroPesadasResultDto(new List<RegistroPesadaDto>(), EsDummy: false);
             }
-        }
-
-    private List<RegistroPesadaDto> GetDummyData()
-        {
-        var random = new Random();
-        var productores = new[] { "Frutas del Sol", "Agrícola San Juan", "Viña del Valle" };
-        var basculas = new[] { "Báscula 1 - Patio", "Báscula 2 - Empaque", "Báscula 3 - Exportación" };
-        var data = new List<RegistroPesadaDto>();
-
-        for (int i = 1; i <= 30; i++)
-            {
-            data.Add(new RegistroPesadaDto
-                {
-                Id = 1000 + i,
-                Fecha = DateTime.Now.AddHours(-random.Next(1, 72)),
-                Lote = $"L{1000 + i}",
-                Productor = productores[random.Next(productores.Length)],
-                Bascula = basculas[random.Next(basculas.Length)],
-                Peso = random.Next(500, 3000),
-                Bins = random.Next(10, 40)
-                });
-            }
-        return data;
         }
     }

@@ -48,16 +48,4 @@ public class GetCamionesZorrasQueryHandler : IRequestHandler<GetCamionesZorrasQu
             return new List<CamionZorraDto>();
             }
         }
-
-    private static List<CamionZorraDto> GetDummyData()
-        {
-        return
-        [
-            new() { Id = 1, Matricula = "ABC 1234", Tipo = "Camión", Transportista = "Transportes del Este", Capacidad = 20 },
-            new() { Id = 2, Matricula = "DEF 5678", Tipo = "Zorra", Transportista = "Logística Rápida", Capacidad = 15 },
-            new() { Id = 3, Matricula = "GHI 9012", Tipo = "Camión", Transportista = "Camiones del Sur", Capacidad = 25 },
-            new() { Id = 4, Matricula = "JKL 3456", Tipo = "Zorra", Transportista = "Fletes Consolidados", Capacidad = 12 },
-            new() { Id = 5, Matricula = "MNO 7890", Tipo = "Camión", Transportista = "Transporte Agro", Capacidad = 18 }
-        ];
-        }
     }

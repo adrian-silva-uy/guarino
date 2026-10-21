@@ -27,8 +27,8 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
             // Validación básica de fechas para evitar errores de lógica
             if (request.FechaDesde > request.FechaHasta)
                 {
-                _logger.LogWarning("Fecha 'Desde' ({FechaDesde}) es mayor que 'Hasta' ({FechaHasta}). Retornando datos dummy.", request.FechaDesde, request.FechaHasta);
-                return new PalletsDefinitivosResultDto(GetDummyData(), EsDummy: true);
+                _logger.LogWarning("Fecha 'Desde' ({FechaDesde}) es mayor que 'Hasta' ({FechaHasta}). Se devuelve vacío (sin datos de ejemplo).", request.FechaDesde, request.FechaHasta);
+                return new PalletsDefinitivosResultDto(new List<PalletDefinitivoDto>(), EsDummy: false);
                 }
 
             var fechaDesde = request.FechaDesde.Date;
@@ -48,7 +48,10 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
                     Calibre = p.Calibre,
                     Envase = p.Envase,
                     Marca = p.Marca,
-                    Cliente = p.Cliente,
+                    // Coherencia con Stock General (GetPallets): un pallet sin
+                    // cliente se muestra como "Sin cliente", no en blanco
+                    // (celda vacía es ambigua en la demo).
+                    Cliente = string.IsNullOrWhiteSpace(p.Cliente) ? "Sin cliente" : p.Cliente,
                     Variedad = p.Variedad,
                     Estado = p.Estado.ToDisplayName(),
                     Productor = p.Productor,
@@ -74,13 +77,13 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
                     })
                 .ToListAsync(cancellationToken);
 
-            // Si no hay datos en el rango, retornamos datos dummy para pruebas
-            // — y se lo decimos a la página vía EsDummy, para que avise al
-            // usuario en vez de mostrar filas de ejemplo como si fueran reales.
+            // Cero datos inventados: rango sin resultados → vacío real, marcado
+            // como no-dummy; la página informa "sin registros". Nunca filas de
+            // ejemplo presentadas como reales (Demo/Prod leen la BD de DTrace).
             if (result.Count == 0)
                 {
-                _logger.LogInformation("No se encontraron pallets definitivos en el rango de fechas. Retornando datos dummy.");
-                return new PalletsDefinitivosResultDto(GetDummyData(), EsDummy: true);
+                _logger.LogInformation("No se encontraron pallets definitivos en el rango de fechas.");
+                return new PalletsDefinitivosResultDto(result, EsDummy: false);
                 }
 
             _logger.LogInformation("Se encontraron {Count} pallets definitivos.", result.Count);
@@ -89,140 +92,9 @@ public class GetPalletsDefinitivosQueryHandler : IRequestHandler<GetPalletsDefin
         catch (Exception ex)
             {
             _logger.LogError(ex, "Error crítico al obtener pallets definitivos para el rango {Desde} - {Hasta}", request.FechaDesde, request.FechaHasta);
-            // En caso de error, retornamos datos dummy para que la UI no falle completamente
-            return new PalletsDefinitivosResultDto(GetDummyData(), EsDummy: true);
+            // Vacío + log ante error de BD: nunca datos de ejemplo (ocultarían
+            // el fallo y romperían la coherencia con la base real).
+            return new PalletsDefinitivosResultDto(new List<PalletDefinitivoDto>(), EsDummy: false);
             }
-        }
-
-    private static List<PalletDefinitivoDto> GetDummyData()
-        {
-        var fechaDummy = DateTime.Today;
-        return
-        [
-            new()
-        {
-            Orden = "ORD-001",
-            Contramarca = "SUNKIST",
-            Calibre = "60",
-            Envase = "10kg",
-            Marca = "Sunkist",
-            Cliente = "Supermercados del Grupo",
-            Variedad = "Valencia Late", // Naranja de mesa
-            Estado = EstadoPallet.Despachado.ToDisplayName(),
-            Productor = "AgroCítricos del Sur",
-            TipoPallet = "Definitivo",
-            FormaEmbalado = "Red",
-            Frio = "Si",
-            Fecha = fechaDummy,
-            Hora = "08:30",
-            SemanaProd = 34,
-            Embalaje = "Malla",
-            Especie = "Naranja",
-            Categoria = "Extra",
-            Produccion = "Zafra 2026",
-            O_Obs3 = "Cosecha temprana",
-            SPA = "SPA-123",
-            Lote = "L-001",
-            Cuadros = "120",
-            FecCosecha = fechaDummy.AddDays(-5).ToString("yyyy-MM-dd"),
-            Cantidad = 1,
-            CantEnvases = 100,
-            PesoNeto = 1050m,
-            Pallet = 1
-        },
-        new()
-        {
-            Orden = "ORD-002",
-            Contramarca = "DEL MONTE",
-            Calibre = "88",
-            Envase = "12kg",
-            Marca = "Del Monte",
-            Cliente = "Exportadora Global",
-            Variedad = "Navel Late", // Naranja de mesa
-            Estado = EstadoPallet.EnFrio.ToDisplayName(),
-            Productor = "Inversiones Cítricas",
-            TipoPallet = "Definitivo",
-            FormaEmbalado = "Plastico",
-            Frio = "Si",
-            Fecha = fechaDummy.AddDays(1),
-            Hora = "14:15",
-            SemanaProd = 35,
-            Embalaje = "Caja Cartón",
-            Especie = "Naranja",
-            Categoria = "Primera",
-            Produccion = "Zafra 2026",
-            O_Obs3 = "Lote especial exportación",
-            SPA = "SPA-456",
-            Lote = "L-002",
-            Cuadros = "90",
-            FecCosecha = fechaDummy.AddDays(-4).ToString("yyyy-MM-dd"),
-            Cantidad = 1,
-            CantEnvases = 120,
-            PesoNeto = 1180m,
-            Pallet = 2
-        },
-        new()
-        {
-            Orden = "ORD-003",
-            Contramarca = "NANAK",
-            Calibre = "112",
-            Envase = "15kg",
-            Marca = "Nanak",
-            Cliente = "Mercado Central",
-            Variedad = "Lima Vicuña", // Lima
-            Estado = EstadoPallet.Despachado.ToDisplayName(),
-            Productor = "Citrico del Norte",
-            TipoPallet = "Definitivo",
-            FormaEmbalado = "Red",
-            Frio = "Si",
-            Fecha = fechaDummy.AddDays(2),
-            Hora = "09:45",
-            SemanaProd = 36,
-            Embalaje = "Malla",
-            Especie = "Lima",
-            Categoria = "Extra",
-            Produccion = "Zafra 2026",
-            O_Obs3 = "Alto contenido de jugo",
-            SPA = "SPA-789",
-            Lote = "L-003",
-            Cuadros = "80",
-            FecCosecha = fechaDummy.AddDays(-3).ToString("yyyy-MM-dd"),
-            Cantidad = 1,
-            CantEnvases = 80,
-            PesoNeto = 950m,
-            Pallet = 3
-        },
-        new()
-        {
-            Orden = "ORD-004",
-            Contramarca = "EL DORADO",
-            Calibre = "16",
-            Envase = "10kg",
-            Marca = "El Dorado",
-            Cliente = "Jugos y Derivados S.A.",
-            Variedad = "Valencia", // Naranja para jugo
-            Estado = EstadoPallet.EnFrio.ToDisplayName(),
-            Productor = "Cítricos del Valle",
-            TipoPallet = "Definitivo",
-            FormaEmbalado = "Plastico",
-            Frio = "No",
-            Fecha = fechaDummy.AddDays(3),
-            Hora = "11:00",
-            SemanaProd = 36,
-            Embalaje = "Caja Cartón",
-            Especie = "Naranja",
-            Categoria = "Segunda",
-            Produccion = "Zafra 2026",
-            O_Obs3 = "Destino industria",
-            SPA = "SPA-101",
-            Lote = "L-004",
-            Cuadros = "110",
-            FecCosecha = fechaDummy.AddDays(-2).ToString("yyyy-MM-dd"),
-            Cantidad = 1,
-            CantEnvases = 110,
-            PesoNeto = 1020m,
-            Pallet = 4
-        }
-        ];
         }
     }

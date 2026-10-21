@@ -1,4 +1,4 @@
-﻿using GuarinoApp.Application.Common.Interfaces;
+using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.ResumenMensual.Dtos;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -83,38 +83,5 @@ public class GetResumenMensualQueryHandler : IRequestHandler<GetResumenMensualQu
             {
             return new List<ResumenMensualDto>();
             }
-        }
-
-    private List<ResumenMensualDto> GetDummyData(DateTime? fechaDesde, DateTime? fechaHasta)
-        {
-        var random = new Random();
-        var meses = new[] { "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre" };
-        var data = new List<ResumenMensualDto>();
-
-        int year = DateTime.Now.Year;
-        int mesInicio = 1;
-        int mesFin = 12;
-
-        if (fechaDesde.HasValue)
-            mesInicio = fechaDesde.Value.Month;
-        if (fechaHasta.HasValue)
-            mesFin = fechaHasta.Value.Month;
-
-        for (int mes = mesInicio; mes <= mesFin; mes++)
-            {
-            if (mes > DateTime.Now.Month && year == DateTime.Now.Year)
-                break;
-
-            data.Add(new ResumenMensualDto
-                {
-                Año = year,
-                Mes = mes,
-                Nombre = meses[mes - 1],
-                Kgs_Volcados = random.Next(15000, 85000),
-                BinsVolcados = random.Next(100, 500),
-                Balanza = mes % 2 == 0 ? "Báscula 3 - Exportación" : "Báscula 2 - Empaque"
-                });
-            }
-        return data;
         }
     }

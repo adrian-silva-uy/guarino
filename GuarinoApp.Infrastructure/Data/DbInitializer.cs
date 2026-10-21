@@ -300,7 +300,14 @@ namespace GuarinoApp.Infrastructure.Data
                         Envase = "Caja 18kg",
                         Marca = "Guarino Premium",
                         Categoria = "Primera",
-                        Estado = Enum.GetNames(typeof(EstadoPallet)).Length > 0 ? Enum.GetValues(typeof(EstadoPallet)).Cast<EstadoPallet>().First() : default,
+                        // Pallet sin cliente = pendiente de asignación: DEBE estar
+                        // en planta (EnFrío). Antes se tomaba .First() del enum,
+                        // que era Despachado — un pallet recién "creado" sin
+                        // cliente aparecía como ya salido de la planta, y la
+                        // siembra posterior lo re-aleatorizaba igual (ver
+                        // CompletarPallets). La coherencia es: sin cliente +
+                        // EnFrío = stock en nuestro poder esperando cliente.
+                        Estado = EstadoPallet.EnFrio,
                         Cantidad = 1,
                         CantidadEnvases = 56 + (i % 5),
                         PesoNeto = 1008 + (i * 18),
@@ -834,8 +841,14 @@ namespace GuarinoApp.Infrastructure.Data
                 if (pallet.PesoNeto == null && pallet.CantidadEnvases.HasValue)
                     pallet.PesoNeto = Math.Round(pallet.CantidadEnvases.Value * KilosPorEnvase(pallet.Envase), 2);
 
-                // Estado mixto según antigüedad (sólo pallets de esta semilla).
-                pallet.Estado = EstadoMixtoPorAntiguedad(dias, random);
+                // Estado mixto por antigüedad sólo para pallets CON cliente:
+                // un pallet sin cliente es pendiente en planta (lo siembra el
+                // módulo Pallets Sin Cliente con EnFrío) — re-aleatorizarlo
+                // podía marcarlo "Despachado" sin nadie a quien despacharlo,
+                // contradiciendo el módulo y el KPI "kg inmovilizados" de
+                // Contaduría.
+                if (!string.IsNullOrWhiteSpace(pallet.Cliente))
+                    pallet.Estado = EstadoMixtoPorAntiguedad(dias, random);
 
                 if (string.IsNullOrWhiteSpace(pallet.Frio))
                     pallet.Frio = pallet.Estado == EstadoPallet.EnFrio || pallet.Estado == EstadoPallet.PreFrio ? "Si" : "No";

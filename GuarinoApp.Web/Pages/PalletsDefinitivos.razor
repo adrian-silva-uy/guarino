@@ -42,13 +42,6 @@
 
 <MudDivider Class="mb-4" />
 
-@if (_esDummy)
-{
-    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
-        ⚠️ Datos de ejemplo — no hay pallets reales en el rango de fechas seleccionado. Ajustá las fechas para ver los pallets cargados.
-    </MudAlert>
-}
-
 <MudTable T="PalletDefinitivoDto"
           Items="_pallets"
           Loading="_isLoading"
@@ -156,7 +149,10 @@
         "FecCosecha", "CantEnvases", "PesoNeto"
     };
 
-    private DateTime? _fechaDesde = DateTime.Now.AddDays(-30);
+    // Rango por defecto: vacío = desde el inicio (la ayuda del filtro dice
+    // "vacío = desde el inicio" — antes hardcodeaba 30 días y la página
+    // quedaba vacía porque los pallets cargados son de zafra anterior).
+    private DateTime? _fechaDesde;
     private DateTime? _fechaHasta = DateTime.Now;
     private bool _isLoading;
     private bool _esDummy;
@@ -189,11 +185,13 @@
 
         try
         {
-            var desde = _fechaDesde ?? DateTime.Now.AddDays(-30);
+            // Fecha vacía = sin límite inferior (DateTime.MinValue es seguro:
+            // la columna CreatedAt es datetime2).
+            var desde = _fechaDesde ?? DateTime.MinValue;
             var hasta = _fechaHasta ?? DateTime.Now;
 
-            // Rango invertido: no se consulta y se limpia la tabla, en vez de
-            // mostrar filas de ejemplo como si fueran del rango pedido.
+            // Rango invertido: no se consulta y se limpia la tabla (la página
+            // informa "sin registros" para el rango pedido).
             if (desde > hasta)
             {
                 _pallets = new();

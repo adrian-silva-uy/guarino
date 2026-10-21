@@ -68,14 +68,4 @@ public class GetEmpaqueQueryHandler : IRequestHandler<GetEmpaqueQuery, List<Empa
             return new List<EmpaqueDto>();
             }
         }
-
-    private List<EmpaqueDto> GetDummyData()
-        {
-        return new List<EmpaqueDto>
-        {
-            new EmpaqueDto { TipoEmpaque = "Empaque Norte", TotalPallets = 185, TotalEnvases = 9240, PesoTotal = 34200, CapacidadMaxima = 500, Ocupacion = 37 },
-            new EmpaqueDto { TipoEmpaque = "Empaque Sur", TotalPallets = 142, TotalEnvases = 7120, PesoTotal = 25800, CapacidadMaxima = 400, Ocupacion = 36 },
-            new EmpaqueDto { TipoEmpaque = "Empaque Central", TotalPallets = 98, TotalEnvases = 4880, PesoTotal = 17600, CapacidadMaxima = 350, Ocupacion = 28 }
-        };
-        }
     }

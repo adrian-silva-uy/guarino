@@ -41,17 +41,8 @@ public class GetLugaresOrigenQueryHandler : IRequestHandler<GetLugaresOrigenQuer
             }
         catch (Exception ex)
             {
-            _logger.LogError(ex, "Error consultando lugares de origen vía EF Core; devolviendo datos de ejemplo.");
+            _logger.LogError(ex, "Error consultando lugares de origen vía EF Core; se devuelve vacío (sin datos de ejemplo).");
             return new List<LugaresOrigenDto>();
             }
-        }
-
-    private List<LugaresOrigenDto> GetDummyData()
-        {
-        return
-        [
-            new LugaresOrigenDto { IdLugarOrigen = 1, Nombre = "Quinta La Esperanza", Direccion = "Ruta 5 km 120", Localidad = "Montevideo" },
-            new LugaresOrigenDto { IdLugarOrigen = 2, Nombre = "Finca San José", Direccion = "Ruta 8 km 45", Localidad = "Canelones" }
-        ];
         }
     }

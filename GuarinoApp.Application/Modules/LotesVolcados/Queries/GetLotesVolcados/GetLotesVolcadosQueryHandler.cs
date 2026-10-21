@@ -55,47 +55,18 @@ public class GetLotesVolcadosQueryHandler : IRequestHandler<GetLotesVolcadosQuer
 
             var result = await query.ToListAsync(cancellationToken);
 
-            if (result.Count == 0)
-                {
-                // Los datos de ejemplo solo corresponden si la tabla está vacía (BD sin datos reales).
-                // Un rango de fechas sin resultados NO es dato demo: se devuelve vacío para que
-                // la página informe "sin registros para el rango".
-                var hayDatosReales = await _context.LotesEmboquille.AsNoTracking().AnyAsync(cancellationToken);
-                if (!hayDatosReales)
-                    return new LotesVolcadosResultDto(GetDummyData(), EsDummy: true);
-                }
-
+            // Cero datos inventados: si el rango está vacío o la tabla no tiene
+            // filas, se devuelve vacío real (la página informa "sin registros").
+            // Nunca se rellena con ejemplos: en Demo/Prod los números deben
+            // salir sí o sí de la base de datos de DTrace.
             return new LotesVolcadosResultDto(result, EsDummy: false);
             }
         catch (Exception ex)
             {
-            _logger.LogError(ex, "Error consultando lotes volcados vía EF Core; devolviendo datos de ejemplo.");
-            return new LotesVolcadosResultDto(GetDummyData(), EsDummy: true);
+            // En error se devuelve vacío + log: mostrar datos de ejemplo ante un
+            // fallo de BD ocultaría el problema y rompería la coherencia de cifras.
+            _logger.LogError(ex, "Error consultando lotes volcados vía EF Core; se devuelve vacío (sin datos de ejemplo).");
+            return new LotesVolcadosResultDto(new List<LoteVolcadoDto>(), EsDummy: false);
             }
-        }
-
-    private List<LoteVolcadoDto> GetDummyData()
-        {
-        var random = new Random();
-        var variedades = new[] { "Valencia", "Navel", "Satsuma", "Murcott", "Eureka", "Star Ruby" };
-        var productores = new[] { "Frutas del Sol", "Agrícola San Juan", "Cítricos del Valle", "Huerta San Rafael" };
-        var data = new List<LoteVolcadoDto>();
-
-        for (int i = 1; i <= 20; i++)
-            {
-            var bins = random.Next(20, 150);
-            data.Add(new LoteVolcadoDto
-                {
-                IdLote = 5000 + i,
-                Codigo = $"LOTE-{DateTime.Now.Year}-{5000 + i}",
-                Variedad = variedades[random.Next(variedades.Length)],
-                Productor = productores[random.Next(productores.Length)],
-                FechaVolcado = DateTime.Now.AddDays(-random.Next(1, 90)),
-                KilosVolcados = bins * random.Next(15, 22),
-                BinsVolcados = bins
-                });
-            }
-
-        return data;
         }
     }

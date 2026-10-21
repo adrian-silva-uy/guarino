@@ -18,12 +18,6 @@
 
 <MudCard>
     <MudCardContent>
-        @if (_esDummy)
-        {
-            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">
-                ⚠️ Datos de ejemplo — no se encontraron lotes volcados reales para mostrar.
-            </MudAlert>
-        }
         <ExportToolbar ReportName="Lotes_Volcados"
                        @bind-FechaDesde="_fechaDesde"
                        @bind-FechaHasta="_fechaHasta"

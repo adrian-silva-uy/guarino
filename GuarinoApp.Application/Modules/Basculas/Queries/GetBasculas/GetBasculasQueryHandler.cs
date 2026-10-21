@@ -25,7 +25,8 @@ public class GetBasculasQueryHandler : IRequestHandler<GetBasculasQuery, List<Ba
                     Id = b.Id,
                     Descripcion = b.Descripcion,
                     // La entidad solo guarda la descripción; la ubicación conocida de
-                    // cada báscula se deriva del Id (mismos datos que veía el fallback).
+                    // cada báscula se deriva del Id (dato fijo de la planta: no hay
+                    // columna de ubicación en la entidad).
                     Ubicacion = b.Id == 1 ? "Patio principal"
                               : b.Id == 2 ? "Empaque Norte"
                               : b.Id == 3 ? "Empaque Sur"
@@ -43,16 +44,5 @@ public class GetBasculasQueryHandler : IRequestHandler<GetBasculasQuery, List<Ba
             {
             return new List<BasculaDto>();
             }
-        }
-
-    private static List<BasculaDto> GetDummyData()
-        {
-        return
-        [
-            new() { Id = 1, Descripcion = "Báscula 1 - Patio", Ubicacion = "Patio principal", Estado = "Activa" },
-            new() { Id = 2, Descripcion = "Báscula 2 - Empaque", Ubicacion = "Empaque Norte", Estado = "Activa" },
-            new() { Id = 3, Descripcion = "Báscula 3 - Exportación", Ubicacion = "Empaque Sur", Estado = "Activa" },
-            new() { Id = 4, Descripcion = "Báscula 4 - Playa", Ubicacion = "Playa de empaque", Estado = "En mantenimiento" }
-        ];
         }
     }

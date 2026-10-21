@@ -53,21 +53,16 @@ public class GetPalletsQueryHandler : IRequestHandler<GetPalletsQuery, PalletsRe
                 else
                     {
                     // Valor desconocido: estado inexistente, ninguna fila
-                    // coincide (el caller cae en el fallback de datos dummy,
-                    // igual que antes con el filtro por texto).
+                    // coincide (la página informará "sin registros", igual
+                    // que con cualquier filtro sin resultados).
                     query = query.Where(p => p.Estado == (EstadoPallet)(-1));
                     }
                 }
 
             var pallets = await query.ToListAsync(cancellationToken);
 
-            // Si no hay datos en la BD, recurre a los datos de prueba -- y ahora se lo decimos
-            // explícitamente al caller vía EsDummy, en vez de dejar que el .razor lo asuma.
-            if (!pallets.Any())
-                {
-                return new PalletsResultDto(GetDummyData(), EsDummy: true);
-                }
-
+            // Cero datos inventados: filtro sin resultados o BD vacía → lista
+            // vacía real, marcada como no-dummy. Nunca filas de ejemplo.
             var dtos = pallets.Select(p => new PalletDto
                 {
                 Id = p.Id,
@@ -83,29 +78,10 @@ public class GetPalletsQueryHandler : IRequestHandler<GetPalletsQuery, PalletsRe
             }
         catch (Exception ex)
             {
-            // Se loguea el motivo real antes de caer a datos dummy: tragarse la excepción en
-            // silencio puede ocultar problemas de conexión reales.
-            _logger.LogError(ex, "Error consultando pallets vía EF Core; devolviendo datos de ejemplo.");
-            return new PalletsResultDto(GetDummyData(), EsDummy: true);
+            // Vacío + log ante error de BD: los datos de ejemplo ocultarían el
+            // fallo y romperían la coherencia con la base real en Demo/Prod.
+            _logger.LogError(ex, "Error consultando pallets vía EF Core; se devuelve vacío (sin datos de ejemplo).");
+            return new PalletsResultDto(new List<PalletDto>(), EsDummy: false);
             }
-        }
-
-    private List<PalletDto> GetDummyData()
-        {
-        var random = new Random();
-        var variedadesCitricas = new[] { "Valencia Late", "Navel", "Clemenules", "Satsuma", "Nova", "Eureka", "Star Ruby" };
-        var estados = new[] { "En Frío", "Pre Frío", "Rearmado" };
-        var zafras = new[] { "2024", "2025", "2026" };
-
-        return Enumerable.Range(1, 15).Select(i => new PalletDto
-            {
-            Id = i,
-            Codigo = $"PLT-{1000 + i}",
-            LoteCodigo = $"L-{200 + i}",
-            Variedad = variedadesCitricas[random.Next(variedadesCitricas.Length)],
-            Estado = estados[random.Next(estados.Length)],
-            Cliente = i % 3 == 0 ? "Sin cliente" : $"Cliente {i}",
-            Zafra = zafras[random.Next(zafras.Length)]
-            }).ToList();
         }
     }

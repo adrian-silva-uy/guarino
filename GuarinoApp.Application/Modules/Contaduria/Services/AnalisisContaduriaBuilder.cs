@@ -266,7 +266,9 @@ public static class AnalisisContaduriaBuilder
                 };
             }
 
-        // La zafra dummy (datos de ejemplo de la página) no aporta estacionalidad real.
+        // Guard histórico: la rama dummy de la proyección se eliminó (cero datos
+        // inventados), pero se conserva la condición por si alguna fuente volviera
+        // a marcar una zafra como ejemplo — la IA no debe recibir cifras de prueba.
         if (proyectada is { EsDummy: false } &&
             (!string.IsNullOrWhiteSpace(proyectada.MesesPico) ||
              !string.IsNullOrWhiteSpace(proyectada.SupuestosOperativos)))

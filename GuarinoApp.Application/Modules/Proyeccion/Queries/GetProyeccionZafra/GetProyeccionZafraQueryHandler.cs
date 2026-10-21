@@ -3,6 +3,7 @@ using GuarinoApp.Application.Modules.Proyeccion.Dtos;
 using GuarinoApp.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Globalization;
 
 namespace GuarinoApp.Application.Modules.Proyeccion.Queries.GetProyeccionZafra;
@@ -24,10 +25,12 @@ public class GetProyeccionZafraQueryHandler : IRequestHandler<GetProyeccionZafra
     private const decimal KgPorBinUltimoRecurso = 20m; // solo si no hay NINGÚN Lote cargado
 
     private readonly IApplicationDbContext _context;
+    private readonly ILogger<GetProyeccionZafraQueryHandler> _logger;
 
-    public GetProyeccionZafraQueryHandler(IApplicationDbContext context)
+    public GetProyeccionZafraQueryHandler(IApplicationDbContext context, ILogger<GetProyeccionZafraQueryHandler> logger)
         {
         _context = context;
+        _logger = logger;
         }
 
     public async Task<List<ZafraDto>> Handle(GetProyeccionZafraQuery request, CancellationToken cancellationToken)
@@ -48,11 +51,19 @@ public class GetProyeccionZafraQueryHandler : IRequestHandler<GetProyeccionZafra
                 return await GenerarZafras(datos, request, cancellationToken);
                 }
 
-            return await GenerarZafrasDummy(request, cancellationToken);
+            // Cero datos inventados: sin histórico real no se proyecta. Antes se
+            // simulaba una historia aleatoria (kilos inventados por año, semilla
+            // fija) que en Demo/Prod podía confundirse con datos de DTrace; la
+            // página informa "sin registros" con la lista vacía.
+            _logger.LogWarning("Sin histórico de LotesEmboquille: no hay zafras para proyectar. Se devuelve vacío (sin datos simulados).");
+            return new List<ZafraDto>();
             }
-        catch (Exception)
+        catch (Exception ex)
             {
-            return await GenerarZafrasDummy(request, cancellationToken);
+            // Vacío + log ante error de BD: nunca historia simulada (ocultaría
+            // el fallo y rompería la coherencia con la base real).
+            _logger.LogError(ex, "Error calculando la proyección de zafra; se devuelve vacío (sin datos simulados).");
+            return new List<ZafraDto>();
             }
         }
 
@@ -174,84 +185,6 @@ public class GetProyeccionZafraQueryHandler : IRequestHandler<GetProyeccionZafra
         return n % 2 == 1
             ? ordenados[n / 2]
             : (ordenados[n / 2 - 1] + ordenados[n / 2]) / 2m;
-        }
-
-    private async Task<List<ZafraDto>> GenerarZafrasDummy(GetProyeccionZafraQuery request, CancellationToken cancellationToken)
-        {
-        var random = new Random(2026827);
-        var zafras = new List<ZafraDto>();
-        var añoActual = DateTime.Now.Year;
-        var variacionesDummy = new List<decimal>();
-
-        var mesesDummyPorAño = new[]
-            {
-            new[] { 3, 6, 9, 12 },
-            new[] { 2, 5, 8, 11 },
-            new[] { 3, 7, 9, 12 },
-            new[] { 4, 6, 9, 11 }
-        };
-
-        for (int año = añoActual - 3; año <= añoActual; año++)
-            {
-            var idx = año - (añoActual - 3);
-            var total = random.Next(150000, 250000);
-            var variacionHist = idx > 0 ? Math.Round((decimal)(random.Next(-5, 20)), 1) : 0;
-            if (idx > 0) variacionesDummy.Add(variacionHist);
-
-            zafras.Add(new ZafraDto
-                {
-                Año = año,
-                TotalKgs = total,
-                VariacionPorcentual = variacionHist,
-                MesesPico = $"{FormatearMeses(mesesDummyPorAño[idx])} (simulado)",
-                NumeroMeses = 12,
-                Estado = año == añoActual ? EstadoZafra.Actual.ToString() : EstadoZafra.Historico.ToString(),
-                Comentario = año == añoActual
-                    ? "Zafra en curso (datos de ejemplo — no hay registros históricos en el sistema)"
-                    : "Datos de ejemplo (no hay registros históricos en el sistema)",
-                EsDummy = true
-                });
-            }
-
-        var ultimoTotal = zafras.Last().TotalKgs;
-        decimal factorCrecimiento;
-        string comentarioMetodo;
-
-        if (request.PorcentajeCrecimientoManual.HasValue)
-            {
-            factorCrecimiento = request.PorcentajeCrecimientoManual.Value;
-            comentarioMetodo = $"Escenario manual ingresado por el usuario: +{factorCrecimiento:F1}% (aplicado sobre datos de ejemplo).";
-            }
-        else
-            {
-            factorCrecimiento = variacionesDummy.Any() ? Math.Round(variacionesDummy.Average(), 1) : 0m;
-            comentarioMetodo = $"Promedio de variación simulada (+{factorCrecimiento:F1}%) — sin datos históricos reales para calcular tendencias.";
-            }
-
-        var totalProyectado = Math.Round(ultimoTotal * (1 + factorCrecimiento / 100), 0);
-        var capacidadMaxHistorica = zafras.Select(z => z.TotalKgs).DefaultIfEmpty(0m).Max();
-
-        var (impacto, supuestos) = await CalcularImpactoOperativoAsync(totalProyectado, capacidadMaxHistorica, request, cancellationToken);
-
-        zafras.Add(new ZafraDto
-            {
-            Año = añoActual + 1,
-            TotalKgs = totalProyectado,
-            VariacionPorcentual = Math.Round(factorCrecimiento, 1),
-            MesesPico = $"{FormatearMeses(mesesDummyPorAño[0])} (estimado, simulado)",
-            NumeroMeses = 12,
-            Estado = EstadoZafra.Proyectado.ToString(),
-            Comentario = comentarioMetodo,
-            EsDummy = true,
-            BinsEstimados = impacto.Bins,
-            CamionesEstimados = impacto.Camiones,
-            HorasEmpaqueEstimadas = impacto.Horas,
-            RiesgoCapacidad = impacto.Riesgo,
-            CapacidadMaximaHistoricaKgs = capacidadMaxHistorica,
-            SupuestosOperativos = supuestos
-            });
-
-        return zafras;
         }
 
     /// <summary>

@@ -60,61 +60,18 @@ public class GetGraficaProcesosQueryHandler : IRequestHandler<GetGraficaProcesos
                 return result;
                 }
 
-            // Si no hay datos reales (por ejemplo, la vista aún no tiene registros),
-            // se devuelven datos dummy para el desarrollo.
+            // Cero datos inventados: si la vista no tiene registros se devuelve
+            // vacío y la página informa "sin registros" (antes acá se generaban
+            // filas dummy para desarrollo).
             return new List<GraficaProcesosDto>();
             }
         catch (Exception ex)
             {
-            // Si la consulta falla (la vista no existe, no hay acceso a producción, etc.),
-            // se devuelven datos dummy para no romper la UI.
+            // Si la consulta falla (la vista no existe, no hay acceso a producción, etc.)
+            // se devuelve vacío + log: nunca datos inventados (romperían la coherencia
+            // de cifras con la base real en Demo/Prod).
             _logger.LogError(ex, "Error en GetGraficaProcesos: {Message}", ex.Message);
             return new List<GraficaProcesosDto>();
             }
-        }
-
-    private List<GraficaProcesosDto> GetDummyData(DateTime? fechaDesde, DateTime? fechaHasta)
-        {
-        var random = new Random();
-        var data = new List<GraficaProcesosDto>();
-
-        // Generar 60 días de datos dummy (para que haya suficiente rango)
-        var startDate = DateTime.Now.AddDays(-60);
-        var endDate = DateTime.Now;
-
-        // Si hay filtros, ajustar el rango de generación
-        if (fechaDesde.HasValue)
-            startDate = fechaDesde.Value;
-        if (fechaHasta.HasValue)
-            endDate = fechaHasta.Value;
-
-        // Si el rango es muy grande, limitar a 60 días para no generar demasiados datos
-        var totalDays = (endDate - startDate).Days;
-        if (totalDays > 60) totalDays = 60;
-        if (totalDays < 1) totalDays = 30;
-
-        for (int i = 0; i < totalDays; i++)
-            {
-            var currentDate = startDate.AddDays(i);
-            data.Add(new GraficaProcesosDto
-                {
-                Loteroda = $"L{1000 + i}",
-                Fecha = currentDate,
-                IdEspecie = 10,
-                Especie = "Mandarina",
-                Variedad = i % 2 == 0 ? "Murco" : "Común",
-                IdVariedad = i % 2 == 0 ? 1 : 2,
-                Calibradora = random.Next(50, 200),
-                DcteSincera = random.Next(10, 50),
-                Volcado = random.Next(100, 400),
-                Hscal = random.Next(20, 80),
-                Hspar = random.Next(10, 60),
-                Ritmo1 = random.Next(80, 250),
-                Ritmo2 = random.Next(60, 180),
-                Observacion = i % 5 == 0 ? "Observación de muestra" : ""
-                });
-            }
-
-        return data;
         }
     }

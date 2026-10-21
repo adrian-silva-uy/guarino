@@ -41,20 +41,8 @@ public class GetLugaresQueryHandler : IRequestHandler<GetLugaresQuery, List<Luga
             }
         catch (Exception ex)
             {
-            _logger.LogError(ex, "Error consultando lugares vía EF Core; devolviendo datos de ejemplo.");
+            _logger.LogError(ex, "Error consultando lugares vía EF Core; se devuelve vacío (sin datos de ejemplo).");
             return new List<LugarDto>();
             }
-        }
-
-    private static List<LugarDto> GetDummyData()
-        {
-        return
-        [
-            new LugarDto { Id = 1, Nombre = "Finca El Paraíso", Tipo = "Origen", Direccion = "Ruta 5 km 123" },
-            new LugarDto { Id = 2, Nombre = "Empaque Central", Tipo = "Destino", Direccion = "Av. Principal 456" },
-            new LugarDto { Id = 3, Nombre = "Quinta Los Pinos", Tipo = "Origen", Direccion = "Camino rural s/n" },
-            new LugarDto { Id = 4, Nombre = "Puerto Frío", Tipo = "Destino", Direccion = "Zona Franca" },
-            new LugarDto { Id = 5, Nombre = "Finca San José", Tipo = "Origen", Direccion = "Ruta 3 km 456" }
-        ];
         }
     }

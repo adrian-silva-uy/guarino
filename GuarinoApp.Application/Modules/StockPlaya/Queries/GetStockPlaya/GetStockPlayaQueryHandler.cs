@@ -186,39 +186,4 @@ public class GetStockPlayaQueryHandler : IRequestHandler<GetStockPlayaQuery, Lis
         var lambda = Expression.Lambda<Func<LoteEmboquille, bool>>(body, param);
         return query.Where(lambda);
         }
-
-    private List<StockPlayaDto> GetDummyData()
-        {
-        var random = new Random();
-        var productores = new[] { "Frutas del Sol", "Agrícola San Juan", "Cítricos del Valle", "Huerta San Rafael", "Cosechas del Este" };
-        var variedades = new[] { "Valencia", "Navel", "Satsuma", "Murcott", "Eureka", "Lisboa", "Marsh", "Star Ruby" };
-
-        var especies = new[] { "Naranja", "Mandarina", "Limón", "Pomelo" };
-
-        var data = new List<StockPlayaDto>();
-
-        for (int i = 1; i <= 25; i++)
-            {
-            data.Add(new StockPlayaDto
-                {
-                Empaque = i % 2 == 0 ? "Empaque Norte" : "Empaque Sur",
-                Especie = especies[random.Next(especies.Length)],
-                Variedad = variedades[random.Next(variedades.Length)],
-                Lote = 1000 + i,
-                Balanza = i % 3 == 0 ? "Báscula 3 - Exportación" : "Báscula 1 - Patio",
-                Destino = i % 2 == 0 ? "Cámara Fría" : "Distribución",
-                Feccha = DateTime.Now.AddDays(-random.Next(1, 30)).ToString("yyyy.MM.dd"),
-                Chacra = $"Chacra {random.Next(1, 6)}",
-                Productor = productores[random.Next(productores.Length)],
-                TipoLote = i % 3 == 0 ? "Exportación" : "Mercado Interno",
-                Ingresados = random.Next(30, 100),
-                Volcados = random.Next(10, 40),
-                Saldo = random.Next(5, 30),
-                KgIngreso = random.Next(1000, 5000),
-                KgVolcados = random.Next(300, 1500),
-                KgStock = random.Next(200, 800)
-                });
-            }
-        return data;
-        }
     }
