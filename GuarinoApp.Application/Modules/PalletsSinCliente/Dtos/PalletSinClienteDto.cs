@@ -12,7 +12,9 @@ namespace GuarinoApp.Application.Modules.PalletsSinCliente.Dtos
         public string? Contramarca { get; set; }
         public string? Calibre { get; set; }
 
-        // Mantener Cliente por compatibilidad si alguna vista lo usa
-        public string? Cliente { get; set; }
+        // Sin propiedad Cliente: la página es "pallets SIN cliente", la columna
+        // quedaba siempre vacía en la grilla (el handler nunca la mapeaba) y
+        // solo confundía. La página renderiza columnas por reflexión, así que
+        // al quitarla acá desaparece de la vista.
         }
     }

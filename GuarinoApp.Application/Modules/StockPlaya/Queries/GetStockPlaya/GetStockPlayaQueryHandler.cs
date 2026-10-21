@@ -2,6 +2,7 @@ using GuarinoApp.Application.Common.Filters;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.StockPlaya.Dtos;
 using GuarinoApp.Domain.Entities;
+using GuarinoApp.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -31,7 +32,7 @@ public class GetStockPlayaQueryHandler : IRequestHandler<GetStockPlayaQuery, Lis
                 .Include(le => le.Bascula)
                 .Include(le => le.DestinoInterno)
                 .Include(le => le.Empaque)
-                .Where(le => le.Estado == "E")
+                .Where(le => le.Estado == EstadoEmboquille.EnPlaya)
                 .AsQueryable();
 
             query = ApplyFilters(query, request.Filters);

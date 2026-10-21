@@ -116,7 +116,7 @@ public class GetIndicadoresGerenciaQueryHandler : IRequestHandler<GetIndicadores
         // Contaduría mostraba 1.417.214 kg con la misma etiqueta.
         var stockEnPlaya = await _context.LotesEmboquille
             .AsNoTracking()
-            .Where(le => le.Estado == "E")
+            .Where(le => le.Estado == EstadoEmboquille.EnPlaya)
             .GroupBy(le => 1)
             .Select(g => new IndicadorGerenciaDto
                 {

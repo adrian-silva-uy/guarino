@@ -89,7 +89,7 @@ public class GetContextoOperativoQueryHandler
             if (hayEmboquille)
                 {
                 dto.StockPlayaKg = await _context.LotesEmboquille.AsNoTracking()
-                    .Where(le => le.Estado == "E")
+                    .Where(le => le.Estado == EstadoEmboquille.EnPlaya)
                     .SumAsync(le => le.CantidadBins != 0
                         ? (decimal?)Math.Round(
                             (le.KilosNetos / le.CantidadBins)

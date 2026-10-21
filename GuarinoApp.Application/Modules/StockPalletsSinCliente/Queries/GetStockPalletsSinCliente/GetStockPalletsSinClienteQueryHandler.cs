@@ -51,21 +51,9 @@ public class GetStockPalletsSinClienteQueryHandler : IRequestHandler<GetStockPal
             }
         catch
             {
+            // Nunca datos inventados: ante un error de consulta se devuelve la
+            // lista vacía y la página muestra "No se encontraron registros".
             return new List<StockPalletSinClienteDto>();
             }
-        }
-
-    private List<StockPalletSinClienteDto> GetDummyData()
-        {
-        var random = new Random();
-        var variedades = new[] { "Valencia Late", "Navel", "Clemenules", "Satsuma", "Nova", "Eureka", "Star Ruby" };
-
-        return variedades.Select(v => new StockPalletSinClienteDto
-            {
-            Variedad = v,
-            Cantidad = random.Next(5, 30),
-            PesoTotal = random.Next(500, 3000),
-            Estado = ((EstadoPallet)random.Next(1, 5)).ToDisplayName()
-            }).ToList();
         }
     }

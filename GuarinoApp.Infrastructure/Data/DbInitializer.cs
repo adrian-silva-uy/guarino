@@ -641,8 +641,9 @@ namespace GuarinoApp.Infrastructure.Data
             // Solo saltar si YA sembramos nosotros: otras siembras (p. ej. la
             // legada SeedProyeccionZafra, que escribe Estado="Finalizado") llenan
             // esta misma tabla y no deben impedir la siembra de Stock Playa
-            // (filas con Estado "E"), que de lo contrario queda siempre vacía
-            // para el handler Estado == "E" de la página Stock en Playa.
+            // (filas con Estado = EstadoEmboquille.EnPlaya, es decir "E"), que de
+            // lo contrario queda siempre vacía para el handler
+            // Estado == EstadoEmboquille.EnPlaya de la página Stock en Playa.
             if (context.LotesEmboquille.Any(e => e.CreatedBy == "DbInitializer"))
                 return;
 
@@ -745,13 +746,16 @@ namespace GuarinoApp.Infrastructure.Data
                     loteElegido ??= candidatos[indice % candidatos.Count];
 
                     // Estado: en playa (saldo >= 0) si el pesaje es reciente;
-                    // si no, cerrado como despachado (70 %) o volcado.
+                    // si no, cerrado como despachado (70 %) o volcado. Los
+                    // valores textuales ("E"/"D"/"V") son los heredados de
+                    // DTrace y viven en la BD tal cual; el código usa las
+                    // constantes para que cada rama diga qué representa.
                     string estado;
                     int binsDespachados = 0;
                     int binsVolcados = 0;
                     if (fecha >= hoy.AddDays(-60))
                         {
-                        estado = "E";
+                        estado = EstadoEmboquille.EnPlaya;
                         var consumidos = random.Next(0, bins); // saldo >= 0 siempre
                         if (random.Next(100) < 60)
                             binsDespachados = consumidos;
@@ -760,12 +764,12 @@ namespace GuarinoApp.Infrastructure.Data
                         }
                     else if (random.Next(100) < 70)
                         {
-                        estado = "D";
+                        estado = EstadoEmboquille.Despachado;
                         binsDespachados = bins;
                         }
                     else
                         {
-                        estado = "V";
+                        estado = EstadoEmboquille.Volcado;
                         binsVolcados = bins;
                         }
 

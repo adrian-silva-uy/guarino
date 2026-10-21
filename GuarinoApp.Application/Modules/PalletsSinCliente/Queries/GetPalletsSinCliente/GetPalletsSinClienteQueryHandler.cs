@@ -28,7 +28,9 @@ public class GetPalletsSinClienteQueryHandler : IRequestHandler<GetPalletsSinCli
     // consulta LINQ no necesita ningun join.
     //
     // CONFIRMADO contra PalletSinClienteDto.cs: Id (int), Codigo/Variedad/Estado/Contramarca/
-    // Calibre/Cliente (string?), Fecha (DateTime?) -- ya no hace falta ningún "?? DateTime.MinValue".
+    // Calibre (string?), Fecha (DateTime?) -- ya no hace falta ningún "?? DateTime.MinValue".
+    // El DTO NO expone Cliente: la página es "pallets SIN cliente" y la columna quedaba
+    // siempre vacía (el SELECT nunca la mapeaba), solo confundía al usuario.
     //
     // ESTADO: una sola fuente de verdad. El estado es el enum EstadoPallet y el
     // 'B' (Baja/Anulado) del SQL original es el miembro EstadoPallet.Bajado --
@@ -64,7 +66,7 @@ public class GetPalletsSinClienteQueryHandler : IRequestHandler<GetPalletsSinCli
 
             if (result.Count == 0)
                 {
-                _logger.LogInformation("No se encontraron pallets sin cliente en la base de datos. Retornando datos dummy.");
+                _logger.LogInformation("No se encontraron pallets sin cliente en la base de datos. Retornando lista vacía (nunca datos inventados).");
                 return new List<PalletSinClienteDto>();
                 }
 
@@ -73,56 +75,8 @@ public class GetPalletsSinClienteQueryHandler : IRequestHandler<GetPalletsSinCli
             }
         catch (Exception ex)
             {
-            _logger.LogError(ex, "Error crítico al consultar pallets sin cliente. Retornando datos dummy.");
+            _logger.LogError(ex, "Error crítico al consultar pallets sin cliente. Retornando lista vacía (nunca datos inventados).");
             return new List<PalletSinClienteDto>();
             }
-        }
-
-    private static List<PalletSinClienteDto> GetDummyData()
-        {
-        var fechaActual = DateTime.Today;
-        return
-        [
-            new()
-            {
-                Id = 101,
-                Codigo = "PAL-2026-001",
-                Variedad = "Valencia Late",
-                Estado = "Despachado",
-                Fecha = fechaActual,
-                Contramarca = "SUNKIST",
-                Calibre = "60"
-            },
-            new()
-            {
-                Id = 102,
-                Codigo = "PAL-2026-002",
-                Variedad = "Navel Late",
-                Estado = "En Frío",
-                Fecha = fechaActual.AddDays(-1),
-                Contramarca = "DEL MONTE",
-                Calibre = "88"
-            },
-            new()
-            {
-                Id = 103,
-                Codigo = "PAL-2026-003",
-                Variedad = "Lima Vicuña",
-                Estado = "Pre Frío",
-                Fecha = fechaActual.AddDays(-2),
-                Contramarca = "NANAK",
-                Calibre = "112"
-            },
-            new()
-            {
-                Id = 104,
-                Codigo = "PAL-2026-004",
-                Variedad = "Valencia",
-                Estado = "Rearmado",
-                Fecha = fechaActual.AddDays(-3),
-                Contramarca = "EL DORADO",
-                Calibre = "16"
-            }
-        ];
         }
     }
