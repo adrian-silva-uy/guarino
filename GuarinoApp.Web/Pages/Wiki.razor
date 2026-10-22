@@ -42,6 +42,16 @@
     .wiki-content code {
         word-break: break-word;
     }
+    .mud-nav-link-active {
+        background-color: #e3f2fd !important;
+        color: #1565c0 !important;
+        font-weight: 600 !important;
+        border-left: 3px solid #1565c0 !important;
+        padding-left: 8px !important;
+    }
+    .mud-nav-link-active .mud-icon {
+        color: #1565c0 !important;
+    }
     @@media (max-width: 960px) {
         .wiki-index {
             position: static !important;
@@ -58,6 +68,7 @@
                 @foreach (var sec in _secciones)
                 {
                     <MudNavLink OnClick="@(() => MostrarSeccion(sec.Titulo))" Icon="@Icons.Material.Filled.ChevronRight"
+                                Selected="@(_seccionActual == sec.Titulo)"
                                 Class="@(_seccionActual == sec.Titulo ? "mud-nav-link-active" : "")">
                         @sec.Titulo
                     </MudNavLink>
