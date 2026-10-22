@@ -1,4 +1,4 @@
-# Revisión de rendimiento — GuarinoApp (Blazor Server + MudBlazor + EF Core)
+﻿# Revisión de rendimiento — GuarinoApp (Blazor Server + MudBlazor + EF Core)
 
 **Fecha**: 2026-10-20
 **Alcance**: solo lectura de código (`GuarinoApp.Web`, `GuarinoApp.Application`, `GuarinoApp.Infrastructure`), sin builds ni tocar git/BD. Busqué activamente: `.Result/.Wait/Task.Run`, sync-over-async, `async` sin await, fire-and-forget, tracking/SELECT *, N+1, predicados no traducibles, materialización sin límite, `StateHasChanged` excesivos, y trabajo pesado en el hilo del circuito.
@@ -244,14 +244,13 @@ private void OnPorcentajeCambio()
 3. **Contactos: una sola consulta en vez de dos idénticas** (hallazgo 3 — `Contactos.razor:165-166`): doble round-trip + doble materialización eliminados en la pantalla comercial, cambio de 3 líneas.
 4. **Límites y rangos sargables en las queries de listados grandes** (hallazgo 4 — `GetStockPlayaQueryHandler.cs:39-66`, `GetPalletsQueryHandler.cs:62`, `GetRegistroPesadasQueryHandler.cs:35-36`, `GetPalletsDefinitivosQueryHandler.cs:39-75`): copiar el patrón ya probado de `GetLogsQuery` (`.Date` → rango `[desde, hasta)` y `Take`/paging server-side) ataca el consumo de memoria y los timeouts a medida que la tabla crece con cada zafra.
 5. **Paralelizar donde hay scopes propios, y desdoblar queries duplicadas** (hallazgos 7 y 8 — `Dashboard.razor:287-294` y `OllamaAIService.cs:433-437`): `Task.WhenAll` sobre los métodos de `DashboardDataService` (que ya usan `IServiceScopeFactory`) recorta ~60-70 % de la latencia de entrada al Dashboard y de cada mensaje del chat, y el `totalStock` derivado de `stockPorVariedad` elimina una query completa en ambos flujos.
-
 ---
 
 ## Actualizaciones recientes (Oct 2026)
 
 Cambios aplicados al código y reflejados en la documentación:
 
-- **Filtro de módulos por rol (UI)**: `NavMenu.razor` y `Index.razor` muestran los módulos bloqueados con 🔒 + tooltip "Requiere: X — tu rol actual: Y" en lugar de ocultarlos. Componentes nuevos: `Shared/NavLinkSeguro.razor` y `Shared/EnlaceSeguro.razor`. Matriz de acceso por reflexión en `Services/MapaAccesosRutas.cs` (lee `[Authorize]` de las páginas → ruta→roles). Helper `Services/RolUsuario.cs` resuelve el rol actual con `RoleNames`. Registrado como singleton en `Program.cs`.
+- **Filtro de módulos por rol (UI)**: `NavMenu.razor` y `Index.razor` muestran los módulos bloqueados con candado y tooltip "Requiere: X — tu rol actual: Y" en lugar de ocultarlos. Componentes nuevos: `Shared/NavLinkSeguro.razor` y `Shared/EnlaceSeguro.razor`. Matriz de acceso por reflexión en `Services/MapaAccesosRutas.cs` (lee `[Authorize]` de las páginas → ruta→ roles). Helper `Services/RolUsuario.cs` resuelve el rol actual con `RoleNames`. Registrado como singleton en `Program.cs`.
 - **RoleNames como fuente única**: constantes `Admin`/`Gerencia`/`Contador`/`Operador` + grupos `Todos`/`Financieros`/`Administracion` + cadenas `*Autorizacion` para `[Authorize]`. Cero literales de rol en `.razor`.
 - **Paginación fija de 25 filas** en las 30 grillas (`RowsPerPage="25"` + `MudTablePager PageSizeOptions="new int[] { 25 }"`). Auditoría usa paginación server-side (`ServerData` + `state.Page/PageSize`).
 - **Filtro IA por rol**: `ConsultaIArestringida` (log) + matriz de roles por tool MCP.
@@ -260,3 +259,7 @@ Cambios aplicados al código y reflejados en la documentación:
 - **Autenticación**: Negotiate + Data Protection tokens (`GuarinoApp.Auth.v1`, 12 h, localStorage `auth_token`); lockout 5 fallos/15 min.
 - **Grillas sin paginador** reemplazado por paginación de 25 (instrucción vigente).
 - **Build**: 0 errores / 0 advertencias. UI en español.
+- **Diagramas Mermaid**: 40 bloques en `docs/diagramas.md` y otros archivos (arquitectura, flujos, seguridad, servicios). Renderizan en GitHub, VS Code (con extensión), Obsidian.
+- **Wiki de usuario**: `docs/WIKI_USUARIO.md` con manual funcional por módulo y rol.
+- **Auditoría exhaustiva**: `docs/auditoria-exhaustiva.md` (OWASP + UX + deuda técnica).
+- **Documentación inversa**: `docs/documentacion-inversa.md` (arquitectura, módulos, decisiones, trampas).
