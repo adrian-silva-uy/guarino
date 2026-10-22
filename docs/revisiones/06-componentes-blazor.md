@@ -287,3 +287,19 @@ con `ILogger<T>` inyectado (ya disponible en los proyectos, solo falta usarlo en
 ---
 
 **Resumen ejecutivo**: la base es sólida — separación UI/servicios vía MediatR, patrón IA híbrido bien pensado, manejo serio de interop JS en el mapa y formularios con saneamiento cuidado. Los riesgos se concentran en (a) la **duplicación masiva** que multiplica el costo de cada fix futuro, (b) **filtros que no llegan a la query** y artefactos de render visibles, y (c) **errores tragados que se disfrazan de "sin datos"** en ~15 páginas. Atacando el Top-5 se reducirían unas 700-800 líneas duplicadas y se eliminarían los bugs funcionales más confusos para el usuario final.
+
+---
+
+## Actualizaciones recientes (Oct 2026)
+
+Cambios aplicados al código y reflejados en la documentación:
+
+- **Filtro de módulos por rol (UI)**: `NavMenu.razor` y `Index.razor` muestran los módulos bloqueados con 🔒 + tooltip "Requiere: X — tu rol actual: Y" en lugar de ocultarlos. Componentes nuevos: `Shared/NavLinkSeguro.razor` y `Shared/EnlaceSeguro.razor`. Matriz de acceso por reflexión en `Services/MapaAccesosRutas.cs` (lee `[Authorize]` de las páginas → ruta→roles). Helper `Services/RolUsuario.cs` resuelve el rol actual con `RoleNames`. Registrado como singleton en `Program.cs`.
+- **RoleNames como fuente única**: constantes `Admin`/`Gerencia`/`Contador`/`Operador` + grupos `Todos`/`Financieros`/`Administracion` + cadenas `*Autorizacion` para `[Authorize]`. Cero literales de rol en `.razor`.
+- **Paginación fija de 25 filas** en las 30 grillas (`RowsPerPage="25"` + `MudTablePager PageSizeOptions="new int[] { 25 }"`). Auditoría usa paginación server-side (`ServerData` + `state.Page/PageSize`).
+- **Filtro IA por rol**: `ConsultaIArestringida` (log) + matriz de roles por tool MCP.
+- **Servidor MCP** (`/mcp`) con `WithHttpTransport()` + middleware Bearer propio (`McpAuthMiddleware`); tools solo lectura; auditoría `McpCall`.
+- **Cero datos inventados**: `GetDummyData`/`GenerarZafrasDummy`/fallbacks eliminados; `EsDummy` siempre `false`; "En nuestro poder" = sin cliente y Estado != Bajado/Despachado.
+- **Autenticación**: Negotiate + Data Protection tokens (`GuarinoApp.Auth.v1`, 12 h, localStorage `auth_token`); lockout 5 fallos/15 min.
+- **Grillas sin paginador** reemplazado por paginación de 25 (instrucción vigente).
+- **Build**: 0 errores / 0 advertencias. UI en español.

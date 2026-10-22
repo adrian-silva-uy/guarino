@@ -137,3 +137,19 @@ Por lo tanto, el análisis se hace sobre **esa superficie equivalente**: rutas B
 3. **Cerrar el acceso por rol** — `@attribute [Authorize(Roles=...)]` en las 9 páginas sin atributo (`Dashboard`, `StockPlaya`, `StockGeneral`, `RegistroPesadas`, `LotesVolcados`, `FrutaVolcar`, `PalletsSinCliente`, `Index`, `Counter`) y `EnableFallbackIdentity: false` en producción (`appsettings.json:33`) para que nadie herede "Gerencia" (hallazgos 3 y 4).
 4. **Hacer efectiva la validación** — registrar `ValidationBehavior<,>` en `Application\DependencyInjection.cs` (o borrar el validador muerto `CrearPalletCommandValidator.cs` y el comando huérfano `CrearPalletCommand`), y unificar todo en FluentValidation + envelope `Result<T>` (hallazgos 6, 7 y 13).
 5. **Unificar el manejo de errores de las páginas** — eliminar `ex.Message`/`InnerException` del UI (`Dashboard.razor:577` y 12 ubicaciones más) y sustituir los `catch` silenciosos con `Console.WriteLine` (20 páginas) por un helper común: mensaje genérico al usuario + `Logger.LogError` (hallazgo 8); de paso, estandarizar rutas en kebab-case (hallazgo 12).
+
+---
+
+## Actualizaciones recientes (Oct 2026)
+
+Cambios aplicados al código y reflejados en la documentación:
+
+- **Filtro de módulos por rol (UI)**: `NavMenu.razor` y `Index.razor` muestran los módulos bloqueados con 🔒 + tooltip "Requiere: X — tu rol actual: Y" en lugar de ocultarlos. Componentes nuevos: `Shared/NavLinkSeguro.razor` y `Shared/EnlaceSeguro.razor`. Matriz de acceso por reflexión en `Services/MapaAccesosRutas.cs` (lee `[Authorize]` de las páginas → ruta→roles). Helper `Services/RolUsuario.cs` resuelve el rol actual con `RoleNames`. Registrado como singleton en `Program.cs`.
+- **RoleNames como fuente única**: constantes `Admin`/`Gerencia`/`Contador`/`Operador` + grupos `Todos`/`Financieros`/`Administracion` + cadenas `*Autorizacion` para `[Authorize]`. Cero literales de rol en `.razor`.
+- **Paginación fija de 25 filas** en las 30 grillas (`RowsPerPage="25"` + `MudTablePager PageSizeOptions="new int[] { 25 }"`). Auditoría usa paginación server-side (`ServerData` + `state.Page/PageSize`).
+- **Filtro IA por rol**: `ConsultaIArestringida` (log) + matriz de roles por tool MCP.
+- **Servidor MCP** (`/mcp`) con `WithHttpTransport()` + middleware Bearer propio (`McpAuthMiddleware`); tools solo lectura; auditoría `McpCall`.
+- **Cero datos inventados**: `GetDummyData`/`GenerarZafrasDummy`/fallbacks eliminados; `EsDummy` siempre `false`; "En nuestro poder" = sin cliente y Estado != Bajado/Despachado.
+- **Autenticación**: Negotiate + Data Protection tokens (`GuarinoApp.Auth.v1`, 12 h, localStorage `auth_token`); lockout 5 fallos/15 min.
+- **Grillas sin paginador** reemplazado por paginación de 25 (instrucción vigente).
+- **Build**: 0 errores / 0 advertencias. UI en español.
