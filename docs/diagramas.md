@@ -1,4 +1,4 @@
-﻿# Diagramas de arquitectura y flujo â€” GuarinoApp
+# Diagramas de arquitectura y flujo â€” GuarinoApp
 
 > Todos los diagramas están en formato **Mermaid** (renderizan en GitHub, VS Code, Obsidian y la mayoría de wikis). Pueden copiarse a cualquier `.md`.
 
@@ -248,11 +248,11 @@ Todas las tools MCP son de **solo lectura** (la importación de contactos queda 
 ```mermaid
 flowchart TD
     U[Usuario envía consulta IA] --> F1{FiltroConsultasIA: Â¿tool permitida para el rol?}
-    F1 -- No --> L1[Log "ConsultaIArestringida" + respuesta bloqueada]
+    F1 -- No --> L1[Log ConsultaIArestringida + respuesta bloqueada]
     F1 -- Sí --> F2{McpAuthMiddleware: token válido?}
     F2 -- No --> L2[401]
     F2 -- Sí --> Tool[Ejecuta tool MCP de solo lectura]
-    Tool --> Audit[Log "Consulta IA" / "McpCall"]
+    Tool --> Audit[Log Consulta IA / McpCall]
     Audit --> Resp[Respuesta al chat]
 ```
 
