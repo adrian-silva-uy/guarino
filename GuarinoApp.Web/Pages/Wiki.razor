@@ -7,9 +7,45 @@
 <MudText Typo="Typo.h4" GutterBottom="true">Manual de usuario</MudText>
 <MudText Typo="Typo.body2" Class="mb-4">Guia funcional de GuarinoApp: selecciona un tema del indice para ver su contenido.</MudText>
 
+<style>
+    .wiki-content img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        margin: 12px 0;
+        display: block;
+    }
+    .wiki-content h1, .wiki-content h2, .wiki-content h3 {
+        margin-top: 16px;
+        margin-bottom: 8px;
+    }
+    .wiki-content table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .wiki-content table th, .wiki-content table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+    }
+    .wiki-content pre {
+        overflow-x: auto;
+        max-width: 100%;
+    }
+    .wiki-content code {
+        word-break: break-word;
+    }
+    @media (max-width: 960px) {
+        .wiki-index {
+            position: static !important;
+            max-height: none !important;
+        }
+    }
+</style>
+
 <MudGrid>
     <MudItem xs="12" md="3">
-        <MudPaper Class="pa-3" Elevation="2" Style="position:sticky;top:16px;max-height:80vh;overflow-y:auto;">
+        <MudPaper Class="pa-3 wiki-index" Elevation="2" Style="position:sticky;top:16px;max-height:80vh;overflow-y:auto;">
             <MudText Typo="Typo.h6" Class="mb-2">Indice</MudText>
             <MudNavMenu Dense="true">
                 @foreach (var sec in _secciones)
