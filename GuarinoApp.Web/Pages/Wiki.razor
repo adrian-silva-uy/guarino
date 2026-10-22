@@ -1,0 +1,96 @@
+@page "/wiki"
+@attribute [Authorize(Roles = RoleNames.TodosAutorizacion)]
+@using Markdig
+@using System.IO
+@inject IWebHostEnvironment Env
+
+<MudText Typo="Typo.h4" GutterBottom="true">Manual de usuario</MudText>
+<MudText Typo="Typo.body2" Class="mb-4">Guia funcional de GuarinoApp: modulos, roles, tareas comunes y ayuda.</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="3">
+        <MudPaper Class="pa-3" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-2">Documentos</MudText>
+            <MudList T="string" Dense="true">
+                @foreach (var doc in _documentos)
+                {
+                    <MudListItem T="string" OnClick="@(() => Seleccionar(doc))">
+                        <MudText Typo="Typo.body2">@doc</MudText>
+                    </MudListItem>
+                }
+            </MudList>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="9">
+        <MudPaper Class="pa-4" Elevation="2">
+            @if (_cargando)
+            {
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (string.IsNullOrEmpty(_html))
+            {
+                <MudText Typo="Typo.body1" Color="Color.Secondary">Selecciona un documento de la lista.</MudText>
+            }
+            else
+            {
+                <div class="wiki-content">
+                    @((MarkupString)_html)
+                </div>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private readonly List<string> _documentos = new()
+    {
+        "WIKI_USUARIO.md"
+    };
+
+    private string _seleccionado = string.Empty;
+    private string _html = string.Empty;
+    private bool _cargando = false;
+
+    private readonly MarkdownPipeline _pipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .Build();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_documentos.Count > 0)
+        {
+            await Seleccionar(_documentos[0]);
+        }
+    }
+
+    private async Task Seleccionar(string nombre)
+    {
+        _cargando = true;
+        _seleccionado = nombre;
+        _html = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var path = Path.Combine(Env.WebRootPath, "wiki", nombre);
+            if (File.Exists(path))
+            {
+                var md = await File.ReadAllTextAsync(path);
+                _html = Markdown.ToHtml(md, _pipeline);
+            }
+            else
+            {
+                _html = "<p>Archivo no encontrado.</p>";
+            }
+        }
+        catch (Exception ex)
+        {
+            _html = "<p>Error al cargar: " + ex.Message + "</p>";
+        }
+        finally
+        {
+            _cargando = false;
+            StateHasChanged();
+        }
+    }
+}
