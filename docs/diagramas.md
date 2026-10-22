@@ -1,4 +1,4 @@
-# Diagramas de arquitectura y flujo â€” GuarinoApp
+# Diagramas de arquitectura y flujo — GuarinoApp
 
 > Todos los diagramas están en formato **Mermaid** (renderizan en GitHub, VS Code, Obsidian y la mayoría de wikis). Pueden copiarse a cualquier `.md`.
 
@@ -81,7 +81,7 @@ sequenceDiagram
         else Password válido
             L->>DB: Audit Log "Login"
             L->>W: AuthTokenService.Issue (DP, 12 h)
-            W-->>B: token â†’ localStorage "auth_token"
+            W-->>B: token → localStorage "auth_token"
             B->>W: Redirige a /
         end
     end
@@ -100,7 +100,7 @@ sequenceDiagram
     participant DB as SQL Server
 
     U->>P: Navega a /stockgeneral
-    P->>P: OnInitializedAsync â†’ LoadData()
+    P->>P: OnInitializedAsync → LoadData()
     P->>M: Send(GetPalletsQuery(zafra, estado))
     M->>H: Handle
     H->>DB: SELECT Pallets WHERE Estado != Bajado (LINQ parametrizado)
@@ -129,7 +129,7 @@ sequenceDiagram
     A->>P: Rellena campos y "CREAR USUARIO"
     P->>M: Send(CreateUserCommand)
     M->>H: Handle
-    H->>DB: Â¿rol activo en Roles?
+    H->>DB: ¿rol activo en Roles?
     alt Rol inválido
         H-->>M: Fail("El rol seleccionado no es válido.")
     else Rol válido
@@ -137,7 +137,7 @@ sequenceDiagram
         alt Validación falla
             H-->>M: Fail(mensaje)
         else OK
-            H->>DB: Â¿UserName existe?
+            H->>DB: ¿UserName existe?
             alt Duplicado
                 H-->>M: Fail("Ese usuario ya existe.")
             else
@@ -161,17 +161,17 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Pagina1: OnInitializedAsync â†’ LoadData()
+    [*] --> Pagina1: OnInitializedAsync → LoadData()
     Pagina1 --> Cargando: _loading=true
     Cargando --> Render25: MudTable Items=_data, RowsPerPage=25
-    Render25 --> Pager: "Mostrando 1â€“25 de N"
+    Render25 --> Pager: "Mostrando 1–25 de N"
     Pager --> Pagina2: Click "siguiente" (MudTablePager)
-    Pagina2 --> Render25b: "Mostrando 26â€“50 de N"
+    Pagina2 --> Render25b: "Mostrando 26–50 de N"
     Render25b --> Pagina1: Click "anterior"
     Note right of Render25: PageSizeOptions = {25} (único valor, no modificable)
 ```
 
-Para Auditoría (server-side): el pager dispara `ServerReload(state)` â†’ handler con `Page=state.Page+1, PageSize=state.PageSize` â†’ SQL `Skip/Take` â†’ devuelve `TotalCount`.
+Para Auditoría (server-side): el pager dispara `ServerReload(state)` → handler con `Page=state.Page+1, PageSize=state.PageSize` → SQL `Skip/Take` → devuelve `TotalCount`.
 
 ---
 
@@ -202,7 +202,7 @@ flowchart LR
     M4 -. "bloqueado ðŸ”’" .- Operador
 ```
 
-Los módulos bloqueados se **muestran** con ðŸ”’ + tooltip "Requiere: X â€” tu rol actual: Y" (no se ocultan). La seguridad real la impone cada `[Authorize(Roles=RoleNames.*Autorizacion)]` en la página.
+Los módulos bloqueados se **muestran** con ðŸ”’ + tooltip "Requiere: X — tu rol actual: Y" (no se ocultan). La seguridad real la impone cada `[Authorize(Roles=RoleNames.*Autorizacion)]` en la página.
 
 ---
 
@@ -224,7 +224,7 @@ sequenceDiagram
     else Token válido
         MW->>MW: Componer HttpContext.User (rol del token)
         MW->>T: tools/call <nombre>
-        T->>T: Â¿rol en matriz de la tool?
+        T->>T: ¿rol en matriz de la tool?
         alt No autorizado
             T->>AU: Log "McpCall" (restringido)
             T-->>C: error (rol insuficiente)
@@ -247,7 +247,7 @@ Todas las tools MCP son de **solo lectura** (la importación de contactos queda 
 
 ```mermaid
 flowchart TD
-    U[Usuario envía consulta IA] --> F1{FiltroConsultasIA: Â¿tool permitida para el rol?}
+    U[Usuario envía consulta IA] --> F1{FiltroConsultasIA: ¿tool permitida para el rol?}
     F1 -- No --> L1[Log ConsultaIArestringida + respuesta bloqueada]
     F1 -- Sí --> F2{McpAuthMiddleware: token válido?}
     F2 -- No --> L2[401]
@@ -269,7 +269,7 @@ sequenceDiagram
     H->>A: LogAsync(action, module, description, additionalData)
     A->>A: Obtener usuario actual (ICurrentUserService) + rol
     A->>DB: INSERT LogEntry (UserName, Role, Action, Module, Description, Timestamp, IpAddress)
-    Note over A: catch vacío â†’ no propaga errores (trampa: fallos silenciosos)
+    Note over A: catch vacío → no propaga errores (trampa: fallos silenciosos)
 ```
 
 ---
@@ -319,7 +319,7 @@ stateDiagram-v2
 
 Cambios aplicados al código y reflejados en la documentación:
 
-- **Filtro de módulos por rol (UI)**: `NavMenu.razor` y `Index.razor` muestran los módulos bloqueados con ðŸ”’ + tooltip "Requiere: X â€” tu rol actual: Y" en lugar de ocultarlos. Componentes nuevos: `Shared/NavLinkSeguro.razor` y `Shared/EnlaceSeguro.razor`. Matriz de acceso por reflexión en `Services/MapaAccesosRutas.cs` (lee `[Authorize]` de las páginas â†’ rutaâ†’roles). Helper `Services/RolUsuario.cs` resuelve el rol actual con `RoleNames`. Registrado como singleton en `Program.cs`.
+- **Filtro de módulos por rol (UI)**: `NavMenu.razor` y `Index.razor` muestran los módulos bloqueados con ðŸ”’ + tooltip "Requiere: X — tu rol actual: Y" en lugar de ocultarlos. Componentes nuevos: `Shared/NavLinkSeguro.razor` y `Shared/EnlaceSeguro.razor`. Matriz de acceso por reflexión en `Services/MapaAccesosRutas.cs` (lee `[Authorize]` de las páginas → ruta→roles). Helper `Services/RolUsuario.cs` resuelve el rol actual con `RoleNames`. Registrado como singleton en `Program.cs`.
 - **RoleNames como fuente única**: constantes `Admin`/`Gerencia`/`Contador`/`Operador` + grupos `Todos`/`Financieros`/`Administracion` + cadenas `*Autorizacion` para `[Authorize]`. Cero literales de rol en `.razor`.
 - **Paginación fija de 25 filas** en las 30 grillas (`RowsPerPage="25"` + `MudTablePager PageSizeOptions="new int[] { 25 }"`). Auditoría usa paginación server-side (`ServerData` + `state.Page/PageSize`).
 - **Filtro IA por rol**: `ConsultaIArestringida` (log) + matriz de roles por tool MCP.
