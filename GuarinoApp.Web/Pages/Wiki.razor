@@ -5,20 +5,21 @@
 @inject IWebHostEnvironment Env
 
 <MudText Typo="Typo.h4" GutterBottom="true">Manual de usuario</MudText>
-<MudText Typo="Typo.body2" Class="mb-4">Guia funcional de GuarinoApp: modulos, roles, tareas comunes y ayuda.</MudText>
+<MudText Typo="Typo.body2" Class="mb-4">Guia funcional de GuarinoApp: selecciona un tema del indice para ver su contenido.</MudText>
 
 <MudGrid>
     <MudItem xs="12" md="3">
-        <MudPaper Class="pa-3" Elevation="2">
-            <MudText Typo="Typo.h6" Class="mb-2">Documentos</MudText>
-            <MudList T="string" Dense="true">
-                @foreach (var doc in _documentos)
+        <MudPaper Class="pa-3" Elevation="2" Style="position:sticky;top:16px;max-height:80vh;overflow-y:auto;">
+            <MudText Typo="Typo.h6" Class="mb-2">Indice</MudText>
+            <MudNavMenu Dense="true">
+                @foreach (var sec in _secciones)
                 {
-                    <MudListItem T="string" OnClick="@(() => Seleccionar(doc))">
-                        <MudText Typo="Typo.body2">@doc</MudText>
-                    </MudListItem>
+                    <MudNavLink OnClick="@(() => MostrarSeccion(sec.Titulo))" Icon="@Icons.Material.Filled.ChevronRight"
+                                Class="@(_seccionActual == sec.Titulo ? "mud-nav-link-active" : "")">
+                        @sec.Titulo
+                    </MudNavLink>
                 }
-            </MudList>
+            </MudNavMenu>
         </MudPaper>
     </MudItem>
     <MudItem xs="12" md="9">
@@ -27,14 +28,14 @@
             {
                 <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
             }
-            else if (string.IsNullOrEmpty(_html))
+            else if (string.IsNullOrEmpty(_htmlSeccion))
             {
-                <MudText Typo="Typo.body1" Color="Color.Secondary">Selecciona un documento de la lista.</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary">Selecciona un tema del indice.</MudText>
             }
             else
             {
                 <div class="wiki-content">
-                    @((MarkupString)_html)
+                    @((MarkupString)_htmlSeccion)
                 </div>
             }
         </MudPaper>
@@ -42,55 +43,125 @@
 </MudGrid>
 
 @code {
-    private readonly List<string> _documentos = new()
-    {
-        "WIKI_USUARIO.md"
-    };
-
-    private string _seleccionado = string.Empty;
-    private string _html = string.Empty;
-    private bool _cargando = false;
-
     private readonly MarkdownPipeline _pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
 
-    protected override async Task OnInitializedAsync()
+    private List<Seccion> _secciones = new();
+    private string _seccionActual = string.Empty;
+    private string _htmlSeccion = string.Empty;
+    private bool _cargando = false;
+
+    private class Seccion
     {
-        if (_documentos.Count > 0)
+        public string Titulo { get; set; } = string.Empty;
+        public string Contenido { get; set; } = string.Empty;
+    }
+
+    private bool _inicializado = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_inicializado)
         {
-            await Seleccionar(_documentos[0]);
+            _inicializado = true;
+            await CargarDocumentoAsync("WIKI_USUARIO.md");
         }
     }
 
-    private async Task Seleccionar(string nombre)
+    private async Task CargarDocumentoAsync(string nombre)
     {
         _cargando = true;
-        _seleccionado = nombre;
-        _html = string.Empty;
         StateHasChanged();
 
         try
         {
             var path = Path.Combine(Env.WebRootPath, "wiki", nombre);
-            if (File.Exists(path))
+            if (!File.Exists(path))
             {
-                var md = await File.ReadAllTextAsync(path);
-                _html = Markdown.ToHtml(md, _pipeline);
+                _htmlSeccion = "<p>Archivo no encontrado.</p>";
+                return;
             }
-            else
+
+            var md = await File.ReadAllTextAsync(path);
+            _secciones = ParsearSecciones(md);
+
+            // Mostrar la primera seccion con contenido
+            var primeraConContenido = _secciones.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.Contenido));
+            if (primeraConContenido != null)
             {
-                _html = "<p>Archivo no encontrado.</p>";
+                await MostrarSeccion(primeraConContenido.Titulo);
+            }
+            else if (_secciones.Count > 0)
+            {
+                await MostrarSeccion(_secciones[0].Titulo);
             }
         }
         catch (Exception ex)
         {
-            _html = "<p>Error al cargar: " + ex.Message + "</p>";
+            _htmlSeccion = "<p>Error al cargar: " + ex.Message + "</p>";
         }
         finally
         {
             _cargando = false;
             StateHasChanged();
         }
+    }
+
+    private List<Seccion> ParsearSecciones(string md)
+    {
+        var secciones = new List<Seccion>();
+        var lines = md.Split('\n');
+        var tituloActual = string.Empty;
+        var contenidoActual = new System.Text.StringBuilder();
+
+        foreach (var line in lines)
+        {
+            // Detectar encabezados de nivel 2 (##) o nivel 3 (###) como secciones
+            if (line.StartsWith("## ") || line.StartsWith("### "))
+            {
+                // Guardar la seccion anterior si tiene contenido
+                if (!string.IsNullOrEmpty(tituloActual) && contenidoActual.Length > 0)
+                {
+                    secciones.Add(new Seccion { Titulo = tituloActual, Contenido = contenidoActual.ToString().Trim() });
+                }
+                // Nuevo titulo (sin los #)
+                tituloActual = line.TrimStart('#').Trim();
+                contenidoActual.Clear();
+            }
+            else
+            {
+                contenidoActual.AppendLine(line);
+            }
+        }
+        // Guardar la ultima seccion
+        if (!string.IsNullOrEmpty(tituloActual) && contenidoActual.Length > 0)
+        {
+            secciones.Add(new Seccion { Titulo = tituloActual, Contenido = contenidoActual.ToString().Trim() });
+        }
+
+        // Si no se encontraron secciones (sin encabezados ##), mostrar todo como una seccion
+        if (secciones.Count == 0)
+        {
+            secciones.Add(new Seccion { Titulo = "Contenido", Contenido = md });
+        }
+
+        return secciones;
+    }
+
+    private Task MostrarSeccion(string titulo)
+    {
+        _seccionActual = titulo;
+        var sec = _secciones.FirstOrDefault(s => s.Titulo == titulo);
+        if (sec != null)
+        {
+            _htmlSeccion = Markdown.ToHtml(sec.Contenido, _pipeline);
+        }
+        else
+        {
+            _htmlSeccion = string.Empty;
+        }
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 }
