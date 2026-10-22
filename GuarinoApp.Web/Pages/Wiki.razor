@@ -8,9 +8,14 @@
 <MudText Typo="Typo.body2" Class="mb-4">Guia funcional de GuarinoApp: selecciona un tema del indice para ver su contenido.</MudText>
 
 <style>
-    .wiki-content img {
+    .wiki-content {
+        overflow-x: hidden;
         max-width: 100%;
-        height: auto;
+    }
+    .wiki-content img {
+        max-width: 100% !important;
+        width: auto !important;
+        height: auto !important;
         border-radius: 8px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         margin: 12px 0;
@@ -23,10 +28,12 @@
     .wiki-content table {
         width: 100%;
         border-collapse: collapse;
+        table-layout: fixed;
     }
     .wiki-content table th, .wiki-content table td {
         border: 1px solid #ddd;
         padding: 8px;
+        word-wrap: break-word;
     }
     .wiki-content pre {
         overflow-x: auto;
@@ -35,7 +42,7 @@
     .wiki-content code {
         word-break: break-word;
     }
-    @media (max-width: 960px) {
+    @@media (max-width: 960px) {
         .wiki-index {
             position: static !important;
             max-height: none !important;
