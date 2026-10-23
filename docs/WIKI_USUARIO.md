@@ -55,8 +55,6 @@ El menú lateral (izquierda) organiza los módulos por categorías:
 - **ADMINISTRACIÓN**: Contaduría, Usuarios, Auditoría
 - **DOCUMENTACIÓN**: Wiki (este manual)
 
-![Menú lateral](img/menú-lateral.svg)
-
 ### 2.2 Paginación
 
 Todas las grillas (tablas) muestran **25 filas por página**.
@@ -203,7 +201,7 @@ Proyecciones de volcados futuros y de la próxima zafra.
 - **Lugares**: catálogo de lugares de origen y destino.
 - **Básculas**: catálogo de básculas.
 
-![Logística y Recursos](img/logística-y-recursos.svg)
+![Logística y Recursos](img/logistica-y-recursos.svg)
 
 ### 3.15 Contactos (solo Administración)
 
@@ -243,7 +241,7 @@ Gestión de contactos con importación masiva.
 
 Datos financieros + contexto operativo. El Asistente IA puede analizar los datos (tarda ~12 segundos).
 
-![Contaduría](img/contaduría.svg)
+![Contaduría](img/contaduria.svg)
 
 ### 3.18 Gerencia (solo Administración)
 
