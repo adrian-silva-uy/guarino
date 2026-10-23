@@ -19,6 +19,8 @@ Bienvenido al manual de usuario de **GuarinoApp**, el sistema de gestión de ope
 
 ### 1.2 Roles y permisos
 
+![Roles y permisos](img/roles-y-permisos.svg)
+
 Cada usuario tiene un rol que determina qué módulos puede ver y usar:
 
 | Rol | Qué puede hacer |
@@ -76,6 +78,8 @@ Todas las grillas (tablas) muestran **25 filas por página**.
 2. Al cambiar un valor, la grilla se actualiza automáticamente.
 3. Para limpiar un filtro, selecciona la opción vacía.
 
+![Filtrar datos](img/filtrar-datos.svg)
+
 ---
 
 ## 3. Módulos principales
@@ -109,9 +113,13 @@ Lista de pallets por variedad, estado y zafra.
 
 Pallets en playa (sin cliente asignado), agrupados por variedad.
 
+![Stock en Playa](img/stock-en-playa.svg)
+
 ### 3.5 Fruta a Volcar
 
 Fruta pendiente de volcar por lote y productor.
+
+![Fruta a Volcar](img/fruta-a-volcar.svg)
 
 ### 3.6 Lotes Volcados
 
@@ -134,13 +142,19 @@ Registro de pesadas (fuente: LotesEmboquille).
 2. Navega con la paginación (25 por página).
 3. Exporta si necesitas.
 
+![Registro de Pesadas](img/registro-de-pesadas.svg)
+
 ### 3.8 Gestión de Empaque
 
 Catálogo y gestión de empaque.
 
+![Gestión de Empaque](img/gestion-de-empaque.svg)
+
 ### 3.9 Pallets por Contramarca / Definitivos / Sin Clientes
 
 Vistas especializadas de pallets según su estado.
+
+![Pallets por Contramarca / Definitivos / Sin Clientes](img/pallets-por-contramarca-definitivos-sin-clientes.svg)
 
 ### 3.10 Gestión de Riesgos Climáticos
 
@@ -169,6 +183,8 @@ Consultas de inteligencia artificial seleccionables según tu rol.
 
 Proyecciones de volcados futuros y de la próxima zafra.
 
+![Proyección de Volcados / Zafra Siguiente](img/proyeccion-de-volcados-zafra-siguiente.svg)
+
 ### 3.13 Reportes
 
 - **Resumen de Liquidaciones**: resumen de liquidaciones.
@@ -176,12 +192,16 @@ Proyecciones de volcados futuros y de la próxima zafra.
 - **Resumen Mensual**: resumen mensual.
 - **Gráfica de Procesos**: gráfica de procesos.
 
+![Reportes](img/reportes.svg)
+
 ### 3.14 Logística y Recursos
 
 - **Transportistas**: catálogo de transportistas.
 - **Camiones y Zorras**: catálogo de camiones y zorras.
 - **Lugares**: catálogo de lugares de origen y destino.
 - **Básculas**: catálogo de básculas.
+
+![Logística y Recursos](img/logistica-y-recursos.svg)
 
 ### 3.15 Contactos (solo Administración)
 
@@ -199,6 +219,8 @@ Gestión de contactos con importación masiva.
 4. Pulsa **IMPORTAR**.
 
 > Validación: correo con formato válido, teléfono de 8 a 15 dígitos.
+
+![Contactos](img/contactos.svg)
 
 ### 3.16 Usuarios (solo Administración)
 
@@ -219,9 +241,13 @@ Gestión de contactos con importación masiva.
 
 Datos financieros + contexto operativo. El Asistente IA puede analizar los datos (tarda ~12 segundos).
 
+![Contaduría](img/contaduria.svg)
+
 ### 3.18 Gerencia (solo Administración)
 
 Indicadores de gerencia.
+
+![Gerencia](img/gerencia.svg)
 
 ### 3.19 Auditoría (solo Administración)
 
@@ -237,6 +263,8 @@ Log de todas las acciones del sistema.
 ---
 
 ## 4. Preguntas frecuentes
+
+![Preguntas frecuentes](img/preguntas-frecuentes.svg)
 
 **No veo un módulo en el menú?**
 Tu rol no tiene acceso. Los módulos bloqueados se muestran con candado. Contacta al administrador si necesitas acceso.
