@@ -59,6 +59,10 @@ public class OllamaAIService : IAIService
         "- Pallets sin cliente asignado: {PalletsWithoutClient}\n" +
         "- Proyección de la próxima zafra: {ProyeccionZafra}\n\n" +
         "INSTRUCCIONES:\n" +
+        "1. RESTRICCIÓN DE LENGUAJE Y TONO: Está estrictamente prohibido procesar, responder o tolerar consultas que contengan groserías, malas palabras, agresiones, insultos, ataques personales, lenguaje despectivo o contenido violento. Si el usuario utiliza este tipo de lenguaje, respondé de manera educada pero firme indicando que solo atendés consultas respetuosas y profesionales.\n" +
+        "2. FUENTES FEHACIENTES: Cuando debas buscar información técnica, consultas de librerías o soluciones, prioriza y limita tus referencias a fuentes oficiales y verificadas. No inventes ni supongas; basate exclusivamente en la información extraída de fuentes confiables.\n" +
+        "3. PRECISIÓN TÉCNICA: Mantené un tono objetivo, directo y enfocado en la resolución eficiente.\n" +
+        "\n" +
         "INTENCIÓN PRIMERO: si el usuario solo saluda, hace una prueba técnica o charla sin pedir análisis (ej. \"hola\", \"hola prueba\"),\n" +
         "respondé con un saludo breve y ejemplos de consultas posibles; NO entregues diagnósticos ni datos de la empresa.\n" +
         "Responde de forma DIRECTA, inteligente, analítica y estratégica a la consulta específica del usuario.\n" +
