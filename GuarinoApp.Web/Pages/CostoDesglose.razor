@@ -1,0 +1,352 @@
+@page "/costo-desglose-kg"
+@attribute [Authorize(Roles = RoleNames.FinancierosAutorizacion)]
+@using GuarinoApp.Application.Modules.CostoDesglose.Commands.UpsertCostoDesglose
+@using GuarinoApp.Application.Modules.CostoDesglose.Dtos
+@using GuarinoApp.Application.Modules.CostoDesglose.Queries.GetCostoDesglose
+@using MediatR
+@using MudBlazor
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Costo por kg exportable - Desglose</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex flex-wrap justify-space-between align-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold text-dark">💰 Costo por kg exportable</h2>
+            <p class="text-muted mb-0">Desglose de rubros: fruta en planta, packing, cartón, energía/frío, flete/puerto y otros.</p>
+        </div>
+        @if (_data != null)
+        {
+            <span class="badge bg-info text-white">Última carga: @(_data.FechaCarga.ToString("dd/MM/yyyy")) por @(_data.CargadoPor ?? "—")</span>
+        }
+    </div>
+
+    <!-- Explicación para el usuario -->
+    <MudCard Elevation="1" Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" GutterBottom="true" Class="fw-bold">¿Qué es este costo?</MudText>
+            <MudText Typo="Typo.body1" Class="mb-2">
+                El <strong>costo real por kg exportable</strong> te dice cuánto te cuesta dejar un kilogramo de fruta listo para exportar, desde que llega a planta hasta que sale rumbo al puerto. Se calcula sumando todos los rubros operativos y dividiéndolos entre los kg que proyectas exportar.
+            </MudText>
+            <MudText Typo="Typo.body1" Class="mb-2">
+                <strong>¿Para qué se usa?</strong> Este valor alimenta los KPIs de <strong>Capital de Trabajo</strong> y <strong>Brecha de Caja</strong> en el tablero de Proyección de Zafra. Si el costo por kg sube, el capital necesario para financiar la zafra también sube.
+            </MudText>
+            <MudGrid Class="mt-3">
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.body2" Color="Color.Tertiary">
+                        💡 Ejemplo: si el desglose suma $1.20/kg y proyectas 120.000 kg exportables, el costo total es $144.000.
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.body2" Color="Color.Tertiary">
+                        ⚠️ Cargá los valores reales de Contaduría antes de tomar decisiones de financiamiento.
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <MudProgressCircular Color="Color.Primary" Size="Size.Large" />
+        </div>
+    }
+    else
+    {
+        <!-- Tarjeta de resultado: costo por kg exportable -->
+        @if (_data != null)
+        {
+            <MudCard Elevation="2" Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Costo por kg exportable</MudText>
+                            <MudText Typo="Typo.h4" Class="fw-bold text-primary">$@_data.CostoPorKgExportable.ToString("N2")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">@(_data.KgExportablesProyectados.ToString("N0")) kg exportables proyectados</MudText>
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Costo total</MudText>
+                            <MudText Typo="Typo.h4" Class="fw-bold">$@_data.CostoTotal.ToString("N2")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Suma de todos los rubros</MudText>
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Zafra</MudText>
+                            <MudText Typo="Typo.h4" Class="fw-bold">@_data.Zafra</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Zafra de referencia</MudText>
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Estado de carga</MudText>
+                            <MudText Typo="Typo.h4" Class="fw-bold text-success">@(_data.CostoPorKgExportable > 0 ? "Completo" : "Incompleto")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">@(_data.CostoPorKgExportable > 0 ? "Costo unitario calculado" : "Faltan datos para calcular")</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+        }
+
+        <!-- Formulario de ingreso (Contaduría y Gerencia) -->
+        <MudCard Elevation="1" Class="mb-4">
+            <MudCardContent>
+                <MudText Typo="Typo.h6" GutterBottom="true" Class="mb-3">Ingresar / actualizar desglose de costo por kg</MudText>
+
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="int"
+                                         @bind-Value="_model.Zafra"
+                                         Label="Zafra"
+                                         Variant="Variant.Outlined"
+                                         Min="2020"
+                                         Max="2100"
+                                         Step="1"
+                                         Required="true"
+                                         HelperText="Zafra a la que aplica este desglose" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal"
+                                         @bind-Value="_model.CostoFrutaPlanta"
+                                         Label="Fruta puesta en planta ($/kg)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Step="0.01m"
+                                         Format="N2"
+                                         Required="true"
+                                         HelperText="Precio pagado al productor o costo propio de quinta" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal"
+                                         @bind-Value="_model.CostoPackingManoObra"
+                                         Label="Packing - mano de obra ($/kg)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Step="0.01m"
+                                         Format="N2"
+                                         HelperText="Mano de obra de packing por kg" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal"
+                                         @bind-Value="_model.CostoCartonEnvases"
+                                         Label="Cartón y envases ($/kg)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Step="0.01m"
+                                         Format="N2"
+                                         HelperText="Costo de cartón y envases por kg" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal"
+                                         @bind-Value="_model.CostoEnergiaFrio"
+                                         Label="Energía y frío ($/kg)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Step="0.01m"
+                                         Format="N2"
+                                         HelperText="Energía y refrigeración por kg" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal"
+                                         @bind-Value="_model.CostoFletePuerto"
+                                         Label="Flete y puerto ($/kg)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Step="0.01m"
+                                         Format="N2"
+                                         HelperText="Flete a Montevideo y gastos de puerto por kg" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal"
+                                         @bind-Value="_model.CostoOtros"
+                                         Label="Otros costos ($/kg)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Step="0.01m"
+                                         Format="N2"
+                                         HelperText="Otros costos operativos por kg" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudNumericField T="decimal"
+                                         @bind-Value="_model.KgExportablesProyectados"
+                                         Label="Kg exportables proyectados"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Step="1000m"
+                                         Format="N0"
+                                         Required="true"
+                                         HelperText="Base para calcular el costo unitario por kg" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.Observaciones"
+                                      Label="Observaciones"
+                                      Variant="Variant.Outlined"
+                                      Lines="2"
+                                      HelperText="Notas adicionales sobre este desglose" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <div class="d-flex justify-content-end gap-2">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               OnClick="LimpiarFormulario"
+                               Disabled="_loading">
+                        Limpiar
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="GuardarDesglose"
+                               Disabled="_loading"
+                               StartIcon="@Icons.Material.Filled.Save">
+                        @(_loading ? "Guardando..." : "Guardar desglose")
+                    </MudButton>
+                </div>
+            </MudCardContent>
+        </MudCard>
+
+        <!-- Tabla de rubros cargados (si existen) -->
+        @if (_data != null)
+        {
+            <MudCard Elevation="1" Class="mt-4">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" GutterBottom="true">Detalle del desglose cargado</MudText>
+                    <div class="table-responsive" style="width: 100%; overflow-x: auto;">
+                        <table class="table table-bordered w-100" style="border-collapse: collapse;">
+                            <thead>
+                                <tr style="background-color: #f8f9fa;">
+                                    <th style="width: 50%; border: 1px solid #dee2e6;">Rubro</th>
+                                    <th class="text-end" style="width: 25%; border: 1px solid #dee2e6;">Costo ($/kg)</th>
+                                    <th class="text-end" style="width: 25%; border: 1px solid #dee2e6;">% del total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (var i = 0; i < _rubros.Count; i++)
+                                {
+                                    var r = _rubros[i];
+                                    var esFilaPar = i % 2 == 1;
+                                    <tr style="@(esFilaPar ? "background-color: #f8f9fa;" : "")">
+                                        <td style="border: 1px solid #dee2e6;">@r.Rubro</td>
+                                        <td class="text-end" style="border: 1px solid #dee2e6;">$@r.Valor.ToString("N2")</td>
+                                        <td class="text-end" style="border: 1px solid #dee2e6;">@r.Porcentaje.ToString("N1")%</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+    }
+</div>
+
+@code {
+    private bool _loading = false;
+    private CostoDesgloseKgDto? _data;
+    private CostoDesgloseKgDto _model = new();
+
+    private List<RubroCosto> _rubros = new();
+
+    private class RubroCosto
+    {
+        public string Rubro { get; set; } = string.Empty;
+        public decimal Valor { get; set; }
+        public decimal Porcentaje { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        _loading = true;
+        try
+        {
+            _data = await Mediator.Send(new GetCostoDesgloseQuery());
+            if (_data != null)
+            {
+                _model = new CostoDesgloseKgDto
+                {
+                    Zafra = _data.Zafra,
+                    CostoFrutaPlanta = _data.CostoFrutaPlanta,
+                    CostoPackingManoObra = _data.CostoPackingManoObra,
+                    CostoCartonEnvases = _data.CostoCartonEnvases,
+                    CostoEnergiaFrio = _data.CostoEnergiaFrio,
+                    CostoFletePuerto = _data.CostoFletePuerto,
+                    CostoOtros = _data.CostoOtros,
+                    KgExportablesProyectados = _data.KgExportablesProyectados,
+                    Observaciones = _data.Observaciones
+                };
+                ConstruirRubros();
+            }
+        }
+        catch
+        {
+            Snackbar.Add("Error al cargar el desglose de costo", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ConstruirRubros()
+    {
+        if (_data == null) return;
+
+        var total = _data.CostoTotal;
+        _rubros = new List<RubroCosto>
+        {
+            new() { Rubro = "Fruta puesta en planta", Valor = _data.CostoFrutaPlanta, Porcentaje = total > 0 ? _data.CostoFrutaPlanta / total * 100 : 0 },
+            new() { Rubro = "Packing - mano de obra", Valor = _data.CostoPackingManoObra, Porcentaje = total > 0 ? _data.CostoPackingManoObra / total * 100 : 0 },
+            new() { Rubro = "Cartón y envases", Valor = _data.CostoCartonEnvases, Porcentaje = total > 0 ? _data.CostoCartonEnvases / total * 100 : 0 },
+            new() { Rubro = "Energía y frío", Valor = _data.CostoEnergiaFrio, Porcentaje = total > 0 ? _data.CostoEnergiaFrio / total * 100 : 0 },
+            new() { Rubro = "Flete y puerto", Valor = _data.CostoFletePuerto, Porcentaje = total > 0 ? _data.CostoFletePuerto / total * 100 : 0 },
+            new() { Rubro = "Otros costos", Valor = _data.CostoOtros, Porcentaje = total > 0 ? _data.CostoOtros / total * 100 : 0 },
+        };
+    }
+
+    private async Task GuardarDesglose()
+    {
+        if (_model.KgExportablesProyectados <= 0)
+        {
+            Snackbar.Add("Los kg exportables proyectados deben ser mayores a 0.", Severity.Warning);
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            var command = new UpsertCostoDesgloseCommand(
+                (int)_model.Zafra,
+                _model.CostoFrutaPlanta,
+                _model.CostoPackingManoObra,
+                _model.CostoCartonEnvases,
+                _model.CostoEnergiaFrio,
+                _model.CostoFletePuerto,
+                _model.CostoOtros,
+                _model.KgExportablesProyectados,
+                _model.Observaciones
+            );
+
+            var resultado = await Mediator.Send(command, cancellationToken: default);
+            _data = resultado;
+            ConstruirRubros();
+            Snackbar.Add("Desglose de costo guardado correctamente", Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add("Error al guardar el desglose de costo", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void LimpiarFormulario()
+    {
+        _model = new CostoDesgloseKgDto();
+    }
+}

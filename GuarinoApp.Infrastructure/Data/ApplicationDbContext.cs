@@ -46,6 +46,9 @@ namespace GuarinoApp.Infrastructure.Data
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<Contacto> Contactos => Set<Contacto>();
 
+        // --- Desglose de costo por kg exportable (Contaduría / Gerencia) ---
+        public DbSet<CostoDesgloseKg> CostosDesgloseKg => Set<CostoDesgloseKg>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
             {
             base.OnModelCreating(modelBuilder);

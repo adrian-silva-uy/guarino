@@ -1,0 +1,175 @@
+@page "/proyeccion-caja"
+@attribute [Authorize(Roles = RoleNames.FinancierosAutorizacion)]
+@using GuarinoApp.Application.Modules.Contaduria.Dtos
+@using GuarinoApp.Application.Modules.Contaduria.Queries.GetProyeccionCaja
+@using MediatR
+@using MudBlazor
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Proyección de caja a 13 semanas</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex flex-wrap justify-space-between align-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold text-dark">💵 Proyección de caja a 13 semanas</h2>
+            <p class="text-muted mb-0">Entradas y salidas semanales por escenario: Base, Pesimista y Optimista.</p>
+        </div>
+    </div>
+
+    <!-- Explicación para el usuario -->
+    <MudCard Elevation="1" Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" GutterBottom="true" Class="fw-bold">¿Qué muestra esta pantalla?</MudText>
+            <MudText Typo="Typo.body1" Class="mb-2">
+                Es la <strong>"película" de tu caja</strong>: no solo una foto de hoy, sino una proyección semana a semana de cuánto dinero entra y cuánto sale durante las próximas 13 semanas.
+            </MudText>
+            <MudGrid Class="mt-3">
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.body2" Color="Color.Success">
+                        ✅ <strong>Entradas:</strong> cobros por embarque (volumen proyectado × precio por kg × factor de escenario).
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.body2" Color="Color.Warning">
+                        ❌ <strong>Salidas:</strong> liquidaciones a quintas, jornales, fletes e impuestos estimados.
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+            <MudText Typo="Typo.body1" Class="mt-3">
+                📉 <strong>Piso de caja:</strong> si el saldo acumulado llega a cero o negativo en alguna semana, hay una <strong>brecha de caja</strong> que deberías cubrir con financiamiento antes de que llegue ese momento.
+            </MudText>
+        </MudCardContent>
+    </MudCard>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <MudProgressCircular Color="Color.Primary" Size="Size.Large" />
+        </div>
+    }
+    else
+    {
+        <!-- Selector de escenario -->
+        <MudSelect T="string"
+                   Label="Escenario"
+                   @bind-Value="_escenarioSeleccionado"
+                   Variant="Variant.Outlined"
+                   Class="mb-4">
+            <MudSelectItem T="string" Value="@("Base")">Base</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Pesimista")">Pesimista (-20%)</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Optimista")">Optimista (+20%)</MudSelectItem>
+        </MudSelect>
+
+        @if (_resultado != null && _resultado.Datos.Any())
+        {
+            <!-- Resumen del escenario - KPIs del mismo tamaño -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" md="4">
+                    <MudCard Elevation="2" Style="min-height: 140px; display: flex; flex-direction: column;">
+                        <MudCardContent>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Saldo inicial</MudText>
+                            <MudText Typo="Typo.h4" Class="fw-bold">$@_resultado.SaldoInicialUsd.ToString("N0")</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudCard Elevation="2" Style="min-height: 140px; display: flex; flex-direction: column;">
+                        <MudCardContent>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Saldo mínimo (piso)</MudText>
+                            <MudText Typo="Typo.h4" Class="@(_resultado.SaldoMinimoUsd < 0 ? "fw-bold text-danger" : "fw-bold text-success")">$@_resultado.SaldoMinimoUsd.ToString("N0")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Semana @_resultado.SemanaPiso</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudCard Elevation="2" Style="min-height: 140px; display: flex; flex-direction: column;">
+                        <MudCardContent>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Última semana proyectada</MudText>
+                            <MudText Typo="Typo.h4" Class="fw-bold">$@_resultado.Datos.Last().SaldoAcumuladoUsd.ToString("N0")</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Tabla semanal con bordes claros, fondo alternante y valores bien alineados -->
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" GutterBottom="true">Desglose semanal - Escenario @_resultado.Escenario</MudText>
+                    <div class="table-responsive" style="width: 100%; overflow-x: auto;">
+                        <table class="table table-bordered w-100" style="border-collapse: collapse;">
+                            <thead>
+                                <tr style="background-color: #f8f9fa;">
+                                    <th style="width: 10%; text-align: center; border: 1px solid #dee2e6;">Semana</th>
+                                    <th style="width: 18%; text-align: center; border: 1px solid #dee2e6;">Periodo</th>
+                                    <th class="text-end" style="width: 13%; border: 1px solid #dee2e6;">Entradas (USD)</th>
+                                    <th class="text-end" style="width: 13%; border: 1px solid #dee2e6;">Salidas líqu. quinta</th>
+                                    <th class="text-end" style="width: 12%; border: 1px solid #dee2e6;">Salidas jornales</th>
+                                    <th class="text-end" style="width: 11%; border: 1px solid #dee2e6;">Salidas fletes</th>
+                                    <th class="text-end" style="width: 12%; border: 1px solid #dee2e6;">Salidas impuestos</th>
+                                    <th class="text-end" style="width: 13%; border: 1px solid #dee2e6;">Saldo acumulado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var d in _resultado.Datos)
+                                {
+                                    var esFilaPar = _resultado.Datos.IndexOf(d) % 2 == 1;
+                                    <tr style="@(esFilaPar ? "background-color: #f8f9fa;" : "")">
+                                        <td style="text-align: center; font-weight: 500; border: 1px solid #dee2e6;">@d.Semana</td>
+                                        <td style="text-align: center; border: 1px solid #dee2e6;">@d.FechaDesde.ToString("dd/MM") - @d.FechaHasta.ToString("dd/MM")</td>
+                                        <td class="text-end" style="border: 1px solid #dee2e6;">$@d.EntradasUsd.ToString("N0")</td>
+                                        <td class="text-end" style="border: 1px solid #dee2e6;">$@d.SalidasLiquidacionesQuintaUsd.ToString("N0")</td>
+                                        <td class="text-end" style="border: 1px solid #dee2e6;">$@d.SalidasJornalesUsd.ToString("N0")</td>
+                                        <td class="text-end" style="border: 1px solid #dee2e6;">$@d.SalidasFletesUsd.ToString("N0")</td>
+                                        <td class="text-end" style="border: 1px solid #dee2e6;">$@d.SalidasImpuestosUsd.ToString("N0")</td>
+                                        <td class="text-end fw-bold" style="border: 1px solid #dee2e6;">$@d.SaldoAcumuladoUsd.ToString("N0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+
+            <MudAlert Severity="Severity.Info" Class="mt-4">
+                Las entradas se calculan como volumen proyectado por semana × precio por kg × factor de escenario.
+                Las salidas incluyen liquidaciones a quintas, jornales, fletes e impuestos estimados.
+                Si el saldo acumulado toca negativo, hay brecha de caja en esa semana.
+            </MudAlert>
+        }
+        else if (_resultado != null)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                No hay datos suficientes para proyectar caja. Cargue el costo por kg y el flujo de caja en Contaduría, y asegúrese de que exista una zafra proyectada.
+            </MudAlert>
+        }
+    }
+</div>
+
+@code {
+    private bool _loading = false;
+    private string _escenarioSeleccionado = "Base";
+    private ProyeccionCajaResultDto? _resultado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        _loading = true;
+        try
+        {
+            _resultado = await Mediator.Send(new GetProyeccionCajaQuery(_escenarioSeleccionado));
+        }
+        catch
+        {
+            Snackbar.Add("Error al cargar la proyección de caja", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

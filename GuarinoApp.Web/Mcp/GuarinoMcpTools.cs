@@ -36,6 +36,10 @@ public sealed class GuarinoMcpTools
         public const string ActividadUsuarios = "actividad_usuarios";
         public const string ContactosClientes = "contactos_clientes";
         public const string IndicadoresGerencia = "indicadores_gerencia";
+        public const string CostoDesglose = "costo_desglose_kg";
+        public const string RendimientoPacking = "rendimiento_packing";
+        public const string ComparativaZafra = "comparativa_zafra";
+        public const string ProyeccionCaja = "proyeccion_caja";
     }
 
     /// <summary>Skills expuestas como tools de solo lectura (contrato MCP):
@@ -45,7 +49,8 @@ public sealed class GuarinoMcpTools
         Skills.StockPlanta, Skills.PesadasRecientes, Skills.VolcadosLotes,
         Skills.PalletsSinCliente, Skills.ClimaRiesgo, Skills.DatosFinancieros,
         Skills.ProyeccionZafra, Skills.ResumenLiquidaciones,
-        Skills.ActividadUsuarios, Skills.ContactosClientes, Skills.IndicadoresGerencia
+        Skills.ActividadUsuarios, Skills.ContactosClientes, Skills.IndicadoresGerencia,
+        Skills.CostoDesglose, Skills.RendimientoPacking, Skills.ComparativaZafra, Skills.ProyeccionCaja
     };
 
     private readonly ISkillRegistry _skillRegistry;
@@ -121,6 +126,28 @@ public sealed class GuarinoMcpTools
     [Description("Indicadores del Panel de Gerencia: valores vigentes agrupados por categoría con su fecha de medición. Reservado a Admin y Gerencia.")]
     public Task<string> IndicadoresGerencia(CancellationToken cancellationToken)
         => EjecutarSkillAsync(Skills.IndicadoresGerencia, cancellationToken);
+
+    // ── Contaduría y proyección extendida (Admin/Gerencia/Contador) ───────────
+
+    [McpServerTool(Name = Skills.CostoDesglose)]
+    [Description("Desglose del costo real por kg exportable: fruta en planta, packing, cartón, energía/frío, flete/puerto y otros, con costo unitario por kg exportable. Reservado a Admin, Gerencia y Contador.")]
+    public Task<string> CostoDesglose(CancellationToken cancellationToken)
+        => EjecutarSkillAsync(Skills.CostoDesglose, cancellationToken);
+
+    [McpServerTool(Name = Skills.RendimientoPacking)]
+    [Description("Rendimiento de packing: kg volcados vs exportable, mercado interno y descarte, con porcentajes por variedad y productor. Reservado a Admin, Gerencia y Contador.")]
+    public Task<string> RendimientoPacking(CancellationToken cancellationToken)
+        => EjecutarSkillAsync(Skills.RendimientoPacking, cancellationToken);
+
+    [McpServerTool(Name = Skills.ComparativaZafra)]
+    [Description("Comparativa contra la zafra anterior en la misma fecha: curva acumulada semanal de volcados y pallets despachados por zafra. Reservado a Admin, Gerencia y Contador.")]
+    public Task<string> ComparativaZafra(CancellationToken cancellationToken)
+        => EjecutarSkillAsync(Skills.ComparativaZafra, cancellationToken);
+
+    [McpServerTool(Name = Skills.ProyeccionCaja)]
+    [Description("Proyección de caja a 13 semanas: entradas y salidas por escenario Base, Pesimista y Optimista, con saldo acumulado. Reservado a Admin, Gerencia y Contador.")]
+    public Task<string> ProyeccionCaja(CancellationToken cancellationToken)
+        => EjecutarSkillAsync(Skills.ProyeccionCaja, cancellationToken);
 
     // ── Catálogo ────────────────────────────────────────────────────────────
 

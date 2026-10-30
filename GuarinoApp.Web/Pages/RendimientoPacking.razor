@@ -1,0 +1,218 @@
+@page "/rendimiento-packing"
+@attribute [Authorize(Roles = RoleNames.FinancierosAutorizacion)]
+@using GuarinoApp.Application.Modules.RendimientoPacking.Dtos
+@using GuarinoApp.Application.Modules.RendimientoPacking.Queries.GetRendimientoPacking
+@using MediatR
+@using MudBlazor
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+<PageTitle>Rendimiento de packing</PageTitle>
+
+@{
+    var filasPorPagina = Configuration.GetValue<int>("Paginacion:FilasPorPaginaPorDefecto", 25);
+}
+
+<div class="container-fluid p-4">
+    <div class="d-flex flex-wrap justify-space-between align-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold text-dark">📦 Rendimiento de packing</h2>
+            <p class="text-muted mb-0">De cada 100 kg volcados: cuánto termina en exportación, mercado interno y descarte.</p>
+        </div>
+    </div>
+
+    <!-- Explicación para el usuario -->
+    <MudCard Elevation="1" Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" GutterBottom="true" Class="fw-bold">¿De dónde salen estos datos?</MudText>
+            <MudText Typo="Typo.body1" Class="mb-2">
+                Compara los kg volcados (fruta que ingresa a planta) contra los kg empacados en pallets, vinculados por lote y variedad.
+            </MudText>
+            <MudText Typo="Typo.body1" Class="mb-2">
+                <strong>Cómo se clasifica cada pallet:</strong>
+            </MudText>
+            <MudGrid Class="mt-2">
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.body2" Color="Color.Success">
+                        ✅ <strong>Exportable:</strong> pallet con cliente asignado y categoría "Export" o estado distinto a "Bajado".
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.body2" Color="Color.Info">
+                        🇺🇾 <strong>Mercado interno:</strong> pallet con cliente nacional, categoría "Primera", sin exportar.
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.body2" Color="Color.Warning">
+                        ❌ <strong>Descarte:</strong> pallet con estado "Bajado" o categoría "Descarte".
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+            <MudText Typo="Typo.body1" Class="mt-3">
+                💡 <strong>Un punto de rendimiento vale decenas de miles de dólares por zafra.</strong> Si mejorás el % exportable en solo 1 punto, recuperás fruta que antes se perdía.
+            </MudText>
+        </MudCardContent>
+    </MudCard>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <MudProgressCircular Color="Color.Primary" Size="Size.Large" />
+        </div>
+    }
+    else
+    {
+        @if (_resultado != null && _resultado.Detalle.Any())
+        {
+            <!-- KPIs totales -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" md="3">
+                    <MudCard Elevation="2">
+                        <MudCardContent>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-uppercase fw-bold">Kg volcados totales</MudText>
+                            <MudText Typo="Typo.h4" Class="fw-bold">@_resultado.TotalKgVolcados.ToString("N0") kg</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudCard Elevation="2">
+                        <MudCardContent>
+                            <MudText Typo="Typo.caption" Color="Color.Success" Class="text-uppercase fw-bold">Exportable</MudText>
+                            <MudText Typo="Typo.h4" Class="fw-bold text-success">@_resultado.PctTotalExportable.ToString("N1")%</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">@_resultado.TotalKgExportable.ToString("N0") kg</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudCard Elevation="2">
+                        <MudCardContent>
+                            <MudText Typo="Typo.caption" Color="Color.Info" Class="text-uppercase fw-bold">Mercado interno</MudText>
+                            <MudText Typo="Typo.h4" Class="fw-bold text-info">@_resultado.PctTotalMercadoInterno.ToString("N1")%</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">@_resultado.TotalKgMercadoInterno.ToString("N0") kg</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudCard Elevation="2">
+                        <MudCardContent>
+                            <MudText Typo="Typo.caption" Color="Color.Warning" Class="text-uppercase fw-bold">Descarte</MudText>
+                            <MudText Typo="Typo.h4" Class="fw-bold text-warning">@_resultado.PctTotalDescarte.ToString("N1")%</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">@_resultado.TotalKgDescarte.ToString("N0") kg</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Tabla de detalle con bordes, fondo alternante y valores alineados -->
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" GutterBottom="true">Detalle por variedad y productor</MudText>
+                    <div class="table-responsive" style="width: 100%; overflow-x: auto;">
+                        <table class="table table-bordered w-100" style="border-collapse: collapse;">
+                            <thead>
+                                <tr style="background-color: #f8f9fa;">
+                                    <th style="width: 20%; border: 1px solid #dee2e6;">Variedad</th>
+                                    <th style="width: 25%; border: 1px solid #dee2e6;">Productor</th>
+                                    <th class="text-end" style="width: 15%; border: 1px solid #dee2e6;">Kg volcados</th>
+                                    <th class="text-end" style="width: 13%; border: 1px solid #dee2e6;">Exportable %</th>
+                                    <th class="text-end" style="width: 14%; border: 1px solid #dee2e6;">Mercado interno %</th>
+                                    <th class="text-end" style="width: 13%; border: 1px solid #dee2e6;">Descarte %</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var d in _datosPaginados)
+                                {
+                                    var esFilaPar = _resultado.Detalle.IndexOf(d) % 2 == 1;
+                                    <tr style="@(esFilaPar ? "background-color: #f8f9fa;" : "")">
+                                        <td style="border: 1px solid #dee2e6;">@d.Variedad</td>
+                                        <td style="border: 1px solid #dee2e6;">@d.Productor</td>
+                                        <td class="text-end" style="border: 1px solid #dee2e6;">@d.KgVolcados.ToString("N0")</td>
+                                        <td class="text-end" style="border: 1px solid #dee2e6;">@d.PctExportable.ToString("N1")%</td>
+                                        <td class="text-end" style="border: 1px solid #dee2e6;">@d.PctMercadoInterno.ToString("N1")%</td>
+                                        <td class="text-end" style="border: 1px solid #dee2e6;">@d.PctDescarte.ToString("N1")%</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Controles de paginación -->
+                    @if (_totalPages > 1)
+                    {
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <MudText Typo="Typo.body2" Color="Color.Tertiary">
+                                Página @_currentPage de @_totalPages (@_resultado.Detalle.Count ítems totales)
+                            </MudText>
+                            <div class="d-flex gap-2">
+                                <MudButton Variant="Variant.Text"
+                                           Disabled="_currentPage == 1"
+                                           OnClick="() => CambiarPagina(_currentPage - 1)">
+                                    Anterior
+                                </MudButton>
+                                <MudButton Variant="Variant.Text"
+                                           Disabled="_currentPage == _totalPages"
+                                           OnClick="() => CambiarPagina(_currentPage + 1)">
+                                    Siguiente
+                                </MudButton>
+                            </div>
+                        </div>
+                    }
+                </MudCardContent>
+            </MudCard>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                No hay datos de rendimiento de packing disponibles. Asegúrese de que existan volcados y pallets cargados en el sistema.
+            </MudAlert>
+        }
+    }
+</div>
+
+@code {
+    private bool _loading = false;
+    private RendimientoPackingResultDto? _resultado;
+    private int _currentPage = 1;
+
+    private int _pageSize => Configuration.GetValue<int>("Paginacion:FilasPorPaginaPorDefecto", 25);
+
+    private int _totalPages => _resultado?.Detalle.Count > 0
+        ? (int)Math.Ceiling((double)_resultado.Detalle.Count / _pageSize)
+        : 1;
+
+    private List<RendimientoPackingDto> _datosPaginados => _resultado?.Detalle
+        .Skip((_currentPage - 1) * _pageSize)
+        .Take(_pageSize)
+        .ToList() ?? new();
+
+    private void CambiarPagina(int nuevaPagina)
+    {
+        if (nuevaPagina >= 1 && nuevaPagina <= _totalPages)
+        {
+            _currentPage = nuevaPagina;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        _loading = true;
+        try
+        {
+            _resultado = await Mediator.Send(new GetRendimientoPackingQuery());
+            _currentPage = 1;
+        }
+        catch
+        {
+            Snackbar.Add("Error al cargar el rendimiento de packing", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

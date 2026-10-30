@@ -20,6 +20,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using OllamaSharp;
 
 public class OllamaAIService : IAIService
     {
@@ -35,6 +36,12 @@ public class OllamaAIService : IAIService
     private readonly IMcpDataService _mcpDataService;
     private readonly IIaWebClient _web;
     private readonly IOptionsMonitor<IaWebOptions> _iaWeb;
+
+    // Auto-descarga silenciosa de modelos: evita "pull storm" con cooldown y
+    // semáforo para que no se disparen múltiples descargas en paralelo.
+    private static readonly TimeSpan CooldownEntreDescargas = TimeSpan.FromMinutes(2);
+    private DateTime? _ultimoIntentoDescarga;
+    private readonly SemaphoreSlim _semaforoDescarga = new(1, 1);
 
     // Tope de tiempo propio para la llamada de estrategia de Zafra -- más corto que el timeout
     // general del HttpClient "Ollama" (60s en appsettings.json). Un JSON estructurado de 5-8
@@ -1455,100 +1462,256 @@ public class OllamaAIService : IAIService
     // ==========================================
     public async Task<string> GetClimateRiskStrategyAsync(string inputJson, CancellationToken cancellationToken)
         {
-        if (!IsAvailable)
+        var options = _optionsMonitor.CurrentValue;
+        var settings = _climateSettings.CurrentValue; // Obtener configuración de clima
+
+        // 1. Cargar el prompt base
+        var template = await LoadPromptTemplateAsync("ClimateRiskStrategy", string.Empty);
+        if (string.IsNullOrWhiteSpace(template))
             {
-            _logger.LogWarning("Servicio Ollama no disponible para estrategia climática.");
-            return string.Empty; // sin IA: el módulo aplica su respaldo marcado "sin IA"
+            _logger.LogWarning("No se encontró la plantilla ClimateRiskStrategy.txt. Sin plan IA.");
+            return string.Empty;
+            }
+
+        // 2. Inyectar valores de configuración en el prompt
+        var prompt = template
+            .Replace("{REGIONAL_CONTEXT}", settings.RegionalContext)
+            .Replace("{HELA_SEVERA_TEMP}", settings.Thresholds.HeladaTempSevera.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{HELA_TEMP}", settings.Thresholds.HeladaTempMin.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{LLUVIA_EXCESIVA_MM}", settings.Thresholds.LluviaExcesivaMm.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{VIENTO_FUERTE_KMH}", settings.Thresholds.VientoFuerteKmh.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{CALOR_EXTREMO_TEMP}", settings.Thresholds.CalorExtremoTempMax.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{LLUVIA_MUY_EXCESIVA_MM}", settings.Thresholds.LluviaMuyExcesivaMm.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{VIENTO_FUERTE_KMH_CRITICO}", settings.Thresholds.VientoFuerteKmhCritico.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{GRANIZO_CODE_MIN}", settings.Thresholds.GranizoWeatherCodeMin.ToString("F0", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{GRANIZO_CODE_SEVERA}", settings.Thresholds.GranizoWeatherCodeSevera.ToString("F0", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{HELA_SEVERA_PERDIDA}", settings.ImpactEstimates.HeladaSeveraPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{HELA_PERDIDA}", settings.ImpactEstimates.HeladaPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{LLUVIA_MUY_EXCESIVA_PERDIDA}", settings.ImpactEstimates.LluviaMuyExcesivaPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{LLUVIA_EXCESIVA_PERDIDA}", settings.ImpactEstimates.LluviaExcesivaPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{VIENTO_FUERTE_PERDIDA}", settings.ImpactEstimates.VientoFuertePerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{CALOR_EXTREMO_PERDIDA}", settings.ImpactEstimates.CalorExtremoPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{GRANIZO_PERDIDA}", settings.ImpactEstimates.GranizoPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{GRANIZO_SEVERA_PERDIDA}", settings.ImpactEstimates.GranizoSeveraPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{INPUT_JSON}", inputJson);
+
+        // 3. Construir los mensajes (accesibles desde los catch para reintento)
+        var messages = new List<object> { new { role = "system", content = prompt } };
+        messages.Add(new { role = "user", content = "Genera el plan de mitigación en JSON estricto." });
+
+        // Máximo 2 intentos: el primero normal; si falla por falta de modelo,
+        // descargamos silenciosamente y reintentamos una vez más.
+        for (int intento = 1; intento <= 2; intento++)
+            {
+            try
+                {
+                // OPTIMIZACIÓN CRÍTICA:
+                // - num_ctx: acotado a 4096 (16384 provoca HTTP 500 en Ollama en esta
+                //   máquina): este prompt puede excederlo y la ruta local responder
+                //   sobre un prompt incompleto — por eso la carrera prioriza la vía
+                //   web, que recibe el prompt completo y es la que resuelve.
+                // - num_predict: el plan (4 a 8 acciones con impacto y riesgo) puede
+                //   superar los 600 tokens y quedar como JSON truncado; se acota igual
+                //   para que la generación no se dispare.
+                // - keep_alive: evita que Ollama descargue el modelo entre peticiones
+                var requestObj = new
+                    {
+                    model = options.Model,
+                    messages,
+                    stream = false,
+                    options = new
+                        {
+                        num_ctx = Math.Max(options.NumCtx ?? 2048, 4096),
+                        num_predict = 1024,
+                        temperature = options.Temperature ?? 0.2,
+                        top_k = options.TopK ?? 40,
+                        top_p = options.TopP ?? 0.9
+                        },
+                    keep_alive = string.IsNullOrWhiteSpace(options.KeepAlive) ? "30m" : options.KeepAlive
+                    };
+
+                // Si Ollama no está disponible, usar la ruta web como Plan B (fallback).
+                // La interfaz IIaWebClient nunca lanza excepción: devuelve null si falla.
+                if (!IsAvailable)
+                    {
+                    _logger.LogWarning("Ollama no disponible, usando ruta web (Plan B) para estrategia climática.");
+                    var contenidoWeb = await _web.EnviarAsync(messages, true, cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(contenidoWeb) && EsJsonUtilizable(contenidoWeb))
+                        {
+                        var rawContentWeb = StripJsonFences(contenidoWeb);
+                        return EsJsonUtilizable(rawContentWeb) ? rawContentWeb : string.Empty;
+                        }
+                    // Si no hay web ni Ollama, y es el primer intento, intentar
+                    // descargar el modelo automáticamente antes de rendirnos.
+                    if (intento == 1)
+                        {
+                        var descargado = await AsegurarModeloDisponibleAsync(cancellationToken);
+                        if (descargado)
+                            {
+                            _logger.LogInformation("Modelo '{Model}' descargado automáticamente. Reintentando consulta de IA.", options.Model);
+                            continue; // Segundo intento con el modelo ya disponible
+                            }
+                        }
+                    return string.Empty;
+                    }
+
+                // Carrera local ↔ web con el MISMO prompt armado; solo cuenta contenido
+                // JSON utilizable (la prosa del modelo pequeño no debe ganarle a una
+                // respuesta web válida) y, si nadie responde, vacío = "sin IA".
+                var contenido = await EnviarEnParaleloAsync(requestObj, messages, modoJson: true,
+                    presupuestoLocal: null, diagnostico: "GetClimateRiskStrategyAsync",
+                    contenidoUtil: EsJsonUtilizable, cancellationToken: cancellationToken);
+
+                // Devolvemos el JSON limpio para que ClimateRiskService lo valide.
+                var rawContent = StripJsonFences(contenido ?? string.Empty);
+                return EsJsonUtilizable(rawContent) ? rawContent : string.Empty;
+                }
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                // Es un Timeout de HttpClient, NO una caída del servidor.
+                // No marcamos IsModelReady = false para no apagar toda la IA.
+                // Probamos la web como Plan B antes de rendirnos.
+                _logger.LogWarning(ex, "Timeout de Ollama en GetClimateRiskStrategyAsync (intento {Intento}/2), probando ruta web (Plan B).", intento);
+                try
+                    {
+                    var contenidoWeb = await _web.EnviarAsync(messages, true, cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(contenidoWeb) && EsJsonUtilizable(contenidoWeb))
+                        {
+                        var rawContentWeb = StripJsonFences(contenidoWeb);
+                        return EsJsonUtilizable(rawContentWeb) ? rawContentWeb : string.Empty;
+                        }
+                    }
+                catch { /* la web tampoco respondió, seguimos con vacío */ }
+
+                // Si es el primer intento y falló por timeout, intentar descargar
+                // el modelo antes de rendirnos completamente.
+                if (intento == 1)
+                    {
+                    var descargado = await AsegurarModeloDisponibleAsync(cancellationToken);
+                    if (descargado)
+                        {
+                        _logger.LogInformation("Modelo '{Model}' descargado automáticamente tras timeout. Reintentando consulta de IA.", options.Model);
+                        continue;
+                        }
+                    }
+
+                MarcarFalloDeGeneracion("Timeout", esFalloDeServidor: false);
+                return string.Empty;
+                }
+            catch (Exception ex)
+                {
+                _logger.LogError(ex, "Error inesperado en GetClimateRiskStrategyAsync (intento {Intento}/2), probando ruta web (Plan B).", intento);
+                try
+                    {
+                    var contenidoWeb = await _web.EnviarAsync(messages, true, cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(contenidoWeb) && EsJsonUtilizable(contenidoWeb))
+                        {
+                        var rawContentWeb = StripJsonFences(contenidoWeb);
+                        return EsJsonUtilizable(rawContentWeb) ? rawContentWeb : string.Empty;
+                        }
+                    }
+                catch { /* la web tampoco respondió, seguimos con vacío */ }
+
+                // Si es el primer intento y falló por excepción, intentar descargar
+                // el modelo antes de rendirnos completamente.
+                if (intento == 1)
+                    {
+                    var descargado = await AsegurarModeloDisponibleAsync(cancellationToken);
+                    if (descargado)
+                        {
+                        _logger.LogInformation("Modelo '{Model}' descargado automáticamente tras error. Reintentando consulta de IA.", options.Model);
+                        continue;
+                        }
+                    }
+
+                MarcarFalloDeGeneracion(ex.GetType().Name, esFalloDeServidor: true);
+                return string.Empty;
+                }
+            }
+
+        return string.Empty;
+        }
+
+    /// <summary>
+    /// Descarga automática y silenciosa del modelo configurado si no está
+    /// instalado en Ollama. Se usa como respaldo cuando la IA local falla,
+    /// para que el usuario no tenga que hacer nada manualmente.
+    /// </summary>
+    private async Task<bool> AsegurarModeloDisponibleAsync(CancellationToken ct)
+        {
+        // Cooldown para evitar descargas repetidas si el modelo no se puede bajar.
+        if (_ultimoIntentoDescarga.HasValue &&
+            DateTime.UtcNow - _ultimoIntentoDescarga.Value < CooldownEntreDescargas)
+            {
+            _logger.LogDebug("Auto-descarga de modelo en cooldown (último intento hace {Minutos:0.0} min).",
+                (DateTime.UtcNow - _ultimoIntentoDescarga.Value).TotalMinutes);
+            return false;
+            }
+
+        if (!await _semaforoDescarga.WaitAsync(0, ct))
+            {
+            _logger.LogDebug("Ya hay una descarga de modelo en curso, se saltea este intento.");
+            return false;
             }
 
         try
             {
-            var options = _optionsMonitor.CurrentValue;
-            var settings = _climateSettings.CurrentValue; // Obtener configuración de clima
+            _ultimoIntentoDescarga = DateTime.UtcNow;
+            var model = _optionsMonitor.CurrentValue.Model;
 
-            // 1. Cargar el prompt base
-            var template = await LoadPromptTemplateAsync("ClimateRiskStrategy", string.Empty);
-            if (string.IsNullOrWhiteSpace(template))
+            using var client = new OllamaApiClient(new Uri(_optionsMonitor.CurrentValue.Url))
+                { SelectedModel = model };
+
+            // Verificar si Ollama está corriendo
+            if (!await client.IsRunningAsync(ct))
                 {
-                _logger.LogWarning("No se encontró la plantilla ClimateRiskStrategy.txt. Sin plan IA.");
-                return string.Empty;
+                _logger.LogDebug("Ollama no está corriendo, no se puede descargar el modelo '{Model}'.", model);
+                return false;
                 }
 
-            // 2. Inyectar valores de configuración en el prompt
-            var prompt = template
-                .Replace("{REGIONAL_CONTEXT}", settings.RegionalContext)
-                .Replace("{HELA_SEVERA_TEMP}", settings.Thresholds.HeladaTempSevera.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{HELA_TEMP}", settings.Thresholds.HeladaTempMin.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{LLUVIA_EXCESIVA_MM}", settings.Thresholds.LluviaExcesivaMm.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{VIENTO_FUERTE_KMH}", settings.Thresholds.VientoFuerteKmh.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{CALOR_EXTREMO_TEMP}", settings.Thresholds.CalorExtremoTempMax.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{LLUVIA_MUY_EXCESIVA_MM}", settings.Thresholds.LluviaMuyExcesivaMm.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{VIENTO_FUERTE_KMH_CRITICO}", settings.Thresholds.VientoFuerteKmhCritico.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{GRANIZO_CODE_MIN}", settings.Thresholds.GranizoWeatherCodeMin.ToString("F0", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{GRANIZO_CODE_SEVERA}", settings.Thresholds.GranizoWeatherCodeSevera.ToString("F0", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{HELA_SEVERA_PERDIDA}", settings.ImpactEstimates.HeladaSeveraPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{HELA_PERDIDA}", settings.ImpactEstimates.HeladaPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{LLUVIA_MUY_EXCESIVA_PERDIDA}", settings.ImpactEstimates.LluviaMuyExcesivaPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{LLUVIA_EXCESIVA_PERDIDA}", settings.ImpactEstimates.LluviaExcesivaPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{VIENTO_FUERTE_PERDIDA}", settings.ImpactEstimates.VientoFuertePerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{CALOR_EXTREMO_PERDIDA}", settings.ImpactEstimates.CalorExtremoPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{GRANIZO_PERDIDA}", settings.ImpactEstimates.GranizoPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{GRANIZO_SEVERA_PERDIDA}", settings.ImpactEstimates.GranizoSeveraPerdida.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("{INPUT_JSON}", inputJson);
+            // Verificar si el modelo ya está instalado (match exacto o por prefijo sin tag)
+            var modelos = await client.ListLocalModelsAsync(ct);
+            var yaInstalado = modelos.Any(m =>
+                m.Name.Equals(model, StringComparison.OrdinalIgnoreCase) ||
+                m.Name.StartsWith(model.Split(':')[0] + ":", StringComparison.OrdinalIgnoreCase));
 
-            // 3. Construir la solicitud a Ollama
-            var messages = new List<object> { new { role = "system", content = prompt } };
-            messages.Add(new { role = "user", content = "Genera el plan de mitigación en JSON estricto." });
-
-            // OPTIMIZACIÓN CRÍTICA:
-            // - num_ctx: acotado a 4096 (16384 provoca HTTP 500 en Ollama en esta
-            //   máquina): este prompt puede excederlo y la ruta local responder
-            //   sobre un prompt incompleto — por eso la carrera prioriza la vía
-            //   web, que recibe el prompt completo y es la que resuelve.
-            // - num_predict: el plan (4 a 8 acciones con impacto y riesgo) puede
-            //   superar los 600 tokens y quedar como JSON truncado; se acota igual
-            //   para que la generación no se dispare.
-            // - keep_alive: evita que Ollama descargue el modelo entre peticiones
-            var requestObj = new
+            if (yaInstalado)
                 {
-                model = options.Model,
-                messages,
-                stream = false,
-                options = new
+                _connectionState.IsModelReady = true;
+                _connectionState.ModeloVerificado = model;
+                _logger.LogInformation("Modelo '{Model}' ya está instalado en Ollama.", model);
+                return true;
+                }
+
+            // Descargar silenciosamente en background
+            _logger.LogInformation("Descargando automáticamente el modelo '{Model}' de Ollama...", model);
+            await foreach (var status in client.PullModelAsync(model, ct))
+                {
+                if (status is null) continue;
+                if (status.Percent % 20 == 0) // Log solo cada 20% para no llenar los logs
                     {
-                    num_ctx = Math.Max(options.NumCtx ?? 2048, 4096),
-                    num_predict = 1024,
-                    temperature = options.Temperature ?? 0.2,
-                    top_k = options.TopK ?? 40,
-                    top_p = options.TopP ?? 0.9
-                    },
-                keep_alive = string.IsNullOrWhiteSpace(options.KeepAlive) ? "30m" : options.KeepAlive
-                };
+                    _logger.LogInformation("Descargando '{Model}': {Status} ({Percent:0}%)", model, status.Status, status.Percent);
+                    }
+                }
 
-            // Carrera local ↔ web con el MISMO prompt armado; solo cuenta contenido
-            // JSON utilizable (la prosa del modelo pequeño no debe ganarle a una
-            // respuesta web válida) y, si nadie responde, vacío = "sin IA".
-            var contenido = await EnviarEnParaleloAsync(requestObj, messages, modoJson: true,
-                presupuestoLocal: null, diagnostico: "GetClimateRiskStrategyAsync",
-                contenidoUtil: EsJsonUtilizable, cancellationToken: cancellationToken);
-
-            // Devolvemos el JSON limpio para que ClimateRiskService lo valide.
-            var rawContent = StripJsonFences(contenido ?? string.Empty);
-            return EsJsonUtilizable(rawContent) ? rawContent : string.Empty;
+            _connectionState.IsModelReady = true;
+            _connectionState.ModeloVerificado = model;
+            _logger.LogInformation("Modelo '{Model}' descargado automáticamente. La IA generativa ya está lista.", model);
+            return true;
             }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException)
             {
-            // Es un Timeout de HttpClient, NO una caída del servidor.
-            // No marcamos IsModelReady = false para no apagar toda la IA.
-            _logger.LogError(ex, "Timeout de Ollama en GetClimateRiskStrategyAsync tras esperar el tiempo configurado.");
-            MarcarFalloDeGeneracion("Timeout", esFalloDeServidor: false);
-            return string.Empty;
+            _logger.LogWarning("Descarga automática de modelo cancelada.");
+            return false;
             }
         catch (Exception ex)
             {
-            _logger.LogError(ex, "Error inesperado en GetClimateRiskStrategyAsync");
-            MarcarFalloDeGeneracion(ex.GetType().Name, esFalloDeServidor: true);
-            return string.Empty;
+            _logger.LogError(ex, "Error en la descarga automática del modelo '{Model}'.", _optionsMonitor.CurrentValue.Model);
+            return false;
+            }
+        finally
+            {
+            _semaforoDescarga.Release();
             }
         }
 
@@ -1574,15 +1737,43 @@ public class OllamaAIService : IAIService
         if (string.IsNullOrWhiteSpace(contenido))
             return false;
 
+        // Intento 1: parsear directo (ya limpio de fences)
         try
             {
             using var _ = JsonDocument.Parse(StripJsonFences(contenido));
             return true;
             }
-        catch (JsonException)
+        catch (JsonException) { /* seguir con intentos */ }
+
+        // Intento 2: buscar bloque entre ```json ... ``` o ``` ... ```
+        var fencedMatch = System.Text.RegularExpressions.Regex.Match(
+            contenido,
+            @"```(?:json)?\s*([\s\S]*?)\s*```",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (fencedMatch.Success)
             {
-            return false;
+            try
+                {
+                using var _ = JsonDocument.Parse(fencedMatch.Groups[1].Value.Trim());
+                return true;
+                }
+            catch (JsonException) { /* seguir con intento 3 */ }
             }
+
+        // Intento 3: buscar el primer { y el último } (JSON embebido en prosa)
+        var primerLlave = contenido.IndexOf('{');
+        var ultimaLlave = contenido.LastIndexOf('}');
+        if (primerLlave >= 0 && ultimaLlave > primerLlave)
+            {
+            try
+                {
+                using var _ = JsonDocument.Parse(contenido.Substring(primerLlave, ultimaLlave - primerLlave + 1));
+                return true;
+                }
+            catch (JsonException) { /* no es JSON utilizable */ }
+            }
+
+        return false;
         }
 
     // ==========================================

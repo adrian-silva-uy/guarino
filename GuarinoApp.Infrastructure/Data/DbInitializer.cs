@@ -351,6 +351,98 @@ namespace GuarinoApp.Infrastructure.Data
                     });
                 }
 
+            // 10.5 Seed Volcados (fruta volcada por lote y fecha) — necesario para
+            // Comparativa Interzafra Semanal y Rendimiento de Packing.
+            // Idempotente: si ya existen volcados, no se pisan.
+            if (!context.Volcados.Any())
+                {
+                var lotes = context.Lotes.Where(l => !l.IsDeleted).ToList();
+                if (lotes.Any())
+                    {
+                    var randomVolcados = new Random(777);
+                    var fechaInicio = DateTime.Today.AddMonths(-12);
+                    var volcados = new List<Volcado>();
+
+                    // Distribuir ~200 volcados en las últimas 52 semanas, con
+                    // picos en mayo-septiembre (temporada cítrica). Usamos dos
+                    // zafras (año actual y año anterior) para la comparativa.
+                    var zafras = new[] { (DateTime.Today.Year - 1).ToString(), DateTime.Today.Year.ToString() };
+                    var lotePorZafra = lotes
+                        .Where(l => !string.IsNullOrEmpty(l.Zafra) && zafras.Contains(l.Zafra))
+                        .GroupBy(l => l.Zafra!)
+                        .ToDictionary(g => g.Key!, g => g.ToList());
+
+                    for (int i = 0; i < 200; i++)
+                        {
+                        var zafra = zafras[i % 2];
+                        if (!lotePorZafra.TryGetValue(zafra, out var candidatos) || !candidatos.Any())
+                            continue;
+                        var lote = candidatos[randomVolcados.Next(candidatos.Count)];
+
+                        // Temporada: más volcados en meses 5-9
+                        var mesPico = new[] { 5, 6, 7, 8, 9 }.Contains(DateTime.Today.Month)
+                            ? DateTime.Today.Month
+                            : randomVolcados.Next(1, 13);
+                        var año = int.Parse(zafra);
+                        var día = randomVolcados.Next(1, 28);
+                        var fecha = new DateTime(año, mesPico, día);
+                        if (fecha > DateTime.Today.AddDays(30))
+                            fecha = fecha.AddMonths(-12); // no fechas futuras lejanas
+
+                        volcados.Add(new Volcado
+                            {
+                            LoteId = lote.Id,
+                            FechaVolcado = fecha,
+                            CantidadBins = randomVolcados.Next(10, 60),
+                            PesoKilos = Math.Round((decimal)(randomVolcados.Next(4000, 24000) + randomVolcados.NextDouble() * 1000), 2),
+                            Canal = (CanalDistribucion)randomVolcados.Next(1, 3),
+                            CreatedAt = fecha,
+                            CreatedBy = "DbInitializer",
+                            IsDeleted = false
+                            });
+                        }
+                    context.Volcados.AddRange(volcados);
+                    context.SaveChanges(); // IDs reales para vincular pallets abajo
+                    }
+                }
+
+            // 10.55 Vincular pallets a volcados (para Rendimiento de Packing).
+            // Algunos pallets existentes sin VolcadoId se asignan a un volcado
+            // de su misma variedad/zafra, con clasificación de categoría para
+            // diferenciar exportable / mercado interno / descarte.
+            VincularPalletsAVolcados(context, random);
+
+            // 10.6 Seed CostoDesgloseKg (punto 1: costo real por kg exportable).
+            // Idempotente: si ya existe un desglose para la zafra actual, no se pisa.
+            // Si la tabla aún no existe (Migrate() no la ha aplicado), se salta
+            // silenciosamente; se creará en el próximo reinicio de la app.
+            try
+            {
+                if (!context.CostosDesgloseKg.Any(c => c.Zafra == DateTime.Today.Year))
+                {
+                    context.CostosDesgloseKg.Add(new CostoDesgloseKg
+                    {
+                        Zafra = DateTime.Today.Year,
+                        CostoFrutaPlanta = 0.62m,      // precio pagado al productor
+                        CostoPackingManoObra = 0.18m,  // mano de obra de packing
+                        CostoCartonEnvases = 0.12m,    // cartón y envases
+                        CostoEnergiaFrio = 0.08m,      // energía y frío
+                        CostoFletePuerto = 0.15m,      // flete a Montevideo + puerto
+                        CostoOtros = 0.05m,            // otros costos
+                        KgExportablesProyectados = 120000m,
+                        CargadoPor = "sistema",
+                        FechaCarga = DateTime.Now,
+                        Observaciones = "Valores de demostración para la zafra " + DateTime.Today.Year +
+                                        ". Actualizar con cifras reales de Contaduría."
+                    });
+                }
+            }
+            catch
+            {
+                // Tabla aún no creada: Migrate() en Program.cs la aplicará en el
+                // próximo arranque. El seed se salta esta vez sin tumbar la app.
+            }
+
             // 10.5 Usuarios de aplicación por rol (Gerencia/Contador/Operador).
             // Sólo si ya existe al menos un usuario: se preserva FR-8 (el primer
             // usuario creado manualmente es Admin y su contraseña no se toca).
@@ -1126,6 +1218,76 @@ VALUES
                 if (cerrarConexion)
                     connection.Close();
                 }
+            }
+
+        // ------------------------------------------------------------------
+        // Vincular pallets a volcados (Rendimiento de Packing)
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Asigna algunos pallets existentes a volcados de su misma variedad y
+        /// zafra, con categorías que permitan demostrar Rendimiento de Packing:
+        /// exportable (categoría "Export" o cliente asignado), mercado interno
+        /// (cliente, categoría nacional) y descarte (estado Bajado).
+        /// Idempotente: solo toca pallets con VolcadoId nulo y sin enlace previo.
+        /// </summary>
+        private static void VincularPalletsAVolcados(ApplicationDbContext context, Random random)
+            {
+            var palletsSinVolcado = context.Pallets
+                .Where(p => !p.IsDeleted && p.VolcadoId == null)
+                .ToList();
+            var volcados = context.Volcados
+                .Include(v => v.Lote).ThenInclude(l => l!.Variedad)
+                .Where(v => !v.Lote.IsDeleted)
+                .ToList();
+            if (palletsSinVolcado.Count == 0 || volcados.Count == 0)
+                return;
+
+            var palletsAAfectar = palletsSinVolcado
+                .Take(Math.Min(30, palletsSinVolcado.Count))
+                .ToList();
+
+            foreach (var pallet in palletsAAfectar)
+                {
+                // Buscar un volcado de la misma variedad y zafra cercana
+                var candidatos = volcados
+                    .Where(v => v.Lote?.Variedad?.Nombre == pallet.Variedad)
+                    .ToList();
+                var volcadoElegido = candidatos.Any()
+                    ? candidatos[random.Next(candidatos.Count)]
+                    : volcados[random.Next(volcados.Count)];
+
+                pallet.VolcadoId = volcadoElegido.Id;
+
+                // Clasificación para demostrar rendimiento de packing
+                var r = random.Next(100);
+                if (r < 55)
+                    {
+                    // Exportable: cliente asignado y categoría Primera/Export
+                    pallet.Cliente = "Importadora San Martín";
+                    pallet.Categoria = "Export";
+                    pallet.Estado = EstadoPallet.EnFrio;
+                    }
+                else if (r < 80)
+                    {
+                    // Mercado interno: cliente nacional
+                    pallet.Cliente = "Frutas del Sur S.A.";
+                    pallet.Categoria = "Primera";
+                    pallet.Estado = EstadoPallet.EnFrio;
+                    }
+                else
+                    {
+                    // Descarte: sin cliente o cliente vacío, estado Bajado
+                    pallet.Cliente = null;
+                    pallet.Categoria = "Descarte";
+                    pallet.Estado = EstadoPallet.Bajado;
+                    }
+
+                pallet.UpdatedAt = DateTime.UtcNow;
+                pallet.UpdatedBy = "DbInitializer";
+                }
+
+            context.SaveChanges();
             }
 
         // ------------------------------------------------------------------

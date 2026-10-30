@@ -176,6 +176,11 @@ namespace GuarinoApp.Infrastructure
             services.AddScoped<ISkill, PalletsSkill>();
             services.AddScoped<ISkill, IndicadoresGerenciaSkill>();
             services.AddScoped<ISkill, ClimaRiesgoSkill>();
+            // Nuevas skills financieras (Contaduría / Gerencia) — puntos 1 al 4 del análisis de Contador Senior
+            services.AddScoped<ISkill, CostoDesgloseSkill>();
+            services.AddScoped<ISkill, RendimientoPackingSkill>();
+            services.AddScoped<ISkill, ComparativaZafraSkill>();
+            services.AddScoped<ISkill, ProyeccionCajaSkill>();
             services.AddScoped<ISkillRegistry, SkillRegistry>();
 
             // Filtro IA por rol (capa 1): clasifica la consulta por temas según

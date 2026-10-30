@@ -1,0 +1,150 @@
+@page "/comparativa-zafra-semanal"
+@attribute [Authorize(Roles = RoleNames.FinancierosAutorizacion)]
+@using GuarinoApp.Application.Modules.Proyeccion.Dtos
+@using GuarinoApp.Application.Modules.Proyeccion.Queries.GetComparativaZafraSemanal
+@using MediatR
+@using MudBlazor
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Comparativa interzafra semanal</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex flex-wrap justify-space-between align-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold text-dark">📊 Comparativa interzafra semanal</h2>
+            <p class="text-muted mb-0">Curva acumulada de volcados y pallets despachados por semana, comparando zafras.</p>
+        </div>
+    </div>
+
+    <!-- Explicación para el usuario -->
+    <MudCard Elevation="1" Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" GutterBottom="true" Class="fw-bold">¿Cómo leer esta tabla?</MudText>
+            <MudText Typo="Typo.body1" Class="mb-2">
+                Compara la zafra en curso contra la zafra anterior, <strong>semana a semana, misma fecha</strong>. Los valores son acumulados: cada semana suma los volcados de las semanas previas.
+            </MudText>
+            <MudText Typo="Typo.body1" Class="mb-2">
+                <strong>¿Para qué sirve?</strong> Te responde la pregunta de todos los días: <em>¿vamos adelantados o atrasados respecto al año pasado?</em> Si tu zafra está por encima de la anterior, vas adelantado. Si está por debajo, vas atrasado.
+            </MudText>
+            <MudText Typo="Typo.body1" Class="mb-2">
+                Seleccioná al menos dos zafras para ver la comparativa lado a lado.
+            </MudText>
+        </MudCardContent>
+    </MudCard>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <MudProgressCircular Color="Color.Primary" Size="Size.Large" />
+        </div>
+    }
+    else
+    {
+        @if (_resultado != null && _resultado.Datos.Any())
+        {
+            <!-- Filtro de zafras (múltiple) -->
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Seleccioná las zafras a comparar:</MudText>
+            <div class="d-flex flex-wrap gap-3 mb-4">
+                @foreach (var z in _resultado.Zafras.OrderBy(z => z))
+                {
+                    var zStr = z.ToString();
+                    <MudCheckBox T="bool"
+                                 Label="@zStr"
+                                 Checked="_zafrasSeleccionadas.Contains(zStr)"
+                                 CheckedChanged="(val) => { if (val) _zafrasSeleccionadas.Add(zStr); else _zafrasSeleccionadas.Remove(zStr); }"
+                                 Color="Color.Primary" />
+                }
+            </div>
+
+            @if (_zafrasSeleccionadas.Count < 2)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4">
+                    Seleccioná al menos dos zafras para ver la comparativa.
+                </MudAlert>
+            }
+            else
+            {
+                <!-- Tabla comparativa con bordes claros y valores bien alineados -->
+                <MudCard Elevation="1">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6" GutterBottom="true">Volcados acumulados por semana y zafra (kg)</MudText>
+                        <div class="table-responsive" style="width: 100%; overflow-x: auto;">
+                            <table class="table table-bordered w-100" style="border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background-color: #f8f9fa;">
+                                        <th style="width: 8%; text-align: center; border: 1px solid #dee2e6;">Semana</th>
+                                        @foreach (var z in _zafrasSeleccionadas.OrderBy(z => z))
+                                        {
+                                            <th class="text-end" style="min-width: 120px; border: 1px solid #dee2e6;">Zafra @z</th>
+                                        }
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int s = 1; s <= 52; s++)
+                                    {
+                                        var esFilaPar = (s - 1) % 2 == 1;
+                                        <tr style="@(esFilaPar ? "background-color: #f8f9fa;" : "")">
+                                            <td style="text-align: center; font-weight: 500; border: 1px solid #dee2e6;">@s</td>
+                                            @foreach (var z in _zafrasSeleccionadas.OrderBy(z => z))
+                                            {
+                                                var zInt = int.Parse(z);
+                                                var valor = _resultado.Datos.FirstOrDefault(d => d.Semana == s && d.Zafra == zInt);
+                                                <td class="text-end" style="border: 1px solid #dee2e6;">@(valor?.KgVolcadosAcumulados.ToString("N0") ?? "—")</td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+
+                <MudAlert Severity="Severity.Info" Class="mt-4">
+                    Los valores son acumulados semana a semana dentro de cada zafra. Compará las columnas para ver si vas adelantado o atrasado respecto a cada zafra de referencia.
+                </MudAlert>
+            }
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                No hay datos históricos de volcados para comparar zafras.
+            </MudAlert>
+        }
+    }
+</div>
+
+@code {
+    private bool _loading = false;
+    private ComparativaZafraSemanalResultDto? _resultado;
+    private List<string> _zafrasSeleccionadas = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        _loading = true;
+        try
+        {
+            _resultado = await Mediator.Send(new GetComparativaZafraSemanalQuery());
+
+            // Seleccionar las dos zafras más recientes por defecto
+            if (_resultado.Zafras.Any())
+            {
+                var dosMasRecientes = _resultado.Zafras.OrderByDescending(z => z).Take(2).Select(z => z.ToString()).ToList();
+                _zafrasSeleccionadas = dosMasRecientes;
+            }
+        }
+        catch
+        {
+            Snackbar.Add("Error al cargar la comparativa interzafra", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

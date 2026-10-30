@@ -278,6 +278,18 @@ public class FallbackAIService : IAIService
         if (Pregunta("caja", "capital", "finanz", "costo", "factura", "insumo", "credito", "flujo", "presupuesto"))
             puntos.Add("Sin métrica de caja en esta consulta → cruzar la proyección con Contaduría: capital necesario contra flujo de caja → dimensionar la brecha antes de comprometer insumos.");
 
+        if (Pregunta("costo", "desglose", "kg", "exportable", "fruta", "planta", "packing", "carton", "envases", "flete", "puerto"))
+            puntos.Add("Costo real por kg exportable: revisá el desglose en Contaduría/Gerencia (fruta en planta, packing, cartón, energía/frío, flete/puerto) para saber cuánto cuesta dejar un kg listo para exportar.");
+
+        if (Pregunta("rendimiento", "packing", "exportable", "mercado interno", "descarte", "packout", "calibradora"))
+            puntos.Add("Rendimiento de packing: de cada 100 kg volcados, cuánto se exporta, cuánto va al mercado interno y cuánto se descarta. Un punto de rendimiento vale miles de dólares por zafra.");
+
+        if (Pregunta("comparativa", "zafra", "anterior", "misma", "fecha", "adelantados", "atrasados", "curva", "acumulado"))
+            puntos.Add("Comparativa interzafra: curva acumulada semanal de volcados y pallets despachados vs. la zafra anterior en la misma fecha. ¿Vamos adelantados o atrasados?");
+
+        if (Pregunta("proyeccion", "caja", "13", "semanas", "piso", "escenario", "pesimista", "optimista", "base", "liquidez", "flujo"))
+            puntos.Add("Proyección de caja a 13 semanas: entradas y salidas por escenario (Base, Pesimista, Optimista) y en qué semana se toca el piso de caja.");
+
         if (Pregunta("cosecha", "proceso", "cadena", "planta", "fruta", "zafra", "proyecc", "crecimiento", "capacidad", "planific"))
             puntos.Add($"Crecimiento proyectado de {crecimiento.ToString("0.0").Replace('.', ',')}% vs. período anterior → asegurar cajas, zunchos y turnos de empaque → evitar paradas de línea en el pico.");
 

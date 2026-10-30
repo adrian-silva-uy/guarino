@@ -120,4 +120,30 @@
             </MudCardContent>
         </MudCard>
     </MudItem>
+
+    <!-- 4. Administración y Finanzas -->
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Error" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.AttachMoney" />
+                    </MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Administración y Finanzas</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="d-flex flex-column gap-1">
+                    <EnlaceSeguro Href="/contaduria">Contaduría</EnlaceSeguro>
+                    <EnlaceSeguro Href="/costo-desglose-kg">Costo por kg exportable</EnlaceSeguro>
+                    <EnlaceSeguro Href="/rendimiento-packing">Rendimiento de Packing</EnlaceSeguro>
+                    <EnlaceSeguro Href="/comparativa-zafra-semanal">Comparativa Interzafra</EnlaceSeguro>
+                    <EnlaceSeguro Href="/proyeccion-caja">Proyección de Caja</EnlaceSeguro>
+                    <EnlaceSeguro Href="/usuarios">Usuarios</EnlaceSeguro>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
 </MudGrid>

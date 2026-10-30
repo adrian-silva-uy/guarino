@@ -260,6 +260,56 @@ Log de todas las acciones del sistema.
 
 ![Auditoría con filtros](img/auditoria.png)
 
+### 3.20 Costo por kg exportable (solo Administración y Contaduría)
+
+Permite ingresar el desglose de costos para saber cuánto cuesta realmente dejar un kg de fruta listo para exportar.
+
+**Cómo usarlo:**
+1. Ingresa la **Zafra** a la que aplica el desglose.
+2. Completa cada rubro: Fruta puesta en planta, Packing (mano de obra), Cartón y envases, Energía y frío, Flete y puerto, Otros costos.
+3. Ingresa los **Kg exportables proyectados** (base para calcular el costo unitario).
+4. Pulsa **Guardar desglose**.
+
+El sistema calcula automáticamente el costo total y el **costo por kg exportable**, que se usa en los tableros de Capital de Trabajo y Brecha de Caja de Proyección de Zafra.
+
+![Costo por kg exportable](img/costo-por-kg-exportable.svg)
+
+### 3.21 Rendimiento de Packing (solo Administración y Contaduría)
+
+Muestra de cada 100 kg volcados, cuántos terminan en exportación, mercado interno y descarte.
+
+**Cómo se clasifican los pallets:**
+- **Exportable:** pallet con cliente asignado y categoría "Export" o estado distinto a "Bajado".
+- **Mercado interno:** pallet con cliente nacional, categoría "Primera", sin exportar.
+- **Descarte:** pallet con estado "Bajado" o categoría "Descarte".
+
+La pantalla muestra KPIs totales y una tabla detallada por variedad y productor.
+
+![Rendimiento de Packing](img/rendimiento-de-packing.svg)
+
+### 3.22 Comparativa Interzafra Semanal (solo Administración y Contaduría)
+
+Compara la zafra en curso contra la zafra anterior, **semana a semana, misma fecha**. Los valores son acumulados: cada semana suma los volcados de las semanas previas.
+
+**Cómo usarlo:**
+1. Selecciona al menos dos zafras para comparar (marca los checkboxes).
+2. La tabla muestra los volcados acumulados por semana para cada zafra seleccionada.
+3. Si tu zafra está por encima de la anterior, vas **adelantado**. Si está por debajo, vas **atrasado**.
+
+![Comparativa Interzafra](img/comparativa-interzafra.svg)
+
+### 3.23 Proyección de Caja a 13 Semanas (solo Administración y Contaduría)
+
+Muestra la "película" de tu caja: entradas y salidas semanales proyectadas para las próximas 13 semanas, por escenario (Base, Pesimista, Optimista).
+
+**Cómo usarlo:**
+1. Selecciona el **Escenario** (Base, Pesimista o Optimista).
+2. Revisa el saldo inicial, el saldo mínimo (piso de caja) y la semana en que se toca el piso.
+3. La tabla semanal muestra entradas y salidas desglosadas (liquidaciones a quintas, jornales, fletes, impuestos).
+4. Si el saldo acumulado toca negativo en alguna semana, hay una **brecha de caja** que debes cubrir con financiamiento antes de que llegue ese momento.
+
+![Proyección de Caja](img/proyeccion-de-caja.svg)
+
 ---
 
 ## 4. Preguntas frecuentes
