@@ -272,6 +272,8 @@ Permite ingresar el desglose de costos para saber cuánto cuesta realmente dejar
 
 El sistema calcula automáticamente el costo total y el **costo por kg exportable**, que se usa en los tableros de Capital de Trabajo y Brecha de Caja de Proyección de Zafra.
 
+![Costo por kg exportable](img/costo-por-kg-exportable.svg)
+
 
 ### 3.21 Rendimiento de Packing (solo Administración y Contaduría)
 
@@ -284,6 +286,8 @@ Muestra de cada 100 kg volcados, cuántos terminan en exportación, mercado inte
 
 La pantalla muestra KPIs totales y una tabla detallada por variedad y productor.
 
+![Rendimiento de Packing](img/rendimiento-de-packing.svg)
+
 
 ### 3.22 Comparativa Interzafra Semanal (solo Administración y Contaduría)
 
@@ -293,6 +297,8 @@ Compara la zafra en curso contra la zafra anterior, **semana a semana, misma fec
 1. Selecciona al menos dos zafras para comparar (marca los checkboxes).
 2. La tabla muestra los volcados acumulados por semana para cada zafra seleccionada.
 3. Si tu zafra está por encima de la anterior, vas **adelantado**. Si está por debajo, vas **atrasado**.
+
+![Comparativa Interzafra](img/comparativa-interzafra.svg)
 
 
 ### 3.23 Proyección de Caja a 13 Semanas (solo Administración y Contaduría)
@@ -304,6 +310,8 @@ Muestra la "película" de tu caja: entradas y salidas semanales proyectadas para
 2. Revisa el saldo inicial, el saldo mínimo (piso de caja) y la semana en que se toca el piso.
 3. La tabla semanal muestra entradas y salidas desglosadas (liquidaciones a quintas, jornales, fletes, impuestos).
 4. Si el saldo acumulado toca negativo en alguna semana, hay una **brecha de caja** que debes cubrir con financiamiento antes de que llegue ese momento.
+
+![Proyección de Caja](img/proyeccion-de-caja.svg)
 
 
 ---

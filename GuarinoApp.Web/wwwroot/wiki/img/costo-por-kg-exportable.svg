@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400">
+  <rect width="800" height="400" fill="#f8f9fa"/>
+  <rect x="50" y="50" width="700" height="300" fill="#e3f2fd" stroke="#2196f3" stroke-width="2"/>
+  <text x="400" y="100" font-family="Arial" font-size="24" font-weight="bold" fill="#1976d2" text-anchor="middle">Costo por kg Exportable</text>
+  <rect x="100" y="150" width="600" height="100" fill="#ffffff" stroke="#bdbdbd" stroke-width="1"/>
+  <text x="400" y="200" font-family="Arial" font-size="16" fill="#666" text-anchor="middle">Desglose de costos: Fruta, Packing, Cartón, Energía, Flete</text>
+  <text x="400" y="240" font-family="Arial" font-size="14" fill="#999" text-anchor="middle">Costo unitario por kg exportable</text>
+  <rect x="150" y="260" width="500" height="40" fill="#4caf50" opacity="0.3"/>
+  <text x="400" y="285" font-family="Arial" font-size="16" font-weight="bold" fill="#4caf50" text-anchor="middle">$1.20 / kg exportable</text>
+</svg>

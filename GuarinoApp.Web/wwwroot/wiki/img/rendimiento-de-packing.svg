@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400">
+  <rect width="800" height="400" fill="#f8f9fa"/>
+  <rect x="50" y="50" width="700" height="300" fill="#e8f5e9" stroke="#4caf50" stroke-width="2"/>
+  <text x="400" y="100" font-family="Arial" font-size="24" font-weight="bold" fill="#388e3c" text-anchor="middle">Rendimiento de Packing</text>
+  <rect x="100" y="140" width="200" height="180" fill="#4caf50" opacity="0.6"/>
+  <text x="200" y="250" font-family="Arial" font-size="14" fill="#2e7d32" text-anchor="middle">Exportable</text>
+  <text x="200" y="270" font-family="Arial" font-size="12" fill="#666" text-anchor="middle">65%</text>
+  <rect x="300" y="180" width="200" height="140" fill="#2196f3" opacity="0.6"/>
+  <text x="400" y="290" font-family="Arial" font-size="14" fill="#1976d2" text-anchor="middle">Mercado Interno</text>
+  <text x="400" y="310" font-family="Arial" font-size="12" fill="#666" text-anchor="middle">25%</text>
+  <rect x="500" y="240" width="200" height="80" fill="#f44336" opacity="0.6"/>
+  <text x="600" y="300" font-family="Arial" font-size="14" fill="#d32f2f" text-anchor="middle">Descarte</text>
+  <text x="600" y="320" font-family="Arial" font-size="12" fill="#666" text-anchor="middle">10%</text>
+  <text x="400" y="360" font-family="Arial" font-size="14" fill="#666" text-anchor="middle">De cada 100 kg volcados</text>
+</svg>
