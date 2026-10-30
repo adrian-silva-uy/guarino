@@ -19,6 +19,13 @@ CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 var builder = WebApplication.CreateBuilder(args);
 
 // ============================================================================
+// USER SECRETS - Datos sensibles (API keys, contraseñas, connection strings)
+// Se cargan desde el almacén local de usuario (NO se suben al repositorio).
+// Disponible en todos los entornos gracias al UserSecretsId del csproj.
+// ============================================================================
+builder.Configuration.AddUserSecrets<Program>();
+
+// ============================================================================
 // AUTENTICACIÓN Y AUTORIZACIÓN
 // Negotiate (Windows Auth) es correcto para app Blazor Server interna en red
 // corporativa. JWT sería para APIs públicas o SPAs, no aplica aquí.

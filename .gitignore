@@ -2048,3 +2048,22 @@ ClientBin/
 *.sqlproj.suo
 *.vcxproj.s
 .aider*
+
+# ============================================================================
+# DATOS SENSIBLES - Nunca subir al repositorio
+# ============================================================================
+# Archivos de configuración con valores sensibles (connection strings, API keys, etc.)
+appsettings.Development.json
+appsettings.Production.json
+appsettings.*.local.json
+appsettings.*.secret.json
+
+# ASP.NET Core User Secrets (almacén local de claves sensibles)
+**/usersecrets/
+*.usersecrets
+
+# Variables de entorno
+.env
+.env.local
+.env.development.local
+.env.production.local
