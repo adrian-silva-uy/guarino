@@ -201,7 +201,7 @@
         var sec = _secciones.FirstOrDefault(s => s.Titulo == titulo);
         if (sec != null)
         {
-            var contenidoConImagenes = sec.Contenido.Replace("](img/", "](" + "/img/");
+            var contenidoConImagenes = sec.Contenido.Replace("](img/", "](" + "/wiki/img/");
             _htmlSeccion = Markdown.ToHtml(contenidoConImagenes, _pipeline);
         }
         else
