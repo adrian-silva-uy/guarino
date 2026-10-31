@@ -148,6 +148,31 @@ builder.Services.AddHttpClient("Ollama", (sp, client) =>
 });
 
 // ============================================================================
+// CACHÉ REDIS - Proyecciones y consultas pesadas
+// Si Redis no está disponible, cae a memoria en proceso sin fallar.
+// ============================================================================
+builder.Services.AddOptions<CacheOptions>()
+    .BindConfiguration("Cache")
+    .ValidateOnStart();
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    var cacheOpts = builder.Configuration.GetSection("Cache").Get<CacheOptions>();
+    options.Configuration = cacheOpts?.ConnectionString ?? "localhost:6379";
+    options.InstanceName = cacheOpts?.InstanceName ?? "guarino:";
+    // Si Redis no está disponible, no fallar el arranque
+    options.ConfigurationOptions = new StackExchange.Redis.ConfigurationOptions
+    {
+        ConnectRetry = 1,
+        ConnectTimeout = 1000,
+        SyncTimeout = 1000,
+        AbortOnConnectFail = false
+    };
+});
+
+builder.Services.AddScoped<IDistributedCacheService, DistributedCacheService>();
+
+// ============================================================================
 // HEALTH CHECKS
 // Monitoreo de SQL Server y Ollama para herramientas de infraestructura.
 // Solo SQL Server lleva el tag "ready": es el requisito para recibir tráfico
