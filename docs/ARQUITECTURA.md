@@ -143,10 +143,16 @@ graph TD
 - `Lugares.razor` - Orígenes y destinos
 - `Basculas.razor` - Básculas de pesaje
 
-#### 👥 Administración
+#### 👥 Administración (Admin/Gerencia)
 - `Usuarios.razor` - Gestión de usuarios
 - `Auditoria.razor` - Logs de auditoría
 - `Contaduria.razor` - Módulo contable
+
+#### 💰 Contaduría y Finanzas (Admin/Gerencia/Contador)
+- `CostoDesglose.razor` - **NUEVO** - Costo real por kg exportable (desglose por rubros)
+- `RendimientoPacking.razor` - **NUEVO** - Rendimiento de packing (exportable/mercado interno/descarte)
+- `ComparativaZafraSemanal.razor` - **NUEVO** - Comparativa interzafra semanal
+- `ProyeccionCaja.razor` - **NUEVO** - Proyección de caja a 13 semanas (Base/Pesimista/Optimista)
 
 ---
 
@@ -377,6 +383,7 @@ graph TB
 | `ICurrentUserService` | Información del usuario autenticado |
 | `IAuditService` | Registro de auditoría |
 | `IPdfGenerator` | Generación de reportes PDF |
+| **`IDistributedCacheService`** | **Caché distribuida (Redis) con fallback a memoria** |
 
 ### Servicios Globales (HostedServices)
 
@@ -392,7 +399,40 @@ builder.Services.AddHostedService<ClimateMonitoringHostedService>();
 - Genera alertas si es necesario
 - Almacena eventos en BD
 
+### Caché Distribuida (Redis)
+
+El sistema utiliza `IDistributedCacheService` para caché distribuida con Redis como backend principal y memoria en proceso (MemoryCache) como fallback cuando Redis no está disponible.
+
+```csharp
+// Program.cs
+builder.Services.AddOptions<CacheOptions>()
+    .BindConfiguration(CacheOptions.SectionName)
+    .ValidateOnStart();
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    var cacheOpts = builder.Configuration.GetSection(CacheOptions.SectionName).Get<CacheOptions>();
+    options.Configuration = cacheOpts?.ConnectionString ?? "localhost:6379";
+    options.InstanceName = cacheOpts?.InstanceName ?? "guarino:";
+    options.ConfigurationOptions = new StackExchange.Redis.ConfigurationOptions
+    {
+        ConnectRetry = 1,
+        ConnectTimeout = 1000,
+        SyncTimeout = 1000,
+        AbortOnConnectFail = false
+    };
+});
+
+builder.Services.AddScoped<IDistributedCacheService, DistributedCacheService>();
+```
+
+**Características:**
+- Almacena en Redis para acceso rápido a datos de proyecciones y consultas frecuentes
+- Si Redis no está disponible, se usa automáticamente `MemoryCache` como fallback
+- Se utiliza para caché de proyecciones de caja, comparativas interzafra y otros cálculos costosos
+
 ---
+
 
 ## Base de Datos
 
@@ -608,7 +648,7 @@ graph TB
 | **BD** | SQL Server (EF Core 8) |
 | **Patrones** | Clean Architecture, CQRS, DI, Repository |
 | **Seguridad** | Windows Auth, RBAC, Input Sanitization |
-| **Escalabilidad** | Caché en memoria, async/await |
+| **Escalabilidad** | Redis + Memoria en proceso (caché distribuida), async/await |
 | **Testing** | Unit tests (xUnit/NUnit) |
 | **DevOps** | Git, CI/CD ready |
 
@@ -636,3 +676,5 @@ Cambios aplicados al código y reflejados en la documentación:
 - **Wiki de usuario**: `docs/WIKI_USUARIO.md` con manual funcional por módulo y rol.
 - **Auditoría exhaustiva**: `docs/auditoria-exhaustiva.md` (OWASP + UX + deuda técnica).
 - **Documentación inversa**: `docs/documentacion-inversa.md` (arquitectura, módulos, decisiones, trampas).
+- **Caché Redis**: `GuarinoApp.Infrastructure/Services/DistributedCacheService.cs` con fallback a memoria en proceso cuando Redis no está disponible.
+- **Módulos financieros**: Costo por kg exportable, Rendimiento de Packing, Comparativa Interzafra Semanal, Proyección de Caja a 13 Semanas (todos bajo roles Financieros).

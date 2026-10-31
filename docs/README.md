@@ -1,465 +1,349 @@
-﻿# 📚 Wiki GuarinoApp - Documentación Arquitectónica Completa
+﻿# Manual de usuario - GuarinoApp
 
-## 🎯 Introducción
-
-Bienvenido a la **Wiki Arquitectónica de GuarinoApp**. Este conjunto de documentos proporciona una visión completa y detallada de la arquitectura, seguridad, componentes y procesos de la aplicación web **GuarinoApp.Web** - Sistema de Gestión de Operaciones Citríolas.
-
-### 📋 Stack Tecnológico
-```
-┌─────────────────────────────────────┐
-│ ASP.NET Core 8 + Blazor Server      │ ← Web Framework
-├─────────────────────────────────────┤
-│ MudBlazor + Bootstrap               │ ← UI Components
-├─────────────────────────────────────┤
-│ Entity Framework Core 8              │ ← ORM
-├─────────────────────────────────────┤
-│ SQL Server 2019+                    │ ← Database
-├─────────────────────────────────────┤
-│ MediatR (CQRS) + FluentValidation   │ ← Patterns
-├─────────────────────────────────────┤
-│ Windows Auth (Negotiate)             │ ← Authentication
-├─────────────────────────────────────┤
-│ OpenMeteo + Ollama                  │ ← External Services
-└─────────────────────────────────────┘
-```
-
-### 👥 Público Objetivo
-- **Desarrolladores**: Entienden la estructura y cómo contribuir
-- **Arquitectos**: Validan decisiones de diseño
-- **DevOps/SRE**: Despliegan y mantienen la aplicación
-- **Security/Compliance**: Realizan auditorías
-- **Stakeholders**: Comprenden capacidades y limitaciones
+Bienvenido al manual de usuario de **GuarinoApp**, el sistema de gestión de operaciones citrícolas. Esta guía explica cómo usar cada módulo de la aplicación, paso a paso, con capturas de pantalla.
 
 ---
 
-## 📖 Documentos Disponibles
+## 1. Acceso al sistema
 
-### 1. **[ARQUITECTURA.md](./ARQUITECTURA.md)** 🏗️
-Visión general de la arquitectura del sistema
+### 1.1 Iniciar sesión
 
-**Incluye**:
-- Descripción general y stack tecnológico
-- Arquitectura de capas (Clean Architecture)
-- Jerarquía de componentes Blazor
-- Flujo CQRS principal
-- Diagrama de inyección de dependencias
-- Modelo de autenticación y autorización
-- Jerarquía de roles
-- Protecciones de seguridad
-- Servicios de dominio
-- Schema de base de datos
-- Sistema de auditoría
-- Diagrama de despliegue
-- Checklist de despliegue
+1. Abre la aplicación en el navegador (ejemplo: `http://guarino.company.com`).
+2. Se mostrará la pantalla de **Ingresar**.
+3. Ingresa tu **Usuario** y **Contraseña**.
+4. Pulsa el botón **INGRESAR** (o presiona Enter).
 
-**Audiencia**: Todos  
-**Tiempo de lectura**: 20-30 min  
-**Prerequisitos**: Conocimiento básico de .NET/Blazor
+![Pantalla de login](img/login.png)
 
----
+> **Nota**: Tras 5 intentos fallidos, la cuenta se bloquea por 15 minutos.
 
-### 2. **[SEGURIDAD.md](./SEGURIDAD.md)** 🔐
-Auditoría de seguridad integral y análisis de vulnerabilidades
+### 1.2 Roles y permisos
 
-**Incluye**:
-- Resumen ejecutivo de seguridad
-- Análisis de 10 amenazas principales
-- Estado actual de mitigaciones
-- Controles implementados (AC, EN, IV, LM, SM)
-- Vulnerabilidades potenciales (crítica, alta, media)
-- Recomendaciones priorizadas
-- Matriz de riesgos
-- Checklist de hardening de seguridad
-- Procedimientos de escalación
+Cada usuario tiene un rol que determina qué módulos puede ver y usar:
 
-**Riesgos Identificados**:
-- 🔴 CRÍTICA (1): Secrets en código
-- 🟠 ALTA (4): Falta de autorización backend, encrypting data at rest
-- 🟡 MEDIA (5): CORS, rate limiting, sanitización
+| Rol | Qué puede hacer |
+|---|---|
+| **Admin** | Todo: usuarios, contactos, auditoría, contaduría, gerencia, operaciones. |
+| **Gerencia** | Indicadores, proyecciones, reportes, stock, operaciones. |
+| **Contador** | Reportes, liquidaciones, contaduría, resúmenes, proyecciones, costo por kg. |
+| **Operador** | Operaciones diarias: stock, pesadas, empaque, lotes, fruta a volcar, pallets. |
 
-**Audiencia**: Arquitectos, Security, DevOps  
-**Tiempo de lectura**: 25-35 min  
-**Prerequisitos**: Experiencia en seguridad de aplicaciones
+### 1.3 Menú e Inicio filtrados por rol
+
+- En el **menú lateral** y en **Inicio**, los módulos que tu rol no permite se muestran **bloqueados** con un candado y un mensaje: "Requiere: [rol] - tu rol actual: [tu rol]".
+- Si haces clic en uno bloqueado, **no se abre** (la pantalla no cambia).
+- La seguridad real la impone el servidor: aunque intentes acceder por URL directa, el sistema denegará el acceso.
+
+![Menú lateral con módulos bloqueados](img/menu-bloqueado.png)
 
 ---
 
-### 3. **[FLUJOS_CASOS_USO.md](./FLUJOS_CASOS_USO.md)** 📊
-Flujos de datos y casos de uso detallados
+## 2. Navegación general
 
-**Incluye**:
-- 5 flujos principales con diagramas
-  1. Flujo de autenticación
-  2. Flujo de consulta (GetPallets)
-  3. Flujo de creación (CreatePallet)
-  4. Flujo de monitoreo climático
-  5. Flujo de exportación a Excel
-- Módulos por rol (Admin, Gerencia, Contador, Operador)
-- 5 casos de uso detallados (UC-001 a UC-005)
-- Diagrama de secuencia integrado
-- Integraciones externas (OpenMeteo, Ollama, Email)
+### 2.1 Menú lateral
 
-**Audiencia**: Desarrolladores, Analistas, QA  
-**Tiempo de lectura**: 20-25 min  
-**Prerequisitos**: Comprensión de CQRS
+El menú lateral (izquierda) organiza los módulos por categorías:
 
----
+- **INICIO**: Inicio, Dashboard Ejecutivo, Panel de Gerencia
+- **OPERACIÓN DIARIA**: Stock General, Stock en Playa, Fruta a Volcar, Pallets Sin Clientes, Lotes Volcados, Registro de Pesadas, Gestión de Empaque
+- **INTELIGENCIA ARTIFICIAL**: Proyección de Volcados, Proyección de Zafra Siguiente, Asistente IA
+- **REPORTES Y ANÁLISIS**: Resumen de Liquidaciones, Liquidaciones de Quinta, Stock de Pallets Sin Cliente, Resumen Mensual, Gráfica de Procesos, Pallets por Contramarca, Pallets Definitivos, Gestión de Riesgos Climáticos
+- **LOGÍSTICA Y RECURSOS**: Transportistas, Camiones y Zorras, Lugares de Origen y Destino, Básculas
+- **COMERCIAL**: Contactos
+- **ADMINISTRACIÓN**: Contaduría, Usuarios, Auditoría
+- **DOCUMENTACIÓN**: Wiki (este manual)
 
-### 4. **[COMPONENTES_BLAZOR.md](./COMPONENTES_BLAZOR.md)** 🎨
-Guía de componentes Blazor y patrones de desarrollo
+### 2.2 Paginación
 
-**Incluye**:
-- Estructura de carpetas
-- 6 componentes compartidos principales:
-  - MainLayout.razor
-  - NavMenu.razor
-  - ExportToolbar.razor
-  - InteractiveChart.razor
-  - SimpleDialog.razor
-  - CurrentUserDisplay.razor
-- Páginas principales (~30 páginas)
-- 2 patrones de componentes reutilizables
-- Inyección de dependencias
-- Buenas prácticas (DO's/DON'Ts)
+Todas las grillas (tablas) muestran **25 filas por página**.
 
-**Audiencia**: Desarrolladores frontend  
-**Tiempo de lectura**: 15-20 min  
-**Prerequisitos**: Experiencia con Blazor
+- Usa los botones anterior/siguiente en el pie de la tabla para navegar.
+- El pie muestra: "Mostrando X-Y de Z registros".
+
+![Pie de tabla con paginación](img/paginacion.png)
+
+### 2.3 Exportar datos
+
+1. En cualquier grilla, busca la barra **ExportToolbar** (arriba de la tabla).
+2. Pulsa el botón del formato deseado: **PDF**, **Excel** o **CSV**.
+3. El archivo se descarga automáticamente.
+
+![Barra de exportación](img/export-toolbar.png)
+
+### 2.4 Filtrar datos
+
+1. Usa los selectores de filtro (Variedad, Productor, etc.) en la barra de filtros.
+2. Al cambiar un valor, la grilla se actualiza automáticamente.
+3. Para limpiar un filtro, selecciona la opción vacía.
+
+![Barra de filtros](img/filtrar-datos.svg)
 
 ---
 
-### 5. **[DESPLIEGUE_MANTENIMIENTO.md](./DESPLIEGUE_MANTENIMIENTO.md)** 🚀
-Guía completa de despliegue y mantenimiento
+## 3. Módulos principales
 
-**Incluye**:
-- Requisitos previos (hardware, software, credenciales)
-- Despliegue en desarrollo (5 pasos)
-- Despliegue en producción (7 pasos)
-  - Arquitectura de despliegue (Load Balancer, 3 servidores IIS, BD Replicada)
-  - Configuración por entorno
-  - Migraciones seguras
-- Monitoreo y mantenimiento
-- Troubleshooting (4 problemas comunes)
-- Procedimientos de rollback
-- Checklist pre/durante/post despliegue
+### 3.1 Inicio
 
-**Audiencia**: DevOps, SRE, Release Managers  
-**Tiempo de lectura**: 30-40 min  
-**Prerequisitos**: Experiencia con IIS, SQL Server
+Pantalla principal con accesos rápidos a los módulos disponibles según tu rol.
+
+![Pantalla de inicio](img/inicio.png)
+
+### 3.2 Dashboard Ejecutivo
+
+Muestra KPIs clave de la zafra: kilos, bins, pallets, tendencias.
+
+![Dashboard ejecutivo](img/dashboard.png)
+
+### 3.3 Stock General
+
+Lista de pallets por variedad, estado y zafra.
+
+**Cómo usarlo:**
+1. Selecciona una **Zafra** del filtro (opcional).
+2. Selecciona un **Estado** (opcional): En Frío, Despachado, etc.
+3. La grilla muestra los pallets que cumplen los filtros.
+4. Usa la paginación para navegar.
+5. Exporta con los botones PDF/Excel/CSV.
+
+![Stock General](img/stock-general.png)
+
+### 3.4 Stock en Playa
+
+Pallets en playa (sin cliente asignado), agrupados por variedad.
+
+![Stock en Playa](img/stock-en-playa.svg)
+
+### 3.5 Fruta a Volcar
+
+Fruta pendiente de volcar por lote y productor.
+
+![Fruta a Volcar](img/fruta-a-volcar.svg)
+
+### 3.6 Lotes Volcados
+
+Lotes volcados agrupados por lote y fecha.
+
+**Cómo usarlo:**
+1. Ajusta el rango de fechas (por defecto: últimos 3 meses).
+2. Filtra por **Variedad** o **Productor** (opcional).
+3. La grilla muestra los lotes volcados que cumplen los filtros.
+4. Exporta si necesitas.
+
+![Lotes Volcados con filtros](img/lotes-volcados.png)
+
+### 3.7 Registro de Pesadas
+
+Registro de pesadas (fuente: LotesEmboquille).
+
+**Cómo usarlo:**
+1. Ajusta el rango de fechas (por defecto: últimos 3 meses).
+2. Navega con la paginación (25 por página).
+3. Exporta si necesitas.
+
+![Registro de Pesadas](img/registro-de-pesadas.svg)
+
+### 3.8 Gestión de Empaque
+
+Catálogo y gestión de empaque.
+
+![Gestión de Empaque](img/gestion-de-empaque.svg)
+
+### 3.9 Pallets por Contramarca / Definitivos / Sin Clientes
+
+Vistas especializadas de pallets según su estado.
+
+![Pallets por Contramarca / Definitivos / Sin Clientes](img/pallets-por-contramarca-definitivos-sin-clientes.svg)
+
+### 3.10 Gestión de Riesgos Climáticos
+
+Mapa interactivo de lotes con eventos climáticos.
+
+**Cómo usarlo:**
+1. El mapa muestra lotes con marcadores de riesgo.
+2. Haz clic en un marcador para ver detalles.
+3. Usa el botón **"Ver en la tabla"** para filtrar la tabla por ese lote.
+4. Los KPIs muestran el total exacto (no solo los visibles en la tabla).
+
+![Mapa de riesgos climáticos](img/riesgos-climaticos.png)
+
+### 3.11 Asistente IA
+
+Consultas de inteligencia artificial seleccionables según tu rol.
+
+**Cómo usarlo:**
+1. Selecciona una consulta del catálogo (disponible según tu rol).
+2. Pulsa **Ejecutar**.
+3. Espera la respuesta (hasta ~12 segundos para análisis de Contaduría).
+
+![Asistente IA](img/ia-chat.png)
+
+### 3.12 Proyección de Volcados / Zafra Siguiente
+
+Proyecciones de volcados futuros y de la próxima zafra.
+
+**Cómo usarlo:**
+1. La aplicación muestra la proyección basada en el histórico de volcados.
+2. Se muestra la variación porcentual respecto a la zafra anterior.
+3. Se muestran KPIs de capital de trabajo, brecha de liquidez y riesgo de liquidez.
+4. Se muestran escenarios Base, Pesimista y Optimista.
+
+![Proyección de Volcados / Zafra Siguiente](img/proyeccion-de-volcados-zafra-siguiente.svg)
+
+### 3.13 Reportes
+
+- **Resumen de Liquidaciones**: resumen de liquidaciones.
+- **Liquidaciones de Quinta**: liquidaciones por quinta.
+- **Resumen Mensual**: resumen mensual.
+- **Gráfica de Procesos**: gráfica de procesos.
+
+![Reportes](img/reportes.svg)
+
+### 3.14 Logística y Recursos
+
+- **Transportistas**: catálogo de transportistas.
+- **Camiones y Zorras**: catálogo de camiones y zorras.
+- **Lugares**: catálogo de lugares de origen y destino.
+- **Básculas**: catálogo de básculas.
+
+![Logística y Recursos](img/logistica-y-recursos.svg)
+
+### 3.15 Contactos (solo Administración)
+
+Gestión de contactos con importación masiva.
+
+**Crear un contacto:**
+1. Pulsa **NUEVO CONTACTO**.
+2. Completa: Nombre, Empresa, Correo, Teléfono.
+3. Pulsa **GUARDAR**.
+
+**Importar contactos:**
+1. Pulsa **IMPORTAR**.
+2. Selecciona un archivo CSV.
+3. Revisa la vista previa.
+4. Pulsa **IMPORTAR**.
+
+> Validación: correo con formato válido, teléfono de 8 a 15 dígitos.
+
+![Contactos](img/contactos.svg)
+
+### 3.16 Usuarios (solo Administración)
+
+**Crear un usuario:**
+1. Pulsa **NUEVO USUARIO**.
+2. Completa: Usuario (mínimo 3 caracteres), Nombre completo, Correo (opcional), Contraseña (mínimo 6 caracteres), Rol.
+3. Pulsa **CREAR USUARIO**.
+4. Si hay error, se muestra un mensaje rojo y el formulario permanece abierto.
+5. En éxito: mensaje verde "Usuario creado correctamente." y la grilla se actualiza.
+
+**Desactivar un usuario:**
+1. Busca la fila del usuario en la grilla.
+2. Desactiva el switch **Activo**.
+
+![Formulario de nuevo usuario](img/nuevo-usuario.png)
+
+### 3.17 Contaduría (solo Administración)
+
+Datos financieros + contexto operativo. El Asistente IA puede analizar los datos (tarda ~12 segundos).
+
+**Cómo usarlo:**
+1. Ingresa el **Costo por Kg** (costo operativo promedio por kg).
+2. Ingresa el **Flujo de Caja** (caja disponible actual).
+3. Ingresa el **Margen Bruto** (%).
+4. Opcional: Costo de Flete por Contenedor y Capacidad Instalada.
+5. Pulsa **Guardar Datos**.
+
+El sistema calculará automáticamente:
+- **Capital de Trabajo necesario**: kg proyectados × costo por kg.
+- **Brecha de caja**: capital necesario - flujo de caja.
+- **Riesgo de liquidez**: bajo, medio o alto según el porcentaje de brecha.
+
+![Contaduría](img/contaduria.svg)
+
+### 3.18 Gerencia (solo Administración)
+
+Indicadores de gerencia.
+
+![Gerencia](img/gerencia.svg)
+
+### 3.19 Auditoría (solo Administración)
+
+Log de todas las acciones del sistema.
+
+**Cómo usarlo:**
+1. Filtra por **Usuario**, **Acción**, **Módulo** o **Rango de fechas**.
+2. La grilla muestra las acciones que cumplen los filtros.
+3. Exporta si necesitas.
+
+![Auditoría con filtros](img/auditoria.png)
+
+### 3.20 Costo por kg exportable (solo Administración y Contaduría)
+
+Permite ingresar el desglose de costos para saber cuánto cuesta realmente dejar un kg de fruta listo para exportar.
+
+**Cómo usarlo:**
+1. Ingresa la **Zafra** a la que aplica el desglose.
+2. Completa cada rubro: Fruta puesta en planta, Packing (mano de obra), Cartón y envases, Energía y frío, Flete y puerto, Otros costos.
+3. Ingresa los **Kg exportables proyectados** (base para calcular el costo unitario).
+4. Pulsa **Guardar desglose**.
+
+El sistema calcula automáticamente el costo total y el **costo por kg exportable**, que se usa en los tableros de Capital de Trabajo y Brecha de Caja de Proyección de Zafra.
+
+![Costo por kg exportable](img/costo-por-kg-exportable.svg)
+
+### 3.21 Rendimiento de Packing (solo Administración y Contaduría)
+
+Muestra de cada 100 kg volcados, cuántos terminan en exportación, mercado interno y descarte.
+
+**Cómo se clasifican los pallets:**
+- **Exportable**: pallet con cliente asignado y categoría "Export" o estado distinto a "Bajado".
+- **Mercado interno**: pallet con cliente nacional, categoría "Primera", sin exportar.
+- **Descarte**: pallet con estado "Bajado" o categoría "Descarte".
+
+La pantalla muestra KPIs totales y una tabla detallada por variedad y productor.
+
+![Rendimiento de Packing](img/rendimiento-de-packing.svg)
+
+### 3.22 Comparativa Interzafra Semanal (solo Administración y Contaduría)
+
+Compara la zafra en curso contra la zafra anterior, **semana a semana, misma fecha**. Los valores son acumulados: cada semana suma los volcados de las semanas previas.
+
+**Cómo usarlo:**
+1. Selecciona al menos dos zafras para comparar (marca los checkboxes).
+2. La tabla muestra los volcados acumulados por semana para cada zafra seleccionada.
+3. Si tu zafra está por encima de la anterior, vas **adelantado**. Si está por debajo, vas **atrasado**.
+
+![Comparativa Interzafra](img/comparativa-interzafra.svg)
+
+### 3.23 Proyección de Caja a 13 Semanas (solo Administración y Contaduría)
+
+Muestra la "película" de tu caja: entradas y salidas semanales proyectadas para las próximas 13 semanas, por escenario (Base, Pesimista, Optimista).
+
+**Cómo usarlo:**
+1. Selecciona el **Escenario** (Base, Pesimista o Optimista).
+2. Revisa el saldo inicial, el saldo mínimo (piso de caja) y la semana en que se toca el piso.
+3. La tabla semanal muestra entradas y salidas desglosadas (liquidaciones a quintas, jornales, fletes, impuestos).
+4. Si el saldo acumulado toca negativo en alguna semana, hay una **brecha de caja** que debes cubrir con financiamiento antes de que llegue ese momento.
+
+![Proyección de Caja](img/proyeccion-de-caja.svg)
 
 ---
 
-## 🗺️ Mapa de Navegación
+## 4. Preguntas frecuentes
 
-```
-┌─────────────────────────────────────────────┐
-│          WIKI GUARINO                       │
-└─────────────┬───────────────────────────────┘
-              │
-    ┌─────────┼─────────┬──────────┬──────────────┐
-    │         │         │          │              │
-    v         v         v          v              v
-  [1]       [2]       [3]        [4]            [5]
-  ARQU      SECU      FLUJOS     COMPO         DESPL
+![Preguntas frecuentes](img/preguntas-frecuentes.svg)
 
-  Visión   Riesgos y  Datos y    UI y          Deploy &
-  General  Mitigación Procesos   Patrones      Ops
+**No veo un módulo en el menú?**
+Tu rol no tiene acceso. Los módulos bloqueados se muestran con candado. Contacta al administrador si necesitas acceso.
 
-         ↓ Lee primero esto ↓
+**La grilla tarda mucho en cargar?**
+Algunas páginas (Contaduría, Dashboard) ejecutan análisis pesados. Espera a que aparezca el indicador de carga.
 
-  1. Comienza aquí (15 min)
-  2. Si trabajas en seguridad (25 min)
-  3. Si necesitas entender flujos (20 min)
-  4. Si desarrollas frontend (15 min)
-  5. Si despliegas/mantienes (30 min)
-```
+**Cómo cambio mi contraseña?**
+Contacta al administrador. El sistema no permite cambio de contraseña por el usuario.
+
+**Los números no coinciden con lo que espero?**
+Todas las cifras se calculan directamente de la base de datos. Verifica los filtros de fecha y variedad/productor.
 
 ---
 
-## 🎓 Guías de Lectura por Rol
-
-### 👨‍💻 Desarrollador Backend
-
-**Ruta recomendada**: ARQUITECTURA → FLUJOS_CASOS_USO → SEGURIDAD → COMPONENTES_BLAZOR
-
-1. Lee ARQUITECTURA (30 min)
-   - Entiende capas y flujo CQRS
-   - Familiarízate con DI
-   - Revisa modelo de autenticación
-
-2. Lee FLUJOS_CASOS_USO (20 min)
-   - Casos de uso relevantes a tu módulo
-   - Diagramas de secuencia
-   - Integraciones externas
-
-3. Lee SEGURIDAD (25 min)
-   - Entradas validadas correctamente
-   - Autorización en handlers
-   - Rate limiting configurado
-
-4. Consulta COMPONENTES_BLAZOR (10 min)
-   - Entiende cómo consumes datos desde UI
-
-**Tiempo total**: ~85 min | **Foco**: Lógica de negocio y seguridad
-
----
-
-### 🎨 Desarrollador Frontend
-
-**Ruta recomendada**: COMPONENTES_BLAZOR → ARQUITECTURA → FLUJOS_CASOS_USO
-
-1. Lee COMPONENTES_BLAZOR (20 min)
-   - Estructura de proyectos y carpetas
-   - Componentes compartidos
-   - Patrones de desarrollo
-   - DO's y DON'Ts
-
-2. Lee ARQUITECTURA - Sección Componentes (10 min)
-   - Jerarquía de componentes
-   - MudBlazor theming
-
-3. Lee FLUJOS_CASOS_USO (15 min)
-   - Entiende qué datos necesitas
-   - Cómo se comunica con backend
-
-**Tiempo total**: ~45 min | **Foco**: UI/UX y usabilidad
-
----
-
-### 🔐 Arquitecto/Security Engineer
-
-**Ruta recomendada**: SEGURIDAD → ARQUITECTURA → DESPLIEGUE_MANTENIMIENTO
-
-1. Lee SEGURIDAD completo (35 min)
-   - Identifica brechas
-   - Revisa matriz de riesgos
-   - Valida mitigaciones
-
-2. Lee ARQUITECTURA - Sección Seguridad (15 min)
-   - Controles implementados
-   - Jerarquía de roles
-   - Protecciones
-
-3. Lee DESPLIEGUE_MANTENIMIENTO (15 min)
-   - Hardening del entorno
-   - Monitoreo
-
-**Tiempo total**: ~65 min | **Foco**: Postura de seguridad
-
----
-
-### 🚀 DevOps/SRE
-
-**Ruta recomendada**: DESPLIEGUE_MANTENIMIENTO → ARQUITECTURA → MONITOREO
-
-1. Lee DESPLIEGUE_MANTENIMIENTO completo (40 min)
-   - Pasos de despliegue
-   - Troubleshooting
-   - Rollback procedures
-
-2. Lee ARQUITECTURA - Secciones BD y Despliegue (15 min)
-   - Schema de BD
-   - Diagrama de despliegue
-
-3. Lee MONITOREO Y MANTENIMIENTO (10 min)
-   - Health checks
-   - Logs centralizados
-   - Métricas
-
-**Tiempo total**: ~65 min | **Foco**: Confiabilidad y operaciones
-
----
-
-## 📊 Matriz de Referencia Rápida
-
-| Documento | Secciones Clave | Personas | Tiempo |
-|-----------|-----------------|----------|--------|
-| ARQUITECTURA | Capas, CQRS, Autenticación, BD | Todos | 30 min |
-| SEGURIDAD | Vulnerabilidades, Recomendaciones, Riesgos | Security, Arquitecto | 35 min |
-| FLUJOS_CASOS_USO | UC-001 a UC-005, Integraciones | Dev, QA, Analista | 25 min |
-| COMPONENTES_BLAZOR | Componentes, Patrones, Buenas Prácticas | Dev Frontend | 20 min |
-| DESPLIEGUE_MANTENIMIENTO | Deploy, Troubleshooting, Rollback | DevOps, SRE | 40 min |
-
----
-
-## 🔍 Índice Temático
-
-### Autenticación y Autorización
-- ARQUITECTURA: "Seguridad - Modelo de Autenticación"
-- SEGURIDAD: "Autenticación Débil", "Autorización Insuficiente"
-- DESPLIEGUE: "Problema: Error de autenticación"
-
-### Base de Datos
-- ARQUITECTURA: "Base de Datos"
-- DESPLIEGUE: "Preparar Base de Datos", "Migraciones de BD", "Problema: BD no accesible"
-
-### Componentes UI
-- COMPONENTES_BLAZOR: "Estructura de Componentes", "Componentes Compartidos"
-- ARQUITECTURA: "Componentes Blazor"
-
-### Despliegue
-- DESPLIEGUE_MANTENIMIENTO: Completo
-- ARQUITECTURA: "Despliegue"
-
-### Flujos de Datos
-- FLUJOS_CASOS_USO: "Flujos Principales"
-- ARQUITECTURA: "Flujo de Datos"
-
-### Monitoreo
-- DESPLIEGUE_MANTENIMIENTO: "Monitoreo y Mantenimiento"
-- SEGURIDAD: Auditoría
-
-### Seguridad
-- SEGURIDAD: Completo
-- ARQUITECTURA: "Seguridad"
-- DESPLIEGUE: Hardening
-
----
-
-## ✅ Checklist de Onboarding Nuevo Developer
-
-- [ ] Clonado el repositorio
-- [ ] Ambiente de desarrollo configurado
-- [ ] Leído ARQUITECTURA.md
-- [ ] Leído documento relevante para su rol
-- [ ] Ejecutó la aplicación localmente
-- [ ] Realizó primer commit
-- [ ] Revisó PR de un compañero
-- [ ] Desplegó a staging (con ayuda)
-
----
-
-## 📞 Contacto y Soporte
-
-### Responsables de Documentación
-- **Arquitecto Principal**: [Nombre]
-- **Security Lead**: [Nombre]
-- **DevOps Lead**: [Nombre]
-
-### Canales de Comunicación
-- 🐛 **Issues**: GitHub Issues
-- 💬 **Preguntas**: Slack #guarino-tech
-- 📧 **Escalaciones**: tech-leads@company.com
-
-### Reportar Errores en Documentación
-1. Crear issue en GitHub con etiqueta `documentation`
-2. Describir qué documento, sección y qué falta/es incorrecto
-3. Proponer solución si es posible
-
----
-
-## 🔄 Mantenimiento de la Wiki
-
-### Actualización de Documentos
-- **Frecuencia**: Cada cambio arquitectónico o al desplegar major version
-- **Responsable**: Arquitecto + autor del cambio
-- **Proceso**: 
-  1. Crear branch `docs/update-xxx`
-  2. Editar documentos
-  3. PR con revisión de mínimo 2 personas
-  4. Merge a master
-
-### Versionado de Documentos
-```
-Versión 1.0 - Base
-├─ Versión 1.1 - Agregado Security Audit
-├─ Versión 1.2 - Agregado Componentes Blazor
-└─ Versión 2.0 - Refactor completo (Q2 2024)
-```
-
-**Última revisión**: 2024-01-XX  
-**Próxima revisión**: 2024-04-XX  
-**Versión**: 1.0
-
----
-
-## 📈 Estadísticas de la Documentación
-
-| Métrica | Valor |
-|---------|-------|
-| **Documentos** | 5 |
-| **Palabras totales** | ~15,000 |
-| **Diagramas** | 30+ |
-| **Casos de uso** | 5 |
-| **Recomendaciones** | 12 |
-| **Riesgos identificados** | 10 |
-
----
-
-## 🎓 Recursos Adicionales
-
-### Documentación Externa
-- [ASP.NET Core Docs](https://docs.microsoft.com/aspnet/core)
-- [Blazor Documentation](https://docs.microsoft.com/aspnet/core/blazor)
-- [Entity Framework Core](https://docs.microsoft.com/ef/core)
-- [MudBlazor Components](https://www.mudblazor.com)
-- [OWASP Top 10](https://owasp.org/www-project-top-ten)
-
-### Herramientas Útiles
-- **Visual Studio 2022** (IDE)
-- **SQL Server Management Studio** (BD)
-- **Postman** (Testing API)
-- **Git Bash** (Control de versiones)
-- **Application Insights** (Monitoreo)
-
-### Videos y Tutoriales
-- [Clean Architecture in .NET](https://www.youtube.com/...)
-- [Blazor Server Deep Dive](https://www.youtube.com/...)
-- [CQRS Pattern](https://www.youtube.com/...)
-
----
-
-## ⭐ Notas Importantes
-
-> ⚠️ **Esta documentación es viva**  
-> Se actualiza continuamente. Siempre revisa la fecha de última actualización.
-
-> 🔐 **Información Sensible**  
-> Los ejemplos de connection strings y credenciales son ficticios.  
-> Usar valores reales solo en ambientes seguros.
-
-> 📋 **Confidencialidad**  
-> Distribuir solo a personal autorizado de GuarinoApp.
-
-> 🚀 **Versión de Aplicación Documentada**  
-> GuarinoApp v1.0 - ASP.NET Core 8 - Blazor Server
-
----
-
-## 🎉 Conclusión
-
-Esta Wiki proporciona una **documentación arquitectónica completa y actualizada** de GuarinoApp. Cada documento está diseñado para ser:
-
-- ✅ **Específico**: Enfocado en un aspecto particular
-- ✅ **Detallado**: Con ejemplos y diagramas
-- ✅ **Accesible**: Para diferentes roles
-- ✅ **Mantenible**: Fácil de actualizar
-- ✅ **Práctico**: Listo para aplicar
-
-**¡Bienvenido al equipo GuarinoApp!** 🚀
-
----
-
-**Documento**: README - Wiki Index  
-**Última actualización**: 2024-01-XX  
-**Versión**: 1.0  
-**Responsable**: Documentación Técnica  
-**Distribución**: Internal Only
----
-
-## Actualizaciones recientes (Oct 2026)
-
-Cambios aplicados al código y reflejados en la documentación:
-
-- **Filtro de módulos por rol (UI)**: `NavMenu.razor` y `Index.razor` muestran los módulos bloqueados con candado y tooltip "Requiere: X — tu rol actual: Y" en lugar de ocultarlos. Componentes nuevos: `Shared/NavLinkSeguro.razor` y `Shared/EnlaceSeguro.razor`. Matriz de acceso por reflexión en `Services/MapaAccesosRutas.cs` (lee `[Authorize]` de las páginas → ruta→ roles). Helper `Services/RolUsuario.cs` resuelve el rol actual con `RoleNames`. Registrado como singleton en `Program.cs`.
-- **RoleNames como fuente única**: constantes `Admin`/`Gerencia`/`Contador`/`Operador` + grupos `Todos`/`Financieros`/`Administracion` + cadenas `*Autorizacion` para `[Authorize]`. Cero literales de rol en `.razor`.
-- **Paginación fija de 25 filas** en las 30 grillas (`RowsPerPage="25"` + `MudTablePager PageSizeOptions="new int[] { 25 }"`). Auditoría usa paginación server-side (`ServerData` + `state.Page/PageSize`).
-- **Filtro IA por rol**: `ConsultaIArestringida` (log) + matriz de roles por tool MCP.
-- **Servidor MCP** (`/mcp`) con `WithHttpTransport()` + middleware Bearer propio (`McpAuthMiddleware`); tools solo lectura; auditoría `McpCall`.
-- **Cero datos inventados**: `GetDummyData`/`GenerarZafrasDummy`/fallbacks eliminados; `EsDummy` siempre `false`; "En nuestro poder" = sin cliente y Estado != Bajado/Despachado.
-- **Autenticación**: Negotiate + Data Protection tokens (`GuarinoApp.Auth.v1`, 12 h, localStorage `auth_token`); lockout 5 fallos/15 min.
-- **Grillas sin paginador** reemplazado por paginación de 25 (instrucción vigente).
-- **Build**: 0 errores / 0 advertencias. UI en español.
-- **Diagramas Mermaid**: 40 bloques en `docs/diagramas.md` y otros archivos (arquitectura, flujos, seguridad, servicios). Renderizan en GitHub, VS Code (con extensión), Obsidian.
-- **Wiki de usuario**: `docs/WIKI_USUARIO.md` con manual funcional por módulo y rol.
-- **Auditoría exhaustiva**: `docs/auditoria-exhaustiva.md` (OWASP + UX + deuda técnica).
-- **Documentación inversa**: `docs/documentacion-inversa.md` (arquitectura, módulos, decisiones, trampas).
+*Manual de usuario de GuarinoApp. Última actualización: Octubre 2026.*
