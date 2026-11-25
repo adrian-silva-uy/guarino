@@ -18,19 +18,30 @@ namespace GuarinoApp.Infrastructure
             {
             if (services == null) throw new ArgumentNullException(nameof(services));
 
+            var entorno = configuration["ASPNETCORE_ENVIRONMENT"] ?? string.Empty;
+            var esTesting = entorno.Equals("Testing", StringComparison.OrdinalIgnoreCase);
+
             // Base de datos.
-            // EnableRetryOnFailure reintenta automáticamente ante errores transitorios
-            // de conexión (frecuentes en SQL Azure o servidores que hibernan/despiertan).
-            // IMPORTANTE: este es el ÚNICO lugar donde se registra ApplicationDbContext.
-            // Si se registra también en Program.cs, un registro puede pisar al otro y
-            // el retry dejar de aplicarse sin que se note en el código.
-            services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseSqlServer(
-                    configuration.GetConnectionString("DefaultConnection"),
-                    sqlServerOptions => sqlServerOptions.EnableRetryOnFailure(
-                        maxRetryCount: 5,
-                        maxRetryDelay: TimeSpan.FromSeconds(30),
-                        errorNumbersToAdd: null)));
+            if (esTesting)
+            {
+                services.AddDbContext<ApplicationDbContext>(options =>
+                    options.UseInMemoryDatabase("GuarinoApp.Tests"));
+            }
+            else
+            {
+                // EnableRetryOnFailure reintenta automáticamente ante errores transitorios
+                // de conexión (frecuentes en SQL Azure o servidores que hibernan/despiertan).
+                // IMPORTANTE: este es el ÚNICO lugar donde se registra ApplicationDbContext.
+                // Si se registra también en Program.cs, un registro puede pisar al otro y
+                // el retry dejar de aplicarse sin que se note en el código.
+                services.AddDbContext<ApplicationDbContext>(options =>
+                    options.UseSqlServer(
+                        configuration.GetConnectionString("DefaultConnection"),
+                        sqlServerOptions => sqlServerOptions.EnableRetryOnFailure(
+                            maxRetryCount: 5,
+                            maxRetryDelay: TimeSpan.FromSeconds(30),
+                            errorNumbersToAdd: null)));
+            }
 
             // Contexto de aplicación
             services.AddScoped<IApplicationDbContext>(provider =>
@@ -57,8 +68,9 @@ namespace GuarinoApp.Infrastructure
             // salud de la IA (servicio/modelo/clave) y actualizaciones pendientes
             // con asunto "Guarino App - logs del día : fecha_hora".
             services.Configure<NotificacionesOptions>(configuration.GetSection(NotificacionesOptions.SectionName));
-            services.AddHostedService<NotificadorAdminService>();
-
+            if (!esTesting)
+                services.AddHostedService<NotificadorAdminService>();
+            
             // --- IA generativa (Ollama) con fallback a datos reales ---
             services.AddOptions<OllamaOptions>()
                 .Bind(configuration.GetSection(OllamaOptions.SectionName))
@@ -79,7 +91,6 @@ namespace GuarinoApp.Infrastructure
 
             services.AddScoped<OllamaAIService>();
             services.AddScoped<IAIService, FallbackAIService>();
-            services.AddHostedService<OllamaStartupService>();
 
             // Auto-reparación silenciosa de la IA local: si la generación falla con
             // 5xx (proceso "colgado") o el proceso deja de responder, lo reinicia,
@@ -87,7 +98,8 @@ namespace GuarinoApp.Infrastructure
             // Notificaciones:EmailAdmin con lo ocurrido y la solución. Mientras
             // tanto los usuarios quedan cubiertos por la IA web / planes
             // predefinidos. Configuración: Ollama:Sanacion.
-            services.AddHostedService<OllamaRecuperacionService>();
+            if (!esTesting)
+                services.AddHostedService<OllamaRecuperacionService>();
 
             // Auto-reparación silenciosa de la BASE DE DATOS: verifica la
             // conexión cada BaseDatos:Sanacion:IntervaloSegundos y, solo si el
@@ -102,7 +114,8 @@ namespace GuarinoApp.Infrastructure
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
             services.AddSingleton<BaseDatosRecuperacionService>();
-            services.AddHostedService(sp => sp.GetRequiredService<BaseDatosRecuperacionService>());
+            if (!esTesting)
+                services.AddHostedService(sp => sp.GetRequiredService<BaseDatosRecuperacionService>());
 
             // Caché de resultados IA: en picos (~20 usuarios) la misma consulta
             // repetida por varias cargas de página se contesta una sola vez y el
@@ -140,8 +153,6 @@ namespace GuarinoApp.Infrastructure
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
             services.AddScoped<IMcpDataService, McpDataService>();
-
-            services.AddHostedService<ClimateMonitoringHostedService>();
 
             // Prompts: única fuente de verdad para cargar plantillas desde
             // Resources/Prompts (usa ContentRootPath, ver PromptProvider).

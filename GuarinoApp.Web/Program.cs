@@ -7,7 +7,9 @@ using GuarinoApp.Infrastructure.Data;
 using GuarinoApp.Infrastructure.Services;
 using GuarinoApp.Web.Mcp;
 using GuarinoApp.Web.Services;
+using GuarinoApp.Web;
 using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
@@ -17,6 +19,11 @@ using System.Globalization;
 CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// La composición de Infrastructure recibe IConfiguration; sincronizamos el
+// nombre efectivo del host para que el entorno Testing pueda aislar su base y
+// sus procesos de fondo sin depender de una variable de entorno externa.
+builder.Configuration["ASPNETCORE_ENVIRONMENT"] = builder.Environment.EnvironmentName;
 
 // ============================================================================
 // USER SECRETS - Datos sensibles (API keys, contraseñas, connection strings)
@@ -30,7 +37,19 @@ builder.Configuration.AddUserSecrets<Program>();
 // Negotiate (Windows Auth) es correcto para app Blazor Server interna en red
 // corporativa. JWT sería para APIs públicas o SPAs, no aplica aquí.
 // ============================================================================
-builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme).AddNegotiate();
+if (builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = TestingAuthenticationHandler.Scheme;
+        options.DefaultChallengeScheme = TestingAuthenticationHandler.Scheme;
+    }).AddScheme<AuthenticationSchemeOptions, TestingAuthenticationHandler>(
+        TestingAuthenticationHandler.Scheme, _ => { });
+}
+else
+{
+    builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme).AddNegotiate();
+}
 builder.Services.AddAuthorization();
 
 // ============================================================================
@@ -100,20 +119,6 @@ builder.Services.AddOptions<EmailOptions>()
     .ValidateOnStart();
 
 // ============================================================================
-// SERVICIOS DE DOMINIO
-// ============================================================================
-builder.Services.AddScoped<IClimateService, OpenMeteoClimateService>();
-builder.Services.AddScoped<IClimateRiskService, ClimateRiskService>();
-
-// ============================================================================
-// BACKGROUND SERVICES
-// ClimateMonitoringHostedService es el servicio canónico de escaneo climático.
-// ClimateDetectionBackgroundService fue removido: era una duplicación exacta
-// de ClimateMonitoringHostedService (mismo intervalo, misma lógica).
-// ============================================================================
-builder.Services.AddHostedService<ClimateMonitoringHostedService>();
-
-// ============================================================================
 // HTTP CLIENT
 // ============================================================================
 builder.Services.AddHttpClient();
@@ -172,6 +177,11 @@ builder.Services.AddStackExchangeRedisCache(options =>
 
 builder.Services.AddScoped<IDistributedCacheService, DistributedCacheService>();
 
+// Servicios de dominio climático requeridos por los handlers MediatR.
+// El escaneo hosted se registra una sola vez en Infrastructure.
+builder.Services.AddScoped<IClimateService, OpenMeteoClimateService>();
+builder.Services.AddScoped<IClimateRiskService, ClimateRiskService>();
+
 // ============================================================================
 // HEALTH CHECKS
 // Monitoreo de SQL Server y Ollama para herramientas de infraestructura.
@@ -180,9 +190,13 @@ builder.Services.AddScoped<IDistributedCacheService, DistributedCacheService>();
 // debe marcar la instancia como no lista. Antes NINGÚN check tenía el tag y
 // /health/ready respondía siempre Healthy (vacío), sin validar nada.
 // ============================================================================
-builder.Services.AddHealthChecks()
-    .AddCheck<SqlServerHealthCheck>("sql-server", tags: new[] { "ready" })
-    .AddCheck<OllamaHealthCheck>("ollama");
+var healthChecks = builder.Services.AddHealthChecks();
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    healthChecks
+        .AddCheck<SqlServerHealthCheck>("sql-server", tags: new[] { "ready" })
+        .AddCheck<OllamaHealthCheck>("ollama");
+}
 
 // ============================================================================
 // RATE LIMITING
@@ -359,41 +373,46 @@ else
         notifOpciones.EmailAdmin, Math.Max(5, notifOpciones.IntervaloMinutos), notifOpciones.Asunto);
 
 // ============================================================================
-// SEED DE BASE DE DATOS (solo Development)
-// Database.Migrate aplica las migraciones pendientes automáticamente en
-// Development, de modo que entornos locales siempre tengan el esquema actual.
+// ESQUEMA Y SEED DE BASE DE DATOS
+// Las migraciones se aplican en todos los entornos. El seed con datos de
+// demostración sigue limitado a Development.
 // ============================================================================
-if (app.Environment.IsDevelopment())
+if (!app.Environment.IsEnvironment("Testing"))
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
-    ApplicationDbContext? context = null;
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-    // Si la base no está disponible (instancia LocalDB detenida/colgada o la
-    // máquina sin memoria — fallo real observado), el sanador de BD deja la
-    // instancia local en condiciones (libera memoria / sqllocaldb start) y se
-    // reintenta hasta 4 veces antes de rendirse, en vez de morir al primer
-    // intento. Con la app arriba, el ciclo del propio sanador se encarga de los
-    // reintentos y los correos de aviso.
-    var sanadorBD = app.Services.GetRequiredService<BaseDatosRecuperacionService>();
-    for (var intento = 1; intento <= 4; intento++)
+    if (app.Environment.IsDevelopment())
     {
-        context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        try
+        var sanadorBD = app.Services.GetRequiredService<BaseDatosRecuperacionService>();
+        for (var intento = 1; intento <= 4; intento++)
         {
-            context.Database.Migrate();
-            break;
-        }
-        catch (Exception ex) when (intento < 4)
-        {
-            logger.LogWarning(ex,
-                "Migrate() falló (intento {Intento}/4); se intenta sanar la base de datos local antes de reintentar...",
-                intento);
-            await sanadorBD.SanearArranqueAsync(CancellationToken.None);
-            await Task.Delay(TimeSpan.FromSeconds(10));
+            try
+            {
+                context.Database.Migrate();
+                break;
+            }
+            catch (Exception ex) when (intento < 4)
+            {
+                logger.LogWarning(ex,
+                    "Migrate() falló (intento {Intento}/4); se intenta sanar la base de datos local antes de reintentar...",
+                    intento);
+                await sanadorBD.SanearArranqueAsync(CancellationToken.None);
+                await Task.Delay(TimeSpan.FromSeconds(10));
+            }
         }
     }
+    else
+    {
+        context.Database.Migrate();
+    }
 
-    DbInitializer.Initialize(context!, notifOpciones.EmailAdmin);
+    if (app.Environment.IsDevelopment())
+        DbInitializer.Initialize(context, notifOpciones.EmailAdmin);
 }
 
 app.Run();
+
+public partial class Program
+{
+}

@@ -1,0 +1,8 @@
+{
+  "solution": {
+    "path": "..\\GuarinoApp.sln",
+    "projects": [
+      "GuarinoApp.Tests\\GuarinoApp.Tests.csproj"
+    ]
+  }
+}

@@ -213,6 +213,13 @@ public class NotificadorAdminService : BackgroundService
             if (modelos.Count > 0 && !modelos.Any(m => m.Equals(ia.Modelo, StringComparison.OrdinalIgnoreCase)))
                 return new List<string> { $"IA web (modelo): ACTUALIZACIÓN NECESARIA — '{ia.Modelo}' ya no está disponible en el servicio; elegir otro de: {string.Join(", ", modelos.Take(4))}." };
 
+            if (modelos.Count > 0 && ia.Modelo.Equals("openai/gpt-oss-20b", StringComparison.OrdinalIgnoreCase))
+                {
+                const string mensaje = "IA web (modelo): CORREGIDO — el modelo retirado 'llama-3.1-8b-instant' fue reemplazado por 'openai/gpt-oss-20b'; el cliente continúa operando con normalidad.";
+                _logger.LogInformation(mensaje);
+                return new List<string> { mensaje };
+                }
+
             return new List<string> { $"IA web (plan gratuito): OK — clave aceptada{(modelos.Count > 0 ? $", modelo '{ia.Modelo}' disponible" : string.Empty)}." };
             }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

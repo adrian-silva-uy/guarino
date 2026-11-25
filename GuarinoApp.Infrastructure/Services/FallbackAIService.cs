@@ -18,7 +18,6 @@ public class FallbackAIService : IAIService
     {
     private readonly OllamaAIService _ollamaService;
     private readonly ILogger<FallbackAIService> _logger;
-    private readonly IPromptProvider _promptProvider;
     private readonly IDashboardDataService _dashboardService;
     private readonly ISkillRegistry _skillRegistry;
     private readonly IMcpDataService _mcpDataService;
@@ -26,13 +25,9 @@ public class FallbackAIService : IAIService
     private readonly IBusinessQueryService _businessQueries;
     private readonly AiResultCache _cache;
 
-    private const string FALLBACK_SUGGESTIONS_KEY = "FallbackSuggestions";
-    private const string FALLBACK_ZAFRA_KEY = "FallbackZafra";
-
     public FallbackAIService(
         OllamaAIService ollamaService,
         ILogger<FallbackAIService> logger,
-        IPromptProvider promptProvider,
         IDashboardDataService dashboardService,
         ISkillRegistry skillRegistry,
         IMcpDataService mcpDataService,
@@ -42,7 +37,6 @@ public class FallbackAIService : IAIService
         {
         _ollamaService = ollamaService;
         _logger = logger;
-        _promptProvider = promptProvider;
         _dashboardService = dashboardService;
         _skillRegistry = skillRegistry;
         _mcpDataService = mcpDataService;
@@ -378,13 +372,6 @@ public class FallbackAIService : IAIService
 
     private async Task<List<BusinessSuggestionDto>> BuildFallbackSuggestionsAsync(BusinessSuggestionRequest request)
         {
-        var template = await _promptProvider.GetPromptAsync(FALLBACK_SUGGESTIONS_KEY);
-
-        if (!string.IsNullOrWhiteSpace(template))
-            {
-            // Plantilla reservada para uso futuro; hoy el fallback usa reglas declarativas abajo.
-            }
-
         var result = new List<BusinessSuggestionDto>();
 
         if (request.PalletsWithoutClient > 0)

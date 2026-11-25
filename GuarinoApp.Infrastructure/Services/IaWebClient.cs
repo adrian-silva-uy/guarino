@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -146,7 +146,7 @@ namespace GuarinoApp.Infrastructure.Services
                     ["reasoning_effort"] = "low"
                     };
                 // NOTA: no se envía response_format=json_object: el modelo del plan
-                // gratuito (openai/gpt-oss-120b) lo rechaza con 400 y Groq aún no lo
+                // gratuito (openai/gpt-oss-20b) lo rechaza con 400 y Groq aún no lo
                 // soporta para modelos de razonamiento. La exigencia de JSON estricto
                 // ya está en todos los prompts ("SOLO JSON válido, sin texto antes ni
                 // después"), así que el contrato de salida se mantiene igual.

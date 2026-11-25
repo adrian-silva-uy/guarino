@@ -91,6 +91,35 @@ namespace GuarinoApp.Infrastructure.Data
                 .Property(f => f.CapacidadInstalada)
                 .HasPrecision(18, 2);
 
+            // --- Precisión para el desglose de costos exportables ---
+            modelBuilder.Entity<CostoDesgloseKg>()
+                .Property(c => c.CostoFrutaPlanta)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<CostoDesgloseKg>()
+                .Property(c => c.CostoPackingManoObra)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<CostoDesgloseKg>()
+                .Property(c => c.CostoCartonEnvases)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<CostoDesgloseKg>()
+                .Property(c => c.CostoEnergiaFrio)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<CostoDesgloseKg>()
+                .Property(c => c.CostoFletePuerto)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<CostoDesgloseKg>()
+                .Property(c => c.CostoOtros)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<CostoDesgloseKg>()
+                .Property(c => c.KgExportablesProyectados)
+                .HasPrecision(18, 2);
+
             // corregir advertencia en Lote
             modelBuilder.Entity<Lote>()
                 .Property(l => l.KilosNetos)
