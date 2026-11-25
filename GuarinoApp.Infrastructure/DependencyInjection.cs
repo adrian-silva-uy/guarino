@@ -183,6 +183,9 @@ namespace GuarinoApp.Infrastructure
             services.AddScoped<ISkill, ProyeccionCajaSkill>();
             services.AddScoped<ISkillRegistry, SkillRegistry>();
 
+            // Guard de dominio del chat y ranking de consultas aceptadas por usuario.
+            services.AddScoped<IBusinessQueryService, ConsultaNegocioService>();
+
             // Filtro IA por rol (capa 1): clasifica la consulta por temas según
             // la matriz de módulos y rechaza con mensaje inteligente + auditoría
             // cuando el rol no puede consultar ese tema. Se invoca en el único

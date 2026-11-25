@@ -23,6 +23,7 @@ public class FallbackAIService : IAIService
     private readonly ISkillRegistry _skillRegistry;
     private readonly IMcpDataService _mcpDataService;
     private readonly IFiltroConsultasIA _filtroConsultas;
+    private readonly IBusinessQueryService _businessQueries;
     private readonly AiResultCache _cache;
 
     private const string FALLBACK_SUGGESTIONS_KEY = "FallbackSuggestions";
@@ -36,6 +37,7 @@ public class FallbackAIService : IAIService
         ISkillRegistry skillRegistry,
         IMcpDataService mcpDataService,
         IFiltroConsultasIA filtroConsultas,
+        IBusinessQueryService businessQueries,
         AiResultCache cache)
         {
         _ollamaService = ollamaService;
@@ -45,6 +47,7 @@ public class FallbackAIService : IAIService
         _skillRegistry = skillRegistry;
         _mcpDataService = mcpDataService;
         _filtroConsultas = filtroConsultas;
+        _businessQueries = businessQueries;
         _cache = cache;
         }
 
@@ -52,6 +55,13 @@ public class FallbackAIService : IAIService
 
     public async Task<string> ChatAsync(string prompt, List<ChatMessage> history)
         {
+        // Guard de dominio: una consulta nueva puede ser escrita libremente,
+        // pero debe mencionar un concepto conocido del negocio. Se ejecuta
+        // antes del saludo, la caché y cualquier ruta de IA.
+        var validacion = await _businessQueries.ValidateAsync(prompt);
+        if (!validacion.IsBusinessRelated)
+            return validacion.RejectionMessage!;
+
         // Saludos y pruebas técnicas sin consulta concreta ("hola",
         // "hola prueba", "buenos días"): respuesta cordial determinista y
         // SIN datos de negocio. Va antes de la ruta IA para que ni el modelo
@@ -71,6 +81,10 @@ public class FallbackAIService : IAIService
         var rechazo = await _filtroConsultas.EvaluarAsync(prompt);
         if (rechazo != null)
             return rechazo;
+
+        // Solo se registran consultas que pasaron el guard de dominio y el
+        // filtro de permisos; las rechazadas nunca aparecen como accesos rápidos.
+        await _businessQueries.RegisterAcceptedAsync(prompt);
 
         // Misma consulta repetida en el período pico (p. ej. el chip de
         // sugerencia que varios usuarios tocan a la vez): respuesta IA al

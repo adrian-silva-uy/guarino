@@ -16,6 +16,7 @@
 @inject Microsoft.Extensions.Logging.ILogger<IAChat> Logger
 @inject GuarinoApp.Application.Common.Interfaces.IAuditService AuditService
 @inject GuarinoApp.Application.Common.Interfaces.ISkillRegistry SkillRegistry
+@inject GuarinoApp.Application.Common.Interfaces.IBusinessQueryService BusinessQueryService
 @inject GuarinoApp.Application.Common.Interfaces.ICurrentUserService CurrentUser
 @implements IDisposable
 
@@ -186,9 +187,7 @@
                     }
                 </MudPaper>
 
-                <!-- Consulta seleccionable: presets de las skills del sistema filtrados
-                     por el rol del usuario (matriz de módulos). No hay texto libre:
-                     el usuario ELIGE la consulta y presiona "Consultar". -->
+                <!-- Consultas conocidas del sistema, filtradas por rol. -->
                 <MudGrid>
                     <MudItem xs="12" md="9">
                         <MudSelect T="string"
@@ -214,6 +213,48 @@
                         </MudButton>
                     </MudItem>
                 </MudGrid>
+
+                <MudTextField @bind-Value="_currentInput"
+                              Label="Nueva consulta sobre el negocio"
+                              Placeholder="Ej.: ¿Cómo evolucionó el stock por variedad?"
+                              Variant="Variant.Outlined"
+                              Lines="2"
+                              Immediate="true"
+                              Disabled="@_isLoading"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.EditNote"
+                              Class="mt-3" />
+                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-1">
+                    Podés escribir una consulta nueva. Solo se procesan temas relacionados con la operación y los datos de Guarino.
+                </MudText>
+
+                @if (_consultasFrecuentes.Any())
+                {
+                    <MudPaper Class="pa-3 mt-3" Outlined="true">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">
+                            Consultas frecuentes
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                            Se ordenan automáticamente por cantidad de uso.
+                        </MudText>
+                        <MudList Dense="true">
+                            @foreach (var consulta in _consultasFrecuentes)
+                            {
+                                <MudListItem Class="cursor-pointer suggestion-item"
+                                             OnClick="@(() => EnviarConsultaFrecuente(consulta))">
+                                    <div class="d-flex align-center" style="gap:8px;">
+                                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" Color="Color.Primary" />
+                                        <MudText Typo="Typo.body2" Class="suggestion-text">@consulta.Text</MudText>
+                                        <MudSpacer />
+                                        <MudChip Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                                            @consulta.UsageCount
+                                        </MudChip>
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudPaper>
+                }
 
                 <!-- Importación de contactos (ISkillConEntrada): necesita texto pegado,
                      por eso conserva su propio recuadro — exclusivo de Admin/Gerencia,
@@ -455,6 +496,7 @@
     private string _currentInput = "";
     private string _textoImportacion = "";
     private List<string> _presets = new();
+    private List<FrequentBusinessQuery> _consultasFrecuentes = new();
     private bool _isLoading = false;
     private int _minConfidence = 70;
     private int _horizonte = 6;
@@ -474,7 +516,7 @@
 
     // Copy de layout (no es prompt ni sugerencia de negocio)
     private const string TextoIntroductorioGeneral =
-        "Elegí una consulta del listado y presioná «Consultar»: stock, empaque, logística, tendencias y más. Las consultas disponibles dependen de tu perfil. También podés usar las sugerencias del panel lateral y, si sos Admin o Gerencia, importar contactos desde texto pegado.";
+         "Elegí una consulta del listado o escribí una nueva relacionada con el negocio: stock, empaque, logística, tendencias y más. Las consultas disponibles dependen de tu perfil. También podés usar las sugerencias del panel lateral y, si sos Admin o Gerencia, importar contactos desde texto pegado.";
     private string _textoIntroductorio = TextoIntroductorioGeneral;
 
     private readonly Dictionary<string, (string Short, string Long)> _recommendedParams = new()
@@ -508,6 +550,7 @@
             _enabledExtras[k] = false;
 
         CargarPresets();
+        await CargarConsultasFrecuentes();
 
         _refrescoEstadoIa = new System.Threading.Timer(
             _ => _ = InvokeAsync(StateHasChanged),
@@ -597,6 +640,7 @@
 
             // Recalcular sugerencias tras interactuar, para mantenerlas frescas
             await GenerarSugerencias();
+            await CargarConsultasFrecuentes();
         }
         catch (Exception ex)
         {
@@ -608,6 +652,11 @@
             _isLoading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task CargarConsultasFrecuentes()
+    {
+        _consultasFrecuentes = (await BusinessQueryService.GetFrequentAsync()).ToList();
     }
 
     /// <summary>
@@ -740,6 +789,15 @@
             return;
 
         _currentInput = sugerencia.Text;
+        await SendMessage();
+    }
+
+    private async Task EnviarConsultaFrecuente(FrequentBusinessQuery consulta)
+    {
+        if (_isLoading || string.IsNullOrWhiteSpace(consulta.Text))
+            return;
+
+        _currentInput = consulta.Text;
         await SendMessage();
     }
 
