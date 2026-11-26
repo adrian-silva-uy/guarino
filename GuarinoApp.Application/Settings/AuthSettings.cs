@@ -15,13 +15,13 @@ public class AuthSettings
     /// </summary>
     public string Mode { get; set; } = "Local";
 
-    /// <summary>Permite que los usuarios se registren desde la pantalla de acceso.</summary>
-    public bool AllowRegistration { get; set; } = true;
+    /// <summary>Permite que los usuarios se registren desde la pantalla de acceso. Deshabilitado por defecto.</summary>
+    public bool AllowRegistration { get; set; } = false;
 
     /// <summary>Vigencia de la sesión (token) expresada en horas.</summary>
     public int TokenValidityHours { get; set; } = 12;
 
-    /// <summary>Rol que se asigna a los usuarios nuevos (el primero siempre es Gerencia).</summary>
+    /// <summary>Rol que se asigna a los usuarios nuevos.</summary>
     public string DefaultRole { get; set; } = RoleNames.Operador;
 
     /// <summary>True cuando la autenticación se hace con la identidad de Windows.</summary>
