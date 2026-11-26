@@ -200,11 +200,8 @@ namespace GuarinoApp.Infrastructure.Services
                 EnableSsl = _options.EnableSsl,
                 UseDefaultCredentials = _options.UseDefaultCredentials
                 };
-            _logger.LogDebug("SMTP -> Host={Host} Port={Port} SmtpUser={SmtpUser} PasswordLength={PasswordLength} UseDefaultCredentials={UseDefaultCredentials}",
-            _options.SmtpServer, _options.SmtpPort,
-            string.IsNullOrWhiteSpace(_options.SmtpUser) ? _options.FromEmail : _options.SmtpUser,
-            _options.Password?.Length ?? 0,
-            _options.UseDefaultCredentials);
+            _logger.LogDebug("SMTP -> Host={Host} Port={Port} UseDefaultCredentials={UseDefaultCredentials}",
+            _options.SmtpServer, _options.SmtpPort, _options.UseDefaultCredentials);
             if (!_options.UseDefaultCredentials)
                 {
                 if (_options.UseOAuth2)
