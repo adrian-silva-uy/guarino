@@ -408,7 +408,7 @@ using (var scope = app.Services.CreateScope())
     }
 
     if (app.Environment.IsDevelopment())
-        DbInitializer.Initialize(context, notifOpciones.EmailAdmin);
+        DbInitializer.Initialize(context, notifOpciones.EmailAdmin, builder.Configuration["SeedUsers:Password"]);
 }
 
 app.Run();
