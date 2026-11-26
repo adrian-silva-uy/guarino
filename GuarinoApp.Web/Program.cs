@@ -329,7 +329,7 @@ app.MapBlazorHub();
 
 // Endpoint MCP (streamable HTTP). Debe ir ANTES del fallback para que /mcp no
 // caiga en la página _Host.
-app.MapMcp("/mcp");
+app.MapMcp("/mcp").RequireRateLimiting("fixed");
 
 app.MapFallbackToPage("/_Host");
 
