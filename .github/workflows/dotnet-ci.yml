@@ -36,5 +36,8 @@ jobs:
       - name: Build
         run: dotnet build GuarinoApp.sln --configuration Release --no-restore
 
+      - name: Install Playwright Chromium and OS dependencies
+        run: pwsh GuarinoApp.Tests/bin/Release/net8.0/playwright.ps1 install --with-deps chromium
+
       - name: Test
         run: dotnet test GuarinoApp.sln --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
