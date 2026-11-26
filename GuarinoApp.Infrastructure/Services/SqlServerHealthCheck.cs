@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using GuarinoApp.Infrastructure.Data;
 
@@ -28,18 +28,14 @@ public class SqlServerHealthCheck : IHealthCheck
         try
         {
             var canConnect = await _context.Database.CanConnectAsync(cancellationToken);
-            
-            if (canConnect)
-            {
-                return HealthCheckResult.Healthy("SQL Server está disponible.");
-            }
-            
-            return HealthCheckResult.Unhealthy("No se pudo conectar a SQL Server.");
+            return canConnect
+                ? HealthCheckResult.Healthy("Base de datos disponible.")
+                : HealthCheckResult.Unhealthy("Base de datos no disponible.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error en health check de SQL Server");
-            return HealthCheckResult.Unhealthy("Error al verificar SQL Server: " + ex.Message);
+            return HealthCheckResult.Unhealthy("No se pudo verificar la base de datos.");
         }
     }
 }
