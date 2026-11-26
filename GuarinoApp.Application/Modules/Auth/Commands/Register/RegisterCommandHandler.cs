@@ -54,9 +54,10 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthSessi
         if (exists)
             return AuthSessionDto.Fail("Ese usuario ya existe. Elegí otro.");
 
-        // El primer usuario de la organización siempre queda como Admin.
-        var hasUsers = await _context.Users.AnyAsync(u => !u.IsDeleted, ct);
-        var roleName = hasUsers ? _authSettings.DefaultRole : RoleNames.Admin;
+        // El registro público nunca concede privilegios administrativos,
+        // ni siquiera cuando la base está vacía. El primer Admin debe crearse
+        // mediante un procedimiento de bootstrap controlado fuera del registro.
+        var roleName = _authSettings.DefaultRole;
 
         // El rol se resuelve contra la tabla Roles (fuente única de verdad).
         var role = await _context.Roles
