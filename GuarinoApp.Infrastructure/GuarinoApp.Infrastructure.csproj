@@ -6,11 +6,7 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);CS9057;CS8613;CS8603;CS1591</NoWarn>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Remove="Services\EfDashboardDataService.cs" />
-    <None Include="Services\EfDashboardDataService.cs" />
-  </ItemGroup>
-  <ItemGroup>
+<ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
