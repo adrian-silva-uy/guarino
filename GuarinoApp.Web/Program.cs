@@ -10,9 +10,11 @@ using GuarinoApp.Web.Services;
 using GuarinoApp.Web;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using MediatR;
 using MudBlazor.Services;
 using System.Globalization;
@@ -21,6 +23,12 @@ using System.Threading.RateLimiting;
 CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
+if (builder.Environment.IsEnvironment("Testing"))
+{
+    // El E2E arranca el proyecto con dotnet run y requiere los static web assets
+    // de MudBlazor/Blazor para ejecutar de verdad los circuitos del navegador.
+    builder.WebHost.UseStaticWebAssets();
+}
 
 // La composición de Infrastructure recibe IConfiguration; sincronizamos el
 // nombre efectivo del host para que el entorno Testing pueda aislar su base y
@@ -62,6 +70,15 @@ builder.Services.AddServerSideBlazor();
 builder.Services.AddMudServices();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+if (builder.Environment.IsEnvironment("Testing"))
+{
+    // En Blazor Server el principal HTTP del request inicial no es el proveedor
+    // de identidad del circuito. Este proveedor aislado permite cubrir la UI
+    // autenticada en pruebas sin alterar la autenticación de Development/Prod.
+    builder.Services.Replace(ServiceDescriptor.Scoped<AuthenticationStateProvider, TestingComponentAuthenticationStateProvider>());
+    builder.Services.Replace(ServiceDescriptor.Scoped<IAuthenticationStateNotifier>(sp =>
+        (IAuthenticationStateNotifier)sp.GetRequiredService<AuthenticationStateProvider>()));
+}
 
 // ============================================================================
 // SERVIDOR MCP (Model Context Protocol)
