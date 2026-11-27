@@ -39,7 +39,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthSessionDto>
 
         // Bloqueo temporal tras fallos consecutivos (fuerza bruta): mientras
         // dure, ni siquiera se consulta la base de datos.
-        if (_intentosLogin.EstaBloqueado(userName, out var liberacionUtc))
+        if (_intentosLogin.EstaBloqueado(userName, out var liberacionUtc, request.ClientAddress))
         {
             await _audit.LogAsync(
                 "LoginBlocked",
@@ -55,7 +55,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthSessionDto>
 
         if (user == null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
         {
-            var bloqueada = _intentosLogin.RegistrarFallo(userName);
+            var bloqueada = _intentosLogin.RegistrarFallo(userName, request.ClientAddress);
             await _audit.LogAsync(
                 "LoginFailed",
                 "Acceso",
@@ -77,7 +77,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthSessionDto>
         }
 
         // Ingreso válido: borra los fallos previos acumulados de esta cuenta.
-        _intentosLogin.RegistrarExito(userName);
+        _intentosLogin.RegistrarExito(userName, request.ClientAddress);
 
         // Registro de actividad del acceso: es best-effort, no debe impedir
         // el inicio de sesión si hay una colación con otra actualización.
@@ -96,7 +96,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthSessionDto>
             UserName = user.UserName,
             FullName = user.FullName,
             Role = user.Role.Name,
-            ExpiresAtUtc = DateTime.UtcNow.AddHours(Math.Max(1, _authSettings.TokenValidityHours))
+            ExpiresAtUtc = DateTime.UtcNow.AddHours(Math.Clamp(_authSettings.TokenValidityHours, 1, 24))
         });
 
         await _audit.LogAsync(

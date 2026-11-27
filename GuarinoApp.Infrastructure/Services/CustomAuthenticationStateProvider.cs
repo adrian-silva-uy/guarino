@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Microsoft.JSInterop;
 using System.Security.Claims;
 
 namespace GuarinoApp.Infrastructure.Services;
@@ -14,8 +13,8 @@ namespace GuarinoApp.Infrastructure.Services;
 /// <summary>
 /// Proveedor de estado de autenticación personalizado.
 ///
-/// Modo Local: valida la sesión desde el token guardado en el navegador
-/// (firmado en el servidor) y la mantiene en memoria durante el circuito.
+/// Modo Local: valida la sesión desde una cookie protegida por el servidor
+/// y la mantiene en memoria durante el circuito.
 ///
 /// Modo Windows: usa la identidad de Windows (Negotiate/AD) cuando está
 /// disponible y, si no, la identidad de respaldo de SecuritySettings.
@@ -33,7 +32,6 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider, IA
     private readonly ICurrentUserState _state;
     private readonly IAuthTokenService _tokenService;
     private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly IJSRuntime _jsRuntime;
     private readonly AuthSettings _authSettings;
     private readonly SecuritySettings _securitySettings;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -43,7 +41,6 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider, IA
         IAuthTokenService tokenService,
         IServiceScopeFactory scopeFactory,
         IHttpContextAccessor httpContextAccessor,
-        IJSRuntime jsRuntime,
         IOptions<AuthSettings> authSettings,
         IOptions<SecuritySettings> securitySettings)
     {
@@ -51,7 +48,6 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider, IA
         _tokenService = tokenService;
         _scopeFactory = scopeFactory;
         _httpContextAccessor = httpContextAccessor;
-        _jsRuntime = jsRuntime;
         _authSettings = authSettings.Value;
         _securitySettings = securitySettings.Value;
     }
@@ -173,12 +169,12 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider, IA
         }, "GuarinoFallback");
     }
 
-    /// <summary>Modo Local: sesión a partir del token guardado en el navegador.</summary>
+    /// <summary>Modo Local: sesión a partir de la cookie protegida del navegador.</summary>
     private async Task<ClaimsIdentity?> BuildLocalIdentityAsync()
     {
         try
         {
-            var token = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", AuthStorage.TokenKey);
+            var token = _httpContextAccessor.HttpContext?.Request.Cookies[AuthStorage.CookieName];
             if (string.IsNullOrWhiteSpace(token))
                 return null;
 

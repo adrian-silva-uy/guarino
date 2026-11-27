@@ -1,16 +1,14 @@
 using System.Security.Claims;
 using GuarinoApp.Application.Common.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace GuarinoApp.Web.Mcp;
 
 /// <summary>
-/// Autenticación del endpoint MCP (/mcp): lee el token de sesión de la app en el
-/// encabezado «Authorization: Bearer &lt;token&gt;» (el mismo token firmado con
-/// Data Protection que emite IAuthTokenService al iniciar sesión y se guarda en
-/// localStorage), lo valida y compone el usuario con su rol real. Así las tools
-/// MCP ven el perfil del usuario vía ICurrentUserService (que en requests HTTP
-/// usa HttpContext.User) y aplican la misma matriz de módulos que la app.
-/// Sin token válido responde 401.
+/// Autenticación del endpoint MCP (/mcp): valida el token de sesión y vuelve
+/// a comprobar en base de datos que el usuario siga activo y que su rol vigente
+/// continúe habilitado. El rol se toma de la base, no del token potencialmente
+/// desactualizado.
 /// </summary>
 public sealed class McpAuthMiddleware
 {
@@ -22,37 +20,54 @@ public sealed class McpAuthMiddleware
     public McpAuthMiddleware(RequestDelegate next, ILogger<McpAuthMiddleware> logger)
         => (_next, _logger) = (next, logger);
 
-    public async Task InvokeAsync(HttpContext context, IAuthTokenService tokenService)
+    public async Task InvokeAsync(
+        HttpContext context,
+        IAuthTokenService tokenService,
+        IApplicationDbContext dbContext)
     {
         var header = context.Request.Headers.Authorization.ToString();
-        if (header.Length > PrefijoBearer.Length
-            && header.StartsWith(PrefijoBearer, StringComparison.OrdinalIgnoreCase))
+        var token = header.Length > PrefijoBearer.Length
+            && header.StartsWith(PrefijoBearer, StringComparison.OrdinalIgnoreCase)
+                ? header[PrefijoBearer.Length..].Trim()
+                : context.Request.Cookies[GuarinoApp.Application.Common.AuthStorage.CookieName];
+        if (!string.IsNullOrWhiteSpace(token))
         {
-            var payload = tokenService.Validate(header[PrefijoBearer.Length..].Trim());
+            var payload = tokenService.Validate(token);
             if (payload is not null && payload.ExpiresAtUtc > DateTime.UtcNow)
             {
-                var claims = new List<Claim>
+                var user = await dbContext.Users
+                    .AsNoTracking()
+                    .Include(u => u.Role)
+                    .FirstOrDefaultAsync(
+                        u => u.UserName == payload.UserName && !u.IsDeleted,
+                        context.RequestAborted);
+
+                if (user is { IsActive: true, Role.IsActive: true })
                 {
-                    new(ClaimTypes.Name, payload.UserName),
-                    new(ClaimTypes.Role, payload.Role),
-                    new("full_name", payload.FullName)
-                };
-                context.User = new ClaimsPrincipal(
-                    new ClaimsIdentity(claims, authenticationType: "GuarinoMcp"));
-                await _next(context);
-                return;
+                    var claims = new List<Claim>
+                    {
+                        new(ClaimTypes.Name, user.UserName),
+                        new(ClaimTypes.Role, user.Role.Name),
+                        new("full_name", user.FullName)
+                    };
+
+                    context.User = new ClaimsPrincipal(
+                        new ClaimsIdentity(claims, authenticationType: "GuarinoMcp"));
+                    await _next(context);
+                    return;
+                }
             }
         }
 
         _logger.LogWarning(
-            "MCP: request al endpoint /mcp sin token de sesión válido (origen {IP}).",
+            "MCP: request al endpoint /mcp sin sesión vigente (origen {IP}).",
             context.Connection.RemoteIpAddress);
 
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
         context.Response.Headers.WWWAuthenticate = "Bearer";
         context.Response.ContentType = "text/plain; charset=utf-8";
         await context.Response.WriteAsync(
-            "Autenticación requerida: envíe el encabezado 'Authorization: Bearer <token>' con el token de sesión de la aplicación.",
+            "Autenticación requerida: envíe un token de sesión vigente.",
             context.RequestAborted);
     }
 }

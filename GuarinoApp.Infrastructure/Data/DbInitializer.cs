@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using GuarinoApp.Application.Common;
@@ -16,7 +16,10 @@ namespace GuarinoApp.Infrastructure.Data
     /// </summary>
     public static class DbInitializer
         {
-        public static void Initialize(ApplicationDbContext context, string? emailAdmin = null)
+        public static void Initialize(
+            ApplicationDbContext context,
+            string? emailAdmin = null,
+            string? seedUserPassword = null)
             {
             var random = new Random(12345);
 
@@ -443,10 +446,10 @@ namespace GuarinoApp.Infrastructure.Data
                 // próximo arranque. El seed se salta esta vez sin tumbar la app.
             }
 
-            // 10.5 Usuarios de aplicación por rol (Gerencia/Contador/Operador).
-            // Sólo si ya existe al menos un usuario: se preserva FR-8 (el primer
-            // usuario creado manualmente es Admin y su contraseña no se toca).
-            SembrarUsuariosDeRol(context);
+            // 10.5 Usuarios de desarrollo por rol. Nunca se usan credenciales
+            // conocidas por defecto: deben configurarse explícitamente mediante
+            // SeedUsers__Password en User Secrets o variable de entorno.
+            SembrarUsuariosDeRol(context, seedUserPassword);
 
             // 10.55 Correo de los Admin: los usuarios creados antes de existir
             // la columna Email quedan con NULL y no recibirían reportes.
@@ -1295,15 +1298,16 @@ VALUES
         // ------------------------------------------------------------------
 
         /// <summary>
-        /// Siembra usuarios de respaldo gerencia/contador/operador con la
-        /// contraseña "Guarino2026" hasheada con el PasswordHasher existente
-        /// (PBKDF2-SHA256, nunca texto plano). Sólo si ya existe al menos un
-        /// usuario: se preserva FR-8 (el primer usuario creado manualmente es
-        /// Admin) y el usuario admin existente jamás se modifica.
+        /// Siembra usuarios de desarrollo sólo cuando se proporciona una
+        /// contraseña explícita y suficientemente larga desde User Secrets o
+        /// una variable de entorno. Sin secreto configurado no crea cuentas.
+        /// Nunca modifica usuarios existentes.
         /// </summary>
-        private static void SembrarUsuariosDeRol(ApplicationDbContext context)
+        private static void SembrarUsuariosDeRol(ApplicationDbContext context, string? seedUserPassword)
             {
-            if (!context.Users.Any())
+            if (!context.Users.Any()
+                || string.IsNullOrWhiteSpace(seedUserPassword)
+                || seedUserPassword.Length < 14)
                 return;
 
             var roles = context.Roles.AsNoTracking().Where(r => !r.IsDeleted && r.IsActive).ToList();
@@ -1335,7 +1339,7 @@ VALUES
                     {
                     UserName = userName,
                     FullName = fullName,
-                    PasswordHash = hasher.Hash("Guarino2026"),
+                    PasswordHash = hasher.Hash(seedUserPassword),
                     RoleId = rol.Id,
                     IsActive = true,
                     ActivatedAt = DateTime.UtcNow,

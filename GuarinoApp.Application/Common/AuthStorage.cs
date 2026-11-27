@@ -1,10 +1,10 @@
 namespace GuarinoApp.Application.Common;
 
 /// <summary>
-/// Claves de almacenamiento local del navegador usadas por la sesión.
+/// Nombre de la cookie HttpOnly usada por la sesión.
 /// </summary>
 public static class AuthStorage
 {
-    /// <summary>Clave donde se guarda el token de sesión en localStorage.</summary>
-    public const string TokenKey = "auth_token";
+    /// <summary>Cookie que transporta el token protegido de sesión.</summary>
+    public const string CookieName = "auth_token";
 }

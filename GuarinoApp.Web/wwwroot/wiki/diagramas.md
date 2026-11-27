@@ -64,9 +64,9 @@ sequenceDiagram
     B->>W: GET /login
     W->>B: Render Login.razor
     U->>B: Ingresa usuario/contraseña
-    B->>W: Mediator.Send(LoginCommand)
+    B->>W: POST /auth/login
     W->>L: Handle
-    L->>CI: EstaBloqueado(usuario)?
+        L->>CI: EstaBloqueado(usuario, IP)?
     alt Bloqueado (5 fallos en 30 min)
         CI-->>L: true
         L->>DB: Audit Log "LoginBlocked"
@@ -75,14 +75,14 @@ sequenceDiagram
     else No bloqueado
         L->>DB: SELECT AppUser WHERE UserName = @u
         alt Password inválido
-            L->>CI: RegistrarFallo(usuario)
+            L->>CI: RegistrarFallo(usuario, IP)
             L->>DB: Audit Log "LoginFailed"
             L-->>W: Fail
         else Password válido
             L->>DB: Audit Log "Login"
-            L->>W: AuthTokenService.Issue (DP, 12 h)
-            W-->>B: token → localStorage "auth_token"
-            B->>W: Redirige a /
+            L->>W: AuthTokenService.Issue (DP, 1 h)
+            W-->>B: Set-Cookie HttpOnly; Secure; SameSite=Lax
+            B->>W: Recarga y abre circuito autenticado
         end
     end
 ```
@@ -325,6 +325,6 @@ Cambios aplicados al código y reflejados en la documentación:
 - **Filtro IA por rol**: `ConsultaIArestringida` (log) + matriz de roles por tool MCP.
 - **Servidor MCP** (`/mcp`) con `WithHttpTransport()` + middleware Bearer propio (`McpAuthMiddleware`); tools solo lectura; auditoría `McpCall`.
 - **Cero datos inventados**: `GetDummyData`/`GenerarZafrasDummy`/fallbacks eliminados; `EsDummy` siempre `false`; "En nuestro poder" = sin cliente y Estado != Bajado/Despachado.
-- **Autenticación**: Negotiate + Data Protection tokens (`GuarinoApp.Auth.v1`, 12 h, localStorage `auth_token`); lockout 5 fallos/15 min.
+- **Autenticación**: Negotiate + token Data Protection en cookie HttpOnly, Secure y SameSite=Lax (1 h); login con límite por IP y por usuario/IP.
 - **Grillas sin paginador** reemplazado por paginación de 25 (instrucción vigente).
 - **Build**: 0 errores / 0 advertencias. UI en español.

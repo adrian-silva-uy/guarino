@@ -629,7 +629,7 @@ Cambios aplicados al código y reflejados en la documentación:
 - **Filtro IA por rol**: `ConsultaIArestringida` (log) + matriz de roles por tool MCP.
 - **Servidor MCP** (`/mcp`) con `WithHttpTransport()` + middleware Bearer propio (`McpAuthMiddleware`); tools solo lectura; auditoría `McpCall`.
 - **Cero datos inventados**: `GetDummyData`/`GenerarZafrasDummy`/fallbacks eliminados; `EsDummy` siempre `false`; "En nuestro poder" = sin cliente y Estado != Bajado/Despachado.
-- **Autenticación**: Negotiate + Data Protection tokens (`GuarinoApp.Auth.v1`, 12 h, localStorage `auth_token`); lockout 5 fallos/15 min.
+- **Autenticación**: Negotiate + token Data Protection en cookie HttpOnly, Secure y SameSite=Lax (1 h); login con límite por IP y por usuario/IP.
 - **Grillas sin paginador** reemplazado por paginación de 25 (instrucción vigente).
 - **Build**: 0 errores / 0 advertencias. UI en español.
 - **Diagramas Mermaid**: 40 bloques en `docs/diagramas.md` y otros archivos (arquitectura, flujos, seguridad, servicios). Renderizan en GitHub, VS Code (con extensión), Obsidian.

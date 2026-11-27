@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <NoWarn>$(NoWarn);NU1903;CS9057;CS8613;CS8603;CS1591</NoWarn>
+    <NoWarn>$(NoWarn);CS9057;CS8613;CS8603;CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Services\EfDashboardDataService.cs" />
@@ -32,8 +32,6 @@
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="QuestPDF" Version="2024.6.0" />
     <PackageReference Include="Microsoft.JSInterop" Version="8.0.0" />
-    <PackageReference Include="System.Security.Cryptography.Cng" Version="5.0.0" />
-    <PackageReference Include="System.Security.Principal.Windows" Version="5.0.0" />        
     <PackageReference Include="Polly" Version="8.4.1" />
   </ItemGroup>
   <ItemGroup>

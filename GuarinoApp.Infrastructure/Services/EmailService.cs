@@ -75,7 +75,7 @@ namespace GuarinoApp.Infrastructure.Services
             catch (Exception ex)
                 {
                 _logger.LogError(ex, "Error cargando template de email '{TemplateFilePath}'", templateFilePath);
-                return EmailResult.Fail($"Error al cargar template: {ex.Message}");
+                return EmailResult.Fail("No se pudo preparar el correo. Contactá al administrador.");
                 }
 
             try
@@ -86,7 +86,7 @@ namespace GuarinoApp.Infrastructure.Services
             catch (Exception ex)
                 {
                 _logger.LogError(ex, "Error enviando email a {To}. Inner: {Inner}", to, ex.InnerException?.Message);
-                return EmailResult.Fail($"Error al enviar email: {ex.Message}" + (ex.InnerException != null ? $" | Detalle: {ex.InnerException.Message}" : string.Empty));
+                return EmailResult.Fail("No se pudo enviar el correo. Contactá al administrador.");
                 }
             }
 
@@ -97,22 +97,32 @@ namespace GuarinoApp.Infrastructure.Services
                 return PdfResult.Fail("El contenido del PDF está vacío.");
                 }
 
+            if (pdfBytes.Length > 50 * 1024 * 1024)
+                return PdfResult.Fail("El PDF supera el tamaño máximo permitido.");
+
             try
                 {
-                if (string.IsNullOrWhiteSpace(outputDirectory))
-                    {
-                    outputDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "GuarinoApp", "Pdfs");
-                    }
+                var allowedRoot = Path.GetFullPath(Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "GuarinoApp", "Pdfs"));
+                outputDirectory = string.IsNullOrWhiteSpace(outputDirectory) ? allowedRoot : Path.GetFullPath(outputDirectory);
+                var rootPrefix = allowedRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+                if (!outputDirectory.Equals(allowedRoot, StringComparison.OrdinalIgnoreCase)
+                    && !outputDirectory.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+                    return PdfResult.Fail("El directorio indicado no está permitido.");
 
-                Directory.CreateDirectory(outputDirectory);
+                var safeDirectory = Path.GetFullPath(outputDirectory);
+                Directory.CreateDirectory(safeDirectory);
 
-                var safeFileName = string.IsNullOrWhiteSpace(fileName)
+                var requestedName = string.IsNullOrWhiteSpace(fileName)
                     ? $"document_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf"
-                    : fileName;
+                    : Path.GetFileName(fileName);
+                var safeFileName = Path.ChangeExtension(requestedName, ".pdf");
 
-                var filePath = Path.Combine(outputDirectory, safeFileName);
+                var filePath = Path.Combine(safeDirectory, safeFileName);
 
-                await File.WriteAllBytesAsync(filePath, pdfBytes).ConfigureAwait(false);
+                await using (var output = new FileStream(filePath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    await output.WriteAsync(pdfBytes).ConfigureAwait(false);
 
                 _logger.LogInformation("PDF creado correctamente en {FilePath}", filePath);
 
@@ -121,7 +131,7 @@ namespace GuarinoApp.Infrastructure.Services
             catch (Exception ex)
                 {
                 _logger.LogError(ex, "Error creando PDF");
-                return PdfResult.Fail($"Error creando PDF: {ex.Message}");
+                return PdfResult.Fail("No se pudo guardar el PDF. Contactá al administrador.");
                 }
             }
 
@@ -200,11 +210,8 @@ namespace GuarinoApp.Infrastructure.Services
                 EnableSsl = _options.EnableSsl,
                 UseDefaultCredentials = _options.UseDefaultCredentials
                 };
-            _logger.LogDebug("SMTP -> Host={Host} Port={Port} SmtpUser={SmtpUser} PasswordLength={PasswordLength} UseDefaultCredentials={UseDefaultCredentials}",
-            _options.SmtpServer, _options.SmtpPort,
-            string.IsNullOrWhiteSpace(_options.SmtpUser) ? _options.FromEmail : _options.SmtpUser,
-            _options.Password?.Length ?? 0,
-            _options.UseDefaultCredentials);
+            _logger.LogDebug("SMTP -> Host={Host} Port={Port} UseDefaultCredentials={UseDefaultCredentials}",
+            _options.SmtpServer, _options.SmtpPort, _options.UseDefaultCredentials);
             if (!_options.UseDefaultCredentials)
                 {
                 if (_options.UseOAuth2)
@@ -263,7 +270,7 @@ namespace GuarinoApp.Infrastructure.Services
             catch (Exception ex)
                 {
                 _logger.LogError(ex, "Error enviando email a {To}. Inner: {Inner}", to, ex.InnerException?.Message);
-                return EmailResult.Fail($"Error enviando email: {ex.Message}" + (ex.InnerException != null ? $" | Detalle: {ex.InnerException.Message}" : string.Empty));
+                return EmailResult.Fail("No se pudo enviar el correo. Contactá al administrador.");
                 }
             }
         }

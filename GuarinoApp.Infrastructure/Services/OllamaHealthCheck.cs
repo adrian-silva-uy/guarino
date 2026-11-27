@@ -27,25 +27,17 @@ public class OllamaHealthCheck : IHealthCheck
         var options = _optionsMonitor.CurrentValue;
 
         if (!options.Enabled)
-        {
-            return Task.FromResult(HealthCheckResult.Degraded("Ollama está deshabilitado en configuración."));
-        }
+            return Task.FromResult(HealthCheckResult.Degraded("Servicio opcional no habilitado."));
 
         if (string.IsNullOrWhiteSpace(options.Url) || string.IsNullOrWhiteSpace(options.Model))
-        {
-            return Task.FromResult(HealthCheckResult.Unhealthy("Ollama:Url o Ollama:Model no están configurados."));
-        }
+            return Task.FromResult(HealthCheckResult.Unhealthy("Servicio de IA no configurado."));
 
         if (_connectionState.IsReady)
-        {
-            return Task.FromResult(HealthCheckResult.Healthy($"Ollama disponible en {options.Url} con modelo {options.Model}."));
-        }
+            return Task.FromResult(HealthCheckResult.Healthy("Servicio de IA disponible."));
 
         if (_connectionState.IsConnected)
-        {
-            return Task.FromResult(HealthCheckResult.Degraded("Ollama conectado pero el modelo no está descargado todavía."));
-        }
+            return Task.FromResult(HealthCheckResult.Degraded("Servicio de IA conectado; inicialización pendiente."));
 
-        return Task.FromResult(HealthCheckResult.Unhealthy("Ollama no está disponible."));
+        return Task.FromResult(HealthCheckResult.Unhealthy("Servicio de IA no disponible."));
     }
 }

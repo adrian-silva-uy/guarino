@@ -3,12 +3,10 @@
 @using Microsoft.AspNetCore.WebUtilities
 @using Microsoft.Extensions.Options
 @using GuarinoApp.Application.Common
+@using GuarinoApp.Application.Modules.Auth.Dtos
 @using GuarinoApp.Application.Settings
-@using GuarinoApp.Application.Modules.Auth.Commands.Login
-@inject IMediator Mediator
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthProvider
-@inject IAuthenticationStateNotifier AuthNotifier
 @inject IJSRuntime JS
 @inject IOptions<AuthSettings> AuthOptions
 
@@ -99,16 +97,14 @@
         _loading = true;
         try
         {
-            var result = await Mediator.Send(new LoginCommand(_userName.Trim(), _password));
+            var result = await JS.InvokeAsync<AuthSessionDto>("guarinoAuth.login", _userName.Trim(), _password);
             if (!result.Success)
             {
                 _error = result.Error;
                 return;
             }
 
-            await JS.InvokeVoidAsync("localStorage.setItem", AuthStorage.TokenKey, result.Token);
-            AuthNotifier.NotifyChanged();
-            Navigation.NavigateTo(GetReturnUrl(), replace: true);
+            Navigation.NavigateTo(GetReturnUrl(), forceLoad: true, replace: true);
         }
         finally
         {

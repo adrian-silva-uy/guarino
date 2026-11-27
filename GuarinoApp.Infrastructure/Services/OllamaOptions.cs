@@ -63,7 +63,7 @@ public class OllamaSanacionOptions
 
     /// <summary>False = solo detecta y avisa por correo (p. ej. si se quiere que el
     /// reinicio lo haga únicamente el gestor de servicios del servidor).</summary>
-    public bool GestionarProceso { get; set; } = true;
+    public bool GestionarProceso { get; set; } = false;
 
     /// <summary>Ruta de ollama.exe. Vacío = se toma del proceso que está corriendo
     /// o se busca en el PATH del sistema/usuario. En producción puede dejarse
