@@ -1,4 +1,3 @@
-using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Modules.RendimientoPacking.Dtos;
 using GuarinoApp.Application.Modules.RendimientoPacking.Queries.GetRendimientoPacking;
