@@ -2,12 +2,10 @@
 @attribute [AllowAnonymous]
 @using Microsoft.Extensions.Options
 @using GuarinoApp.Application.Common
+@using GuarinoApp.Application.Modules.Auth.Dtos
 @using GuarinoApp.Application.Settings
-@using GuarinoApp.Application.Modules.Auth.Commands.Register
-@inject IMediator Mediator
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthProvider
-@inject IAuthenticationStateNotifier AuthNotifier
 @inject IJSRuntime JS
 @inject IOptions<AuthSettings> AuthOptions
 
@@ -118,10 +116,10 @@
         _loading = true;
         try
         {
-            var result = await Mediator.Send(new RegisterCommand(
+            var result = await JS.InvokeAsync<AuthSessionDto>("guarinoAuth.register",
                 _userName ?? string.Empty,
                 _fullName ?? string.Empty,
-                _password ?? string.Empty));
+                _password ?? string.Empty);
 
             if (!result.Success)
             {
@@ -129,10 +127,9 @@
                 return;
             }
 
-            // Registro exitoso: queda con sesión iniciada.
-            await JS.InvokeVoidAsync("localStorage.setItem", AuthStorage.TokenKey, result.Token);
-            AuthNotifier.NotifyChanged();
-            Navigation.NavigateTo("/", replace: true);
+            // La respuesta fijó una cookie HttpOnly; recarga para crear un circuito
+            // Blazor nuevo que ya vea la cookie durante la autenticación inicial.
+            Navigation.NavigateTo("/", forceLoad: true, replace: true);
         }
         finally
         {

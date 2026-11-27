@@ -83,7 +83,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthSessi
             UserName = user.UserName,
             FullName = user.FullName,
             Role = role.Name,
-            ExpiresAtUtc = DateTime.UtcNow.AddHours(Math.Max(1, _authSettings.TokenValidityHours))
+            ExpiresAtUtc = DateTime.UtcNow.AddHours(Math.Clamp(_authSettings.TokenValidityHours, 1, 24))
         });
 
         await _audit.LogAsync(

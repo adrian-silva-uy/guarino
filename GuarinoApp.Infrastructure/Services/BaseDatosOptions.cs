@@ -42,7 +42,7 @@ public class BaseDatosSanacionOptions
 
     /// <summary>False = solo detecta y avisa por correo (p. ej. si el gestor de
     /// servicios del servidor es quien debe levantar la instancia).</summary>
-    public bool GestionarInstancia { get; set; } = true;
+    public bool GestionarInstancia { get; set; } = false;
 
     /// <summary>Cómo se levanta la instancia cuando el destino es local:
     /// "LocalDb" (sqllocaldb, por instancia), "ServicioWindows" (net/sc del

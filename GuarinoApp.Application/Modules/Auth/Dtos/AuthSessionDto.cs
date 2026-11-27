@@ -18,7 +18,7 @@ public class AuthSessionDto
     /// <summary>Rol de la sesión.</summary>
     public string? Role { get; set; }
 
-    /// <summary>Token de sesión a guardar en el navegador.</summary>
+    /// <summary>Token interno de sesión; los endpoints HTTP lo envían solo en cookie HttpOnly.</summary>
     public string? Token { get; set; }
 
     /// <summary>Falla con un mensaje apto para el usuario.</summary>

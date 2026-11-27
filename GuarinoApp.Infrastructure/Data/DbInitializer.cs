@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using GuarinoApp.Application.Common;
@@ -16,7 +16,10 @@ namespace GuarinoApp.Infrastructure.Data
     /// </summary>
     public static class DbInitializer
         {
-        public static void Initialize(ApplicationDbContext context, string? emailAdmin = null, string? seedUserPassword = null)
+        public static void Initialize(
+            ApplicationDbContext context,
+            string? emailAdmin = null,
+            string? seedUserPassword = null)
             {
             var random = new Random(12345);
 

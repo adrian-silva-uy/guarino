@@ -1,5 +1,5 @@
-using Blazored.LocalStorage;
 using GuarinoApp.Application;
+using GuarinoApp.Application.Common;
 using GuarinoApp.Application.Common.Interfaces;
 using GuarinoApp.Application.Settings;
 using GuarinoApp.Infrastructure;
@@ -13,8 +13,10 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using MediatR;
 using MudBlazor.Services;
 using System.Globalization;
+using System.Threading.RateLimiting;
 
 CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
@@ -58,7 +60,6 @@ builder.Services.AddAuthorization();
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddMudServices();
-builder.Services.AddBlazoredLocalStorage();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -71,9 +72,13 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // matriz de módulos con el rol real del token y audita la llamada (McpCall).
 // ============================================================================
 builder.Services.AddScoped<GuarinoMcpTools>();
-builder.Services.AddMcpServer()
-    .WithHttpTransport()
-    .WithTools<GuarinoMcpTools>();
+var mcpEnabled = builder.Configuration.GetValue<bool>("Mcp:Enabled");
+if (mcpEnabled)
+{
+    builder.Services.AddMcpServer()
+        .WithHttpTransport()
+        .WithTools<GuarinoMcpTools>();
+}
 
 // ============================================================================
 // NOTIFICACIONES AL ADMINISTRADOR - captura global de errores para el reporte
@@ -211,6 +216,16 @@ builder.Services.AddRateLimiter(options =>
         limiterOptions.Window = TimeSpan.FromMinutes(1);
         limiterOptions.QueueLimit = 10;
     });
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(5),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
 });
 
 // ============================================================================
@@ -250,8 +265,15 @@ builder.Services.AddCors(options =>
         else
         {
             policy.WithOrigins(corsOrigenes)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
+                  .WithHeaders(
+                      "Accept",
+                      "Authorization",
+                      "Content-Type",
+                      "Last-Event-ID",
+                      "MCP-Protocol-Version",
+                      "Mcp-Session-Id")
+                  .WithMethods("GET", "POST", "DELETE")
+                  .WithExposedHeaders("Mcp-Session-Id", "MCP-Protocol-Version")
                   .AllowCredentials();
         }
     });
@@ -306,14 +328,17 @@ app.UseAuthorization();
 
 // ============================================================================
 // AUTENTICACIÓN DEL ENDPOINT MCP (/mcp)
-// El cliente MCP envía el token de sesión de la app en «Authorization: Bearer
-// <token>». El middleware lo valida y compone HttpContext.User con el rol real,
+// El cliente MCP usa el token protegido de la cookie de sesión o Authorization:
+// Bearer <token>. El middleware lo valida y compone HttpContext.User con el rol real,
 // de modo que las tools apliquen la misma matriz de módulos que la UI. Sin
 // token válido responde 401.
 // ============================================================================
-app.UseWhen(
-    context => context.Request.Path.StartsWithSegments("/mcp"),
-    branch => branch.UseMiddleware<McpAuthMiddleware>());
+if (mcpEnabled)
+{
+    app.UseWhen(
+        context => context.Request.Path.StartsWithSegments("/mcp"),
+        branch => branch.UseMiddleware<McpAuthMiddleware>());
+}
 
 // ============================================================================
 // HEALTH CHECKS ENDPOINTS
@@ -327,9 +352,59 @@ app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.Health
 app.MapRazorPages();
 app.MapBlazorHub();
 
+static CookieOptions AuthCookieOptions(TimeSpan lifetime) => new()
+{
+    HttpOnly = true,
+    Secure = true,
+    SameSite = SameSiteMode.Lax,
+    Path = "/",
+    IsEssential = true,
+    MaxAge = lifetime
+};
+
+app.MapPost("/auth/login", async (
+    GuarinoApp.Application.Modules.Auth.Commands.Login.LoginCommand command,
+    IMediator mediator,
+    HttpContext context,
+    IOptions<AuthSettings> authOptions) =>
+{
+    command = command with { ClientAddress = context.Connection.RemoteIpAddress?.ToString() };
+    var session = await mediator.Send(command, context.RequestAborted);
+    if (!session.Success || string.IsNullOrWhiteSpace(session.Token))
+        return Results.Json(session, statusCode: StatusCodes.Status401Unauthorized);
+
+    var lifetime = TimeSpan.FromHours(Math.Clamp(authOptions.Value.TokenValidityHours, 1, 24));
+    context.Response.Cookies.Append(AuthStorage.CookieName, session.Token, AuthCookieOptions(lifetime));
+    session.Token = null;
+    return Results.Ok(session);
+}).AllowAnonymous().RequireRateLimiting("auth");
+
+app.MapPost("/auth/register", async (
+    GuarinoApp.Application.Modules.Auth.Commands.Register.RegisterCommand command,
+    IMediator mediator,
+    HttpContext context,
+    IOptions<AuthSettings> authOptions) =>
+{
+    var session = await mediator.Send(command, context.RequestAborted);
+    if (!session.Success || string.IsNullOrWhiteSpace(session.Token))
+        return Results.Json(session, statusCode: StatusCodes.Status400BadRequest);
+
+    var lifetime = TimeSpan.FromHours(Math.Clamp(authOptions.Value.TokenValidityHours, 1, 24));
+    context.Response.Cookies.Append(AuthStorage.CookieName, session.Token, AuthCookieOptions(lifetime));
+    session.Token = null;
+    return Results.Ok(session);
+}).AllowAnonymous().RequireRateLimiting("auth");
+
+app.MapPost("/auth/logout", (HttpContext context) =>
+{
+    context.Response.Cookies.Delete(AuthStorage.CookieName, AuthCookieOptions(TimeSpan.Zero));
+    return Results.NoContent();
+}).AllowAnonymous();
+
 // Endpoint MCP (streamable HTTP). Debe ir ANTES del fallback para que /mcp no
 // caiga en la página _Host.
-app.MapMcp("/mcp").RequireRateLimiting("fixed");
+if (mcpEnabled)
+    app.MapMcp("/mcp").RequireRateLimiting("fixed");
 
 app.MapFallbackToPage("/_Host");
 

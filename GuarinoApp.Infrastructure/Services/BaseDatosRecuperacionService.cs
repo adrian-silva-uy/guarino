@@ -503,7 +503,10 @@ public class BaseDatosRecuperacionService : BackgroundService
             if (instancia.Length == 0)
                 instancia = "mssqllocaldb";
 
-            var inicio = await EjecutarComandoAsync("sqllocaldb.exe", $"start \"{instancia}\"", ct);
+            if (!EsNombreWindowsSeguro(instancia))
+                return "El nombre de instancia LocalDB contiene caracteres no permitidos.";
+
+            var inicio = await EjecutarComandoAsync("sqllocaldb.exe", new[] { "start", instancia }, ct);
             if (inicio.ExitCode == 0)
                 return $"Instancia LocalDB '{instancia}' iniciada (sqllocaldb start).";
 
@@ -511,8 +514,8 @@ public class BaseDatosRecuperacionService : BackgroundService
                 "Auto-reparación BD: sqllocaldb start '{Instancia}' devolvió código {Codigo} ({Salida}); se detiene la instancia completa y se relanza limpia.",
                 instancia, inicio.ExitCode, inicio.Salida);
 
-            await EjecutarComandoAsync("sqllocaldb.exe", $"stop \"{instancia}\"", ct);
-            var relanzo = await EjecutarComandoAsync("sqllocaldb.exe", $"start \"{instancia}\"", ct);
+            await EjecutarComandoAsync("sqllocaldb.exe", new[] { "stop", instancia }, ct);
+            var relanzo = await EjecutarComandoAsync("sqllocaldb.exe", new[] { "start", instancia }, ct);
             return relanzo.ExitCode == 0
                 ? $"la instancia LocalDB '{instancia}' no respondió al arranque simple: se detuvo (limpieza de proceso colgado de ESA instancia) y se relanzó limpia."
                 : $"la instancia LocalDB '{instancia}' NO levantó (código {relanzo.ExitCode}: {relanzo.Salida}).";
@@ -523,10 +526,12 @@ public class BaseDatosRecuperacionService : BackgroundService
             var servicio = (opciones.Sanacion.NombreServicio ?? "").Trim();
             if (servicio.Length == 0)
                 return "Motor=ServicioWindows pero BaseDatos:Sanacion:NombreServicio está vacío: no se puede gestionar el servicio (completar la configuración).";
+            if (!EsNombreWindowsSeguro(servicio))
+                return "El nombre de servicio contiene caracteres no permitidos.";
 
             if (opciones.Sanacion.ReiniciarServicio)
                 {
-                var detencion = await EjecutarComandoAsync("sc.exe", $"stop \"{servicio}\"", ct);
+                var detencion = await EjecutarComandoAsync("sc.exe", new[] { "stop", servicio }, ct);
                 // 1062 = ya estaba detenido; cualquier otro código no bloquea:
                 // lo que importa es el arranque de abajo.
                 _logger.LogInformation(
@@ -536,7 +541,7 @@ public class BaseDatosRecuperacionService : BackgroundService
                 catch (OperationCanceledException) { throw; }
                 }
 
-            var arranque = await EjecutarComandoAsync("sc.exe", $"start \"{servicio}\"", ct);
+            var arranque = await EjecutarComandoAsync("sc.exe", new[] { "start", servicio }, ct);
             return arranque.ExitCode == 0
                 ? $"servicio '{servicio}' iniciado{(opciones.Sanacion.ReiniciarServicio ? " (reinicio completo: sc stop + sc start)" : "")}."
                 : $"el servicio '{servicio}' no respondió al arranque (código {arranque.ExitCode}: {arranque.Salida}); requiere intervención manual con privilegios (consola de servicios o sc stop/start).";
@@ -547,15 +552,21 @@ public class BaseDatosRecuperacionService : BackgroundService
 
     /// <summary>Ejecuta un comando de sistema de forma silenciosa con timeout,
     /// capturando código de salida y salida (para log/correo).</summary>
-    private static async Task<(int ExitCode, string Salida)> EjecutarComandoAsync(string archivo, string argumentos, CancellationToken ct)
+    private static bool EsNombreWindowsSeguro(string nombre) =>
+        nombre.Length is > 0 and <= 128
+        && nombre.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-' or '.' or '$');
+
+    private static async Task<(int ExitCode, string Salida)> EjecutarComandoAsync(string archivo, IReadOnlyCollection<string> argumentos, CancellationToken ct)
         {
-        var psi = new ProcessStartInfo(archivo, argumentos)
+        var psi = new ProcessStartInfo(archivo)
             {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
             };
+        foreach (var argumento in argumentos)
+            psi.ArgumentList.Add(argumento);
 
         using var proceso = Process.Start(psi)
             ?? throw new InvalidOperationException($"No se pudo iniciar '{archivo}'.");
@@ -574,7 +585,7 @@ public class BaseDatosRecuperacionService : BackgroundService
             {
             try { proceso.Kill(entireProcessTree: true); } catch { /* ya terminó */ }
             ct.ThrowIfCancellationRequested();
-            return (-1, $"timeout de 60 s ejecutando '{archivo} {argumentos}' (proceso terminado por seguridad).");
+            return (-1, $"timeout de 60 s ejecutando '{archivo}' (proceso terminado por seguridad).");
             }
 
         var salida = (await salidaTask).Trim();

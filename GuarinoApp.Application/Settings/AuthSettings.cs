@@ -19,7 +19,7 @@ public class AuthSettings
     public bool AllowRegistration { get; set; } = false;
 
     /// <summary>Vigencia de la sesión (token) expresada en horas.</summary>
-    public int TokenValidityHours { get; set; } = 12;
+    public int TokenValidityHours { get; set; } = 1;
 
     /// <summary>Rol que se asigna a los usuarios nuevos.</summary>
     public string DefaultRole { get; set; } = RoleNames.Operador;

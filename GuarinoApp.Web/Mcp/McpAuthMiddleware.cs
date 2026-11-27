@@ -26,10 +26,13 @@ public sealed class McpAuthMiddleware
         IApplicationDbContext dbContext)
     {
         var header = context.Request.Headers.Authorization.ToString();
-        if (header.Length > PrefijoBearer.Length
-            && header.StartsWith(PrefijoBearer, StringComparison.OrdinalIgnoreCase))
+        var token = header.Length > PrefijoBearer.Length
+            && header.StartsWith(PrefijoBearer, StringComparison.OrdinalIgnoreCase)
+                ? header[PrefijoBearer.Length..].Trim()
+                : context.Request.Cookies[GuarinoApp.Application.Common.AuthStorage.CookieName];
+        if (!string.IsNullOrWhiteSpace(token))
         {
-            var payload = tokenService.Validate(header[PrefijoBearer.Length..].Trim());
+            var payload = tokenService.Validate(token);
             if (payload is not null && payload.ExpiresAtUtc > DateTime.UtcNow)
             {
                 var user = await dbContext.Users

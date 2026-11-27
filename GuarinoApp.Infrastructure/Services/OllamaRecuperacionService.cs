@@ -420,12 +420,13 @@ public class OllamaRecuperacionService : BackgroundService
             string? errorInicio = null;
             try
                 {
-                var inicio = new ProcessStartInfo(exe, "serve")
+                var inicio = new ProcessStartInfo(exe)
                     {
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     WorkingDirectory = Path.GetDirectoryName(exe) ?? string.Empty
                     };
+                inicio.ArgumentList.Add("serve");
                 Process.Start(inicio)?.Dispose();
                 reinicioDeProceso = true;
                 _logger.LogInformation("Auto-reparación IA local: iniciando {Exe} serve...", exe);
